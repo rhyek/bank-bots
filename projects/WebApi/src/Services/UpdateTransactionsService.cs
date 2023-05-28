@@ -1,7 +1,13 @@
 namespace rhyek.BankApis.WebApi;
 
-public class UpdateTransactionsService(ILogger<UpdateTransactionsService> logger)
+public class UpdateTransactionsService
 {
+    ILogger<UpdateTransactionsService> logger;
+    public UpdateTransactionsService(ILogger<UpdateTransactionsService> logger)
+    {
+        this.logger = logger;
+    }
+
     public async Task Update(int? month = null)
     {
         await Task.Delay(0);

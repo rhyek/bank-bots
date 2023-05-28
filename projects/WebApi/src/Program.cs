@@ -3,6 +3,7 @@ using rhyek.BankApis.WebApi;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+// https://zied-ben-tahar.medium.com/aws-lambda-function-urls-with-net-6-minimal-api-727b6d2087a5
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 
 builder.Services.AddSingleton<UpdateTransactionsService>();
@@ -26,5 +27,12 @@ app.MapPost("/list-transactions", async (ListTransactionsService listTransaction
     }
 );
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
-app.Run($"http://*:{port}");
+if (app.Environment.IsDevelopment())
+{
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
+    app.Run($"http://*:{port}");
+}
+else
+{
+    app.Run();
+}
