@@ -76,7 +76,7 @@ jobs:
       - name: Build and deploy image
         run: |
           image=$(projects/WebApi/build.sh)
-          echo "IMAGE_URI=$image" >> $GITHUB_ENV
+          echo "IMAGE_URI=$image" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
