@@ -29,12 +29,12 @@ app.MapPost("/list-transactions", async (ListTransactionsService listTransaction
     }
 );
 
-if (app.Environment.IsDevelopment())
+if (System.Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME") != null)
 {
-    var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
-    app.Run($"http://*:{port}");
+    app.Run();
 }
 else
 {
-    app.Run();
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
+    app.Run($"http://*:{port}");
 }
