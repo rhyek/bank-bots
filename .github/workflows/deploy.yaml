@@ -105,3 +105,7 @@ jobs:
           work-dir: projects/WebApi/infra
           stack-name: dev
           command: up
+      - name: Check ready status
+        run: |
+          function_url=$(pulumi stack --stack dev output functionUrl)
+          curl -s -o /dev/null -w "%{http_code}" ${function_url}ready | grep 200

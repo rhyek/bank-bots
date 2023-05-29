@@ -13,6 +13,8 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
+app.MapGet("/ready", () => Results.Ok("ok"));
+
 app.MapPost("/update-transactions", async (UpdateTransactionsService updateTransactionsService) =>
     {
         await updateTransactionsService.Update();
