@@ -71,6 +71,8 @@ jobs:
         uses: docker/setup-qemu-action@v2
         with:
           platforms: arm64
+      - name: Expose GitHub Runtime
+        uses: crazy-max/ghaction-github-runtime@v2
       - name: Build and deploy image
         run: |
           image=$(projects/WebApi/build.sh)
