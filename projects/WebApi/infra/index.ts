@@ -16,7 +16,7 @@ const lambda = new aws.lambda.Function('webApiLambda', {
   role: lambdaRole.arn, // provide an IAM role for the Lambda function here
   packageType: 'Image',
   architectures: ['arm64'], // set the architecture you want to use
-  timeout: 10,
+  timeout: 20,
 });
 
 const lambdaUrl = new aws.lambda.FunctionUrl('webApiLambdaUrl', {
