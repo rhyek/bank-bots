@@ -109,3 +109,4 @@ jobs:
         run: |
           function_url=$(pulumi stack --stack dev output functionUrl)
           curl -s -o /dev/null -w "%{http_code}" ${function_url}ready | grep 200
+        working-directory: projects/WebApi/infra
