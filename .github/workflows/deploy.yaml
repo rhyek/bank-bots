@@ -14,7 +14,10 @@ env:
 
 jobs:
   infra:
+    name: Deploy infra
     runs-on: ubuntu-22.04
+    env:
+      PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@v3
       - name: Configure AWS Credentials
@@ -49,5 +52,47 @@ jobs:
           work-dir: infra
           stack-name: dev
           command: up
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+  web-api:
+    name: Deploy web-api
+    runs-on: ubuntu-22.04
+    env:
+      PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+      - uses: pulumi/actions@v4
+      - name: Build and deploy image
+        run: |
+          image=$(projects/WebApi/deploy.sh)
+          echo "IMAGE_URI=$image" >> $GITHUB_ENV
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: latest
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-web-api-infra-${{ hashFiles('projects/WebApi/infra/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-web-api-infra
+      - name: Install node dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: projects/WebApi/infra
+      - uses: pulumi/actions@v4
+        with:
+          work-dir: projects/WebApi/infra
+          stack-name: dev
+          command: up

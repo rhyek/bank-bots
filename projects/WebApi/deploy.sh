@@ -10,7 +10,4 @@ image=$repo_url:$tag
 
 aws ecr get-login-password --region $aws_region | docker login --username AWS --password-stdin $aws_account_id.dkr.ecr.$aws_region.amazonaws.com
 docker buildx build -t $image --push .
-export IMAGE_URI=$image
-
-cd infra
-pulumi up --yes
+echo $image
