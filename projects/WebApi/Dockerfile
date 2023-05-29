@@ -7,7 +7,7 @@ WORKDIR /app
 COPY *.csproj appsettings.json ./
 COPY src/ src/
 RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
-  dotnet publish -r linux-arm64 -c Release -o /publish
+  dotnet publish -r linux-arm64 -c Release --no-self-contained -o /publish
 
 # FROM mcr.microsoft.com/playwright/dotnet:v1.34.0-jammy-arm64
 # FROM ubuntu:22.04
