@@ -13,7 +13,6 @@ docker buildx create --use --driver=docker-container
 docker buildx build \
   --platform linux/arm64 \
   -t $image \
-  # https://github.com/docker/build-push-action/issues/755#issuecomment-1378516116
   --provenance=false \
   --cache-to type=gha,mode=max,scope=web-api \
   --cache-from type=gha,scope=web-api \
