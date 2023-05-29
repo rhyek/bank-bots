@@ -17,4 +17,4 @@ docker buildx build \
   --cache-from type=gha,scope=web-api \
   --push \
   .
-echo $image
+echo $image > image-uri.txt
