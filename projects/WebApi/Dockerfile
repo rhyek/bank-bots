@@ -11,7 +11,7 @@ RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
 
 # FROM mcr.microsoft.com/playwright/dotnet:v1.34.0-jammy-arm64
 # FROM ubuntu:22.04
-FROM mcr.microsoft.com/dotnet/runtime:7.0-jammy
+FROM mcr.microsoft.com/dotnet/aspnet:7.0-jammy
 WORKDIR /app
 COPY --from=build /publish .
 CMD [ "dotnet", "WebApi.dll" ]
