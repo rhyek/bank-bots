@@ -67,9 +67,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_DEFAULT_REGION }}
       - uses: pulumi/actions@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
       - name: Build and deploy image
         run: |
-          image=$(projects/WebApi/deploy.sh)
+          image=$(projects/WebApi/build.sh)
           echo "IMAGE_URI=$image" >> $GITHUB_ENV
       - uses: actions/setup-node@v3
         with:

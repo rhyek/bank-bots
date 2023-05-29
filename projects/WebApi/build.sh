@@ -9,5 +9,5 @@ tag=$(date +%s)
 image=$repo_url:$tag
 
 aws ecr get-login-password --region $aws_region | docker login --username AWS --password-stdin $aws_account_id.dkr.ecr.$aws_region.amazonaws.com
-docker buildx build -t $image --push .
+docker buildx build --platform linux/arm64 -t $image --push .
 echo $image
