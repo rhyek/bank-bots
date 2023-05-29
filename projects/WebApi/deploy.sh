@@ -3,8 +3,8 @@ cd $(dirname "$0")
 set -euo pipefail
 
 aws_account_id=$(aws sts get-caller-identity --query "Account" --output text)
-aws_region=$(cd ../../infra; pulumi config get aws:region)
-repo_url=$(cd ../../infra; pulumi stack output imageRepos | jq -r .webApi.url)
+aws_region=$(cd ../../infra; pulumi config --stack dev get aws:region)
+repo_url=$(cd ../../infra; pulumi stack --stack dev output imageRepos | jq -r .webApi.url)
 tag=$(date +%s)
 image=$repo_url:$tag
 

@@ -54,6 +54,7 @@ jobs:
           command: up
   web-api:
     name: Deploy web-api
+    needs: [infra]
     runs-on: ubuntu-22.04
     env:
       PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
