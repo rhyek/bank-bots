@@ -6,8 +6,10 @@ var builder = WebApplication.CreateBuilder(args);
 // https://zied-ben-tahar.medium.com/aws-lambda-function-urls-with-net-6-minimal-api-727b6d2087a5
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 
-builder.Services.AddSingleton<UpdateTransactionsService>();
-builder.Services.AddSingleton<ListTransactionsService>();
+builder.Services.AddDbContext<BankApisContext>();
+
+builder.Services.AddScoped<UpdateTransactionsService>();
+builder.Services.AddScoped<ListTransactionsService>();
 
 var app = builder.Build();
 

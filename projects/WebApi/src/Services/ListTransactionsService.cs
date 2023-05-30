@@ -1,17 +1,20 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace rhyek.BankApis.WebApi;
 
 public class ListTransactionsService
 {
     ILogger<ListTransactionsService> logger;
+    BankApisContext db;
 
-    public ListTransactionsService(ILogger<ListTransactionsService> logger)
+    public ListTransactionsService(ILogger<ListTransactionsService> logger, BankApisContext db)
     {
         this.logger = logger;
+        this.db = db;
     }
 
-    public Task<List<Transaction>> Get(int? month = null)
+    public async Task<List<Transaction>> Get(int? month = null)
     {
-        logger.LogInformation("hi!");
-        return Task.FromResult(new List<Transaction> { new Transaction("1", 10.00m), new Transaction("2", 20.00m) });
+        return await db.Transactions.ToListAsync();
     }
 }
