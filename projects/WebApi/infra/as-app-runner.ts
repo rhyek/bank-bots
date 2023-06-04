@@ -1,5 +1,8 @@
 import * as aws from '@pulumi/aws';
 
+// https://docs.aws.amazon.com/apprunner/latest/dg/security_iam_service-with-iam.html#security_iam_service-with-iam-roles
+
+// Trust policy for an access role
 const appRunnerEcrRole = new aws.iam.Role('webApiAppRunnerEcrRole', {
   assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
     Service: 'build.apprunner.amazonaws.com',
