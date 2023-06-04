@@ -18,10 +18,11 @@ const appRunner = new aws.apprunner.Service('webApiAppRunner', {
       imageIdentifier: process.env.IMAGE_URI!,
       imageRepositoryType: 'ECR',
     },
+    autoDeploymentsEnabled: false,
   },
   instanceConfiguration: {
     cpu: '512',
-    memory: '1GB',
+    memory: '1 GB',
     instanceRoleArn: appRunnerInstanceRole.arn,
   },
 });
