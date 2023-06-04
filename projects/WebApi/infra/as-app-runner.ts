@@ -2,7 +2,7 @@ import * as aws from '@pulumi/aws';
 
 const appRunnerEcrRole = new aws.iam.Role('webApiAppRunnerEcrRole', {
   assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-    Service: 'tasks.apprunner.amazonaws.com',
+    Service: 'build.apprunner.amazonaws.com',
   }),
 });
 
