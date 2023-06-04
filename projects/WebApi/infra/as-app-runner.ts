@@ -1,14 +1,14 @@
 import * as aws from '@pulumi/aws';
 
-const appRunnerInstanceRole = new aws.iam.Role('webApiAppRunnerInstanceRole', {
+const appRunnerEcrRole = new aws.iam.Role('webApiAppRunnerEcrRole', {
   assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
     Service: 'tasks.apprunner.amazonaws.com',
   }),
 });
 
-new aws.iam.RolePolicyAttachment('webApiAppRunnerInstanceAttachment', {
+new aws.iam.RolePolicyAttachment('webApiAppRunnerEcrRoleAttachment', {
   policyArn: aws.iam.ManagedPolicy.AWSAppRunnerServicePolicyForECRAccess,
-  role: appRunnerInstanceRole.name,
+  role: appRunnerEcrRole.name,
 });
 
 const appRunner = new aws.apprunner.Service('webApiAppRunner', {
@@ -18,12 +18,14 @@ const appRunner = new aws.apprunner.Service('webApiAppRunner', {
       imageIdentifier: process.env.IMAGE_URI!,
       imageRepositoryType: 'ECR',
     },
+    authenticationConfiguration: {
+      accessRoleArn: appRunnerEcrRole.arn,
+    },
     autoDeploymentsEnabled: false,
   },
   instanceConfiguration: {
     cpu: '512',
     memory: '1 GB',
-    instanceRoleArn: appRunnerInstanceRole.arn,
   },
 });
 
