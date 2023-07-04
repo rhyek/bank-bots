@@ -15,6 +15,6 @@ public class ListTransactionsService
 
     public async Task<List<Transaction>> Get(int? month = null)
     {
-        return await db.Transactions.ToListAsync();
+        return await db.Transactions.Include(t => t.Bank).ToListAsync();
     }
 }

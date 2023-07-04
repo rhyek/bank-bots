@@ -15,7 +15,12 @@ public class UpdateTransactionsService
 
     public async Task Update(int? month = null)
     {
-        db.Add(new Transaction { Id = Ulid.NewUlid().ToString(), Amount = new Random().Next(10, 100) });
+        db.Add(new Transaction
+        {
+            Id = Ulid.NewUlid().ToString(),
+            BankId = BankId.BancoIndustrialGt,
+            Amount = new Random().Next(10, 100)
+        });
         await db.SaveChangesAsync();
     }
 }

@@ -1,17 +1,24 @@
 lockfileVersion: '6.0'
 
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
 dependencies:
   '@pulumi/aws':
     specifier: ^5.41.0
     version: 5.41.0
+  '@pulumi/awsx':
+    specifier: ^1.0.2
+    version: 1.0.2
   '@pulumi/pulumi':
     specifier: ^3.0.0
     version: 3.0.0
 
 devDependencies:
   '@types/node':
-    specifier: ^16
-    version: 16.0.0
+    specifier: ^18
+    version: 18.16.19
 
 packages:
 
@@ -20,7 +27,7 @@ packages:
     engines: {node: ^8.13.0 || >=10.10.0}
     dependencies:
       '@grpc/proto-loader': 0.7.7
-      '@types/node': 16.0.0
+      '@types/node': 18.16.19
     dev: false
 
   /@grpc/proto-loader@0.7.7:
@@ -95,6 +102,25 @@ packages:
       resolve: 1.22.2
     dev: false
 
+  /@pulumi/awsx@1.0.2:
+    resolution: {integrity: sha512-gT3piAGSa0ErafYYQ3iu7W175+usJ7fWtmoTcJ+oQW2bpnS+fM6uHro/bJlsBup1Ax2A8ep5Ts9AubPGbq01vA==}
+    requiresBuild: true
+    dependencies:
+      '@pulumi/aws': 5.41.0
+      '@pulumi/docker': 3.6.1
+      '@pulumi/pulumi': 3.0.0
+      '@types/aws-lambda': 8.10.119
+      mime: 2.6.0
+    dev: false
+
+  /@pulumi/docker@3.6.1:
+    resolution: {integrity: sha512-BZME50QkT556v+LvmTXPT8ssB2xxNkp9+msB5xYFEnUnWcdGAx5yUysQw70RJCb+U0GbkJSbxtlgMJgOQf/now==}
+    requiresBuild: true
+    dependencies:
+      '@pulumi/pulumi': 3.0.0
+      semver: 5.7.1
+    dev: false
+
   /@pulumi/pulumi@3.0.0:
     resolution: {integrity: sha512-s9pwbdFrMU8vt4F5aIf8cpnDmHSM5Pn5V2Y7T7m0R14pfxTjCqt5ZAuEdKys0SgL+DxDp5L4Kz/53SXC6MFEEw==}
     engines: {node: '>=8.13.0 || >=10.10.0'}
@@ -121,12 +147,16 @@ packages:
     resolution: {integrity: sha512-xfo+yLRM2zVjVEA4p23IjQWzyWl1ZhWOGobsBqRpIarzLvwNH/RAGaoehdxlhx4X92302DrpdIFgTICMN4P38w==}
     dev: false
 
+  /@types/aws-lambda@8.10.119:
+    resolution: {integrity: sha512-Vqm22aZrCvCd6I5g1SvpW151jfqwTzEZ7XJ3yZ6xaZG31nUEOEyzzVImjRcsN8Wi/QyPxId/x8GTtgIbsy8kEw==}
+    dev: false
+
   /@types/long@4.0.2:
     resolution: {integrity: sha512-MqTGEo5bj5t157U6fA/BiDynNkn0YknVdh48CMPkTSpFTVmvao5UQmm7uEF6xBEo7qIMAlY/JSleYaE6VOdpaA==}
     dev: false
 
-  /@types/node@16.0.0:
-    resolution: {integrity: sha512-TmCW5HoZ2o2/z2EYi109jLqIaPIi9y/lc2LmDCWzuCi35bcaQ+OtUh6nwBiFK7SOu25FAU5+YKdqFZUwtqGSdg==}
+  /@types/node@18.16.19:
+    resolution: {integrity: sha512-IXl7o+R9iti9eBW4Wg2hx1xQDig183jj7YLn8F7udNceyfkbn1ZxmzZXuak20gR40D7pIkIY1kYGx5VIGbaHKA==}
 
   /ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -762,7 +792,7 @@ packages:
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
       '@types/long': 4.0.2
-      '@types/node': 16.0.0
+      '@types/node': 18.16.19
       long: 4.0.0
     dev: false
 
@@ -781,7 +811,7 @@ packages:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
-      '@types/node': 16.0.0
+      '@types/node': 18.16.19
       long: 5.2.3
     dev: false
 

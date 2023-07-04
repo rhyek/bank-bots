@@ -1,7 +1,9 @@
 namespace rhyek.BankApis.WebApi;
 
-public class Transaction
+public class Transaction : EntityBase
 {
-    public string Id { get; set; }
-    public decimal Amount { get; set; }
+    public required string Id { get; set; }
+    public Bank Bank { get; set; } = null!;
+    public BankId BankId { get; set; }
+    public required decimal Amount { get; set; }
 }

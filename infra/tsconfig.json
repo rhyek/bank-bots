@@ -8,6 +8,6 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "bin"
-  },
-  "files": ["index.ts"]
+  }
+  // "files": ["src/index.ts"]
 }
