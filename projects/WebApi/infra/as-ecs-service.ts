@@ -43,6 +43,8 @@ new aws.ec2.SecurityGroupRule('webApiAlbToEcsSecurityGroupRule', {
   sourceSecurityGroupId: albSecurityGroup.id,
 });
 
+const healthCheckPath = '_health';
+
 const alb = new awsx.lb.ApplicationLoadBalancer('webApiAppLoadBalancer', {
   internal: false,
   // securityGroups: [ecsSecurityGroupId],
@@ -54,7 +56,7 @@ const alb = new awsx.lb.ApplicationLoadBalancer('webApiAppLoadBalancer', {
     targetType: 'instance',
     healthCheck: {
       enabled: true,
-      path: '/_health',
+      path: `/${healthCheckPath}`,
       port: 'traffic-port',
       protocol: 'HTTP',
       interval: 5,
@@ -110,4 +112,5 @@ const service = new aws.ecs.Service('webApiAppSvc', {
   ],
 });
 
-export const appLoadBalancerUrl = alb.loadBalancer.dnsName;
+export const appHost = alb.loadBalancer.dnsName;
+export const healthCheckUrl = pulumi.interpolate`http://${appHost}/${healthCheckPath}`;
