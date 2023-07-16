@@ -67,10 +67,12 @@ const alb = new awsx.lb.ApplicationLoadBalancer('webApiAppLoadBalancer', {
   },
 });
 
+const containerName = 'web-api';
+
 const taskDefinition = new aws.ecs.TaskDefinition('webApiAppTaskDef', {
   containerDefinitions: pulumi.jsonStringify([
     {
-      name: 'web-api',
+      name: containerName,
       image: process.env.IMAGE_URI,
       memory: 256,
       logConfiguration: {
@@ -106,7 +108,7 @@ const service = new aws.ecs.Service('webApiAppSvc', {
   loadBalancers: [
     {
       targetGroupArn: alb.defaultTargetGroup.arn,
-      containerName: 'web-api',
+      containerName: containerName,
       containerPort: 3000,
     },
   ],
