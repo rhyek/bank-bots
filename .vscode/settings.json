@@ -1,5 +1,5 @@
 {
-  "dotnet.defaultSolution": "projects/WebApi/WebApi.sln",
+  "dotnet.defaultSolution": "projects/BankApis.sln",
   "github.copilot.enable": {
     "*": true
   },
