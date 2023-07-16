@@ -8,21 +8,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="55f39c10-5238-4e1a-b0eb-c14c2f3665be" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Migrations/20230701235702_Bank.Designer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Migrations/20230701235702_Bank.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Migrations/20230702000951_BancoIndustrialGT.Designer.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Migrations/20230702000951_BancoIndustrialGT.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/WebApi.sln" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/Db/Models/Bank.cs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/Enums/BankId.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../infra/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../../infra/pnpm-lock.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Migrations/BankApisContextModelSnapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Migrations/BankApisContextModelSnapshot.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/WebApi.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/WebApi.csproj" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/build.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image-uri.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../.github/workflows/deploy.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.github/workflows/deploy.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../.vscode/settings.json" beforeDir="false" afterPath="$PROJECT_DIR$/../../.vscode/settings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../infra/src/ecs-cluster.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../../infra/src/ecs-cluster.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/infra/as-ecs-service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/infra/as-ecs-service.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/infra/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/infra/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Db/DbContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/Db/DbContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Db/Models/Transaction.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/Db/Models/Transaction.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Program.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/Program.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Services/UpdateTransactionsService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/Services/UpdateTransactionsService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/infra/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/infra/pnpm-lock.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,28 +36,28 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_ADD_EXTERNAL_FILES": "true",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "pnpm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_ADD_EXTERNAL_FILES&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;pnpm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "rider.external.source.directories": [
-      "/Users/carlos/Library/Application Support/JetBrains/Rider2023.1/resharper-host/DecompilerCache",
-      "/Users/carlos/Library/Application Support/JetBrains/Rider2023.1/resharper-host/SourcesCache",
-      "/Users/carlos/.local/share/Symbols/src"
+  &quot;keyToStringList&quot;: {
+    &quot;rider.external.source.directories&quot;: [
+      &quot;/Users/carlos/Library/Application Support/JetBrains/Rider2023.1/resharper-host/DecompilerCache&quot;,
+      &quot;/Users/carlos/Library/Application Support/JetBrains/Rider2023.1/resharper-host/SourcesCache&quot;,
+      &quot;/Users/carlos/.local/share/Symbols/src&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected="dotnet-watch.WebApi">
     <configuration name="WebApi: http" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
       <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/WebApi.csproj" />
@@ -103,6 +97,7 @@
       <option name="presentableId" value="Default" />
       <updated>1688227008427</updated>
       <workItem from="1688227009764" duration="7424000" />
+      <workItem from="1688266574410" duration="4777000" />
     </task>
     <servers />
   </component>

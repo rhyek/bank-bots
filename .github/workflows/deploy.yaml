@@ -75,7 +75,7 @@ jobs:
         uses: crazy-max/ghaction-github-runtime@v2
       - name: Build and deploy image
         run: |
-          ./build.sh
+          ./build.py
           image=$(cat ./image-uri.txt)
           echo "IMAGE_URI=$image" >> "$GITHUB_ENV"
         working-directory: projects/WebApi
