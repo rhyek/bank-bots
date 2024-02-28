@@ -2,7 +2,10 @@ import * as aws from '@pulumi/aws';
 
 const webApiImageRepo = new aws.ecr.Repository('web-api-image-repo');
 const biRegisterNewBiTxPushNotificationImageRepo = new aws.ecr.Repository(
-  'bi-register-new-bi-tx-push-notification-image-repo'
+  'bi-register-new-bi-tx-push-notification-image-repo',
+  {
+    forceDelete: true,
+  }
 );
 
 export const imageRepos = {

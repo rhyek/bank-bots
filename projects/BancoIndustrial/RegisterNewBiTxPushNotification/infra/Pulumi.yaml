@@ -1,6 +1,0 @@
-name: bank-apis.bi.register-new-bi-tx-push-notification
-description: A minimal AWS TypeScript Pulumi program
-runtime:
-  name: nodejs
-  options:
-    nodeargs: '--loader tsx --no-warnings'
