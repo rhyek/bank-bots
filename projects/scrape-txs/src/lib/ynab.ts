@@ -19,12 +19,14 @@ function log(message: string, data: any) {
 
 export async function updateYnab({
   ynabConfig,
-  bankAccountsWithTransactions,
   bankKey,
+  bankAccountsWithTransactions,
+  dryRun,
 }: {
   ynabConfig: YnabConfig;
-  bankAccountsWithTransactions: BankAccountWithTransactions[];
   bankKey: string;
+  bankAccountsWithTransactions: BankAccountWithTransactions[];
+  dryRun: boolean;
 }) {
   const api = new ynab.API(ynabConfig.accessToken);
   for (const {
@@ -94,10 +96,10 @@ export async function updateYnab({
         ynabTxCreates.push({
           account_id: ynabAccountId,
           date: dayjs()
-            .year(year)
-            .month(month - 1)
+            .year(bankTransaction.year)
+            .month(bankTransaction.month - 1)
             .date(bankTransaction.date)
-            .toISOString(),
+            .format('YYYY-MM-DD'),
           amount: bankTransaction.amount,
           memo: JSON.stringify({
             ref: bankTransaction.ref,
@@ -107,6 +109,10 @@ export async function updateYnab({
         });
       } else {
         const { ynabTx } = ynabTxEntry;
+
+        if (ynabTx.approved) {
+          continue;
+        }
 
         type TxData = Omit<SaveTransactionWithId, 'id'>;
         const updateData: {
@@ -145,15 +151,17 @@ export async function updateYnab({
         }
       }
     }
-    if (ynabTxCreates.length > 0) {
-      await api.transactions.createTransactions(ynabConfig.budgetId, {
-        transactions: ynabTxCreates,
-      });
-    }
-    if (ynabTxUpdates.length > 0) {
-      await api.transactions.updateTransactions(ynabConfig.budgetId, {
-        transactions: ynabTxUpdates,
-      });
+    if (!dryRun) {
+      if (ynabTxCreates.length > 0) {
+        await api.transactions.createTransactions(ynabConfig.budgetId, {
+          transactions: ynabTxCreates,
+        });
+      }
+      if (ynabTxUpdates.length > 0) {
+        await api.transactions.updateTransactions(ynabConfig.budgetId, {
+          transactions: ynabTxUpdates,
+        });
+      }
     }
     if (ynabTxCreates.length === 0 && ynabTxUpdates.length === 0) {
       console.log('No transactions to create or update');

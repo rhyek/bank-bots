@@ -3,5 +3,5 @@
   "compilerOptions": {
     "lib": ["ESNext", "DOM"]
   },
-  "include": ["**/*.ts", "../types/**/*.ts"]
+  "include": ["**/*.ts", "../types/**/*.ts", "../@shared/**/*.ts"]
 }

@@ -1,16 +1,19 @@
 {
-  "name": "scrape-bi-confirmed-txs",
+  "name": "scrape-txs",
   "type": "module",
   "devDependencies": {
     "@tsconfig/node20": "~20.1.2",
     "@tsconfig/strictest": "~2.0.3",
     "@types/bun": "^1.0.8",
+    "@types/lodash": "^4.17.0",
     "@types/node": "^20.11.20",
-    "typescript": "^5.0.4"
+    "typescript": "^5.4.2"
   },
   "dependencies": {
+    "commander": "^12.0.0",
     "dayjs": "~1.11.10",
     "decimal.js": "^10.4.3",
+    "lodash": "^4.17.21",
     "playwright": "~1.41.2",
     "ynab": "^2.2.0",
     "zod": "^3.22.4"
