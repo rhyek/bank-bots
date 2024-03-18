@@ -11,4 +11,5 @@ docker buildx build \
   -f ./Dockerfile \
   --cache-to type=gha,scope=scrape-txs,mode=max \
   --cache-from type=gha,scope=scrape-txs \
+  --provenance false \
   $__dirname/../

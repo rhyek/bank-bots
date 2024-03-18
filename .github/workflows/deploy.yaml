@@ -60,12 +60,6 @@ jobs:
           workspace-id: ws-pftgvrxWKzhd2z9z
           outputs: |
             ecr_repository_scrape_txs_url
-
-      # - name: Outputs
-      #   uses: hashicorp/tfc-workflows-github/actions/workspace-output@v1.0.0
-      #   id: outputs
-      #   with:
-      #     workspace: ${{ env.TF_WORKSPACE }}
   deploy-scrape-txs:
     name: Deploy Scrape Bank Transactions
     runs-on: ubuntu-22.04
