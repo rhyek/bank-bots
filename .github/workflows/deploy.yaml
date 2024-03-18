@@ -15,8 +15,8 @@ env:
   FORCE_COLOR: 1
 
 jobs:
-  terraform-apply:
-    name: Terraform Apply
+  terraform:
+    name: Terraform
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -60,7 +60,7 @@ jobs:
       - uses: dnsbty/get-terraform-outputs-action@v1.1
         with:
           api-token: ${{ secrets.TF_API_TOKEN }}
-          workspace-id: ${{ env.TF_WORKSPACE }}
+          workspace-id: ws-pftgvrxWKzhd2z9z
           outputs: |
             ecr_repository_scrape_txs_url
 
