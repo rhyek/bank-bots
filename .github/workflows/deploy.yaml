@@ -89,7 +89,9 @@ jobs:
       - name: Build, tag, and push Docker image
         run: ./build/build.sh
       - name: Install Serverless standalone
-        run: curl -o- -L https://slss.io/install | bash
+        run: |
+          curl -o- -L https://slss.io/install | bash
+          echo "$HOME/.serverless/bin" >> $GITHUB_PATH
       - name: Deploy with Serverless
         run: |
           cd ./deploy
