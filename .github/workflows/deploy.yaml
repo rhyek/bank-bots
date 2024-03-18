@@ -58,6 +58,7 @@ jobs:
       #     aws-region: ${{ vars.AWS_DEFAULT_REGION }}
 
       - uses: dnsbty/get-terraform-outputs-action@v1.1
+        id: terraform-outputs
         with:
           api-token: ${{ secrets.TF_API_TOKEN }}
           workspace-id: ws-pftgvrxWKzhd2z9z
