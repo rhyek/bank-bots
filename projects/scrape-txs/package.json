@@ -4,17 +4,23 @@
   "devDependencies": {
     "@tsconfig/node20": "~20.1.2",
     "@tsconfig/strictest": "~2.0.3",
+    "@types/aws-lambda": "^8.10.136",
     "@types/bun": "^1.0.8",
     "@types/lodash": "^4.17.0",
     "@types/node": "^20.11.20",
+    "@types/pg": "^8.11.2",
+    "kysely-codegen": "^0.14.0",
     "typescript": "^5.4.2"
   },
   "dependencies": {
     "commander": "^12.0.0",
     "dayjs": "~1.11.10",
     "decimal.js": "^10.4.3",
+    "kysely": "^0.27.3",
     "lodash": "^4.17.21",
-    "playwright": "~1.41.2",
+    "pg": "^8.11.3",
+    "playwright": "1.41.1",
+    "playwright-aws-lambda": "^0.10.0",
     "ynab": "^2.2.0",
     "zod": "^3.22.4"
   }

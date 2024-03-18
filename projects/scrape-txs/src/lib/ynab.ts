@@ -1,7 +1,7 @@
 import ynab, { type SaveTransaction, type SaveTransactionWithId } from 'ynab';
 import dayjs from 'dayjs';
 import Decimal from 'decimal.js';
-import type { BankAccountWithTransactions } from '../../../types/types';
+import type { BankAccountWithTransactions } from './types';
 
 export type YnabConfig = {
   accessToken: string;

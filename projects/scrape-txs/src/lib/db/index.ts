@@ -1,10 +1,10 @@
 import { Kysely, PostgresDialect, type InsertObject } from 'kysely';
-import { type DB } from 'kysely-codegen';
 import { Pool } from 'pg';
+import { type DB } from './codegen';
 
 export type { DB, InsertObject };
 
-export const kysely = new Kysely<DB>({
+export const db = new Kysely<DB>({
   dialect: new PostgresDialect({
     pool: new Pool({
       connectionString: process.env.DATABASE_URL,

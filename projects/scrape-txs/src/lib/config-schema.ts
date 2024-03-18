@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AccountType } from '../../../types/types';
+import { AccountType } from './types';
 
 export const configSchema = z.object({
   banks: z.object({

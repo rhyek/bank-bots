@@ -1,7 +1,7 @@
 import path from 'node:path';
 import dayjs, { Dayjs } from 'dayjs';
 import { program } from 'commander';
-import { updateYnab } from './lib/ynab';
+// import { updateYnab } from './lib/ynab';
 import { configSchema } from './lib/config-schema';
 import { bancoIndustrialScrape } from './lib/banco-industrial/scrape';
 

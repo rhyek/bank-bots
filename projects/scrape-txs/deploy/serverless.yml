@@ -1,0 +1,12 @@
+service: scrape-txs-scheduled-lambda
+frameworkVersion: '3'
+
+provider:
+  name: aws
+
+functions:
+  cronHandler:
+    image: ${env:ECR_REPO_URL}:${env:IMAGE_TAG}
+    events:
+      # Invoke Lambda function every day at 7am
+      - schedule: cron(0 7 * * ? *)

@@ -1,13 +1,14 @@
 import type dayjs from 'dayjs';
-import { chromium, type Page } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
+import { launchChromium } from 'playwright-aws-lambda';
 import { groupBy } from 'lodash';
 import Decimal from 'decimal.js';
-import type { AccountType } from '../../../../types/types';
-import {
-  kysely,
-  type InsertObject,
-  type DB,
-} from '../../../../@shared/db/kysely';
+import type { AccountType } from '../types';
+import { db, type InsertObject, type DB } from '../db';
+
+function isLambda() {
+  return !!process.env['AWS_LAMBDA_FUNCTION_NAME'];
+}
 
 function waitRandomMs() {
   const randomMilliSeconds =
@@ -27,9 +28,13 @@ async function login(auth: {
   username: string;
   password: string;
 }) {
-  const browser = await chromium.launch({
-    headless: false,
-  });
+  const browser = isLambda()
+    ? ((await launchChromium({
+        headless: true,
+      })) as Browser)
+    : await chromium.launch({
+        headless: false,
+      });
   const context = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -196,7 +201,7 @@ export async function bancoIndustrialScrape({
       console.log(
         `Inserting/updating ${bankTxs.length} Banco Industrial GT transactions...`
       );
-      await kysely.transaction().execute(async (sqlTx) => {
+      await db.transaction().execute(async (sqlTx) => {
         await Promise.all(
           bankTxs.map(async (bankTx) => {
             await sqlTx
