@@ -15,18 +15,19 @@ env:
   FORCE_COLOR: 1
 
 jobs:
-  infra:
-    name: Infrastructure
+  terraform-apply:
+    name: Terraform Apply
     runs-on: ubuntu-22.04
     permissions:
       contents: read
     env:
-      TF_CLOUD_ORGANIZATION: 'rhyek'
-      TF_API_TOKEN: '${{ secrets.TF_API_TOKEN }}'
+      TF_CLOUD_ORGANIZATION: rhyek
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
       TF_WORKSPACE: 'bank-bots-dev'
       CONFIG_DIRECTORY: './infra'
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
       - name: Upload Configuration
         uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.0.0
@@ -55,3 +56,22 @@ jobs:
       #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
       #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       #     aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+
+      - uses: dnsbty/get-terraform-outputs-action@v1.1
+        with:
+          api-token: ${{ secrets.TF_API_TOKEN }}
+          workspace-id: ${{ env.TF_WORKSPACE }}
+          outputs: |
+            ecr_repository_scrape_txs_url
+
+      # - name: Outputs
+      #   uses: hashicorp/tfc-workflows-github/actions/workspace-output@v1.0.0
+      #   id: outputs
+      #   with:
+      #     workspace: ${{ env.TF_WORKSPACE }}
+  # deploy-scrape-txs:
+  #   name: Deploy Scrape Bank Transactions
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v3
