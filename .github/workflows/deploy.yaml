@@ -76,16 +76,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Set build params
-        run: |
-          echo "ECR_REPO_URL=${{ needs.terraform.outputs.ecr_repository_scrape_txs_url }}" >> $GITHUB_ENV
-          echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+      - name: Set build params
+        run: |
+          echo "ECR_REPO_URL=${{ needs.terraform.outputs.ecr_repository_scrape_txs_url }}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
+      - name: Expose GitHub Runtime
+        uses: crazy-max/ghaction-github-runtime@v3
       - name: Build, tag, and push Docker image
         run: ./build/build.sh
       - name: Install Serverless
