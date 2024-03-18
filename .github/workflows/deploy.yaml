@@ -52,12 +52,6 @@ jobs:
         with:
           run: ${{ steps.apply-run.outputs.run_id }}
           comment: 'Apply Run from GitHub Actions CI ${{ github.sha }}'
-      # - name: Configure AWS Credentials
-      #   uses: aws-actions/configure-aws-credentials@v2
-      #   with:
-      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     aws-region: ${{ vars.AWS_DEFAULT_REGION }}
 
       - uses: dnsbty/get-terraform-outputs-action@v1.1
         id: terraform-outputs
@@ -76,6 +70,9 @@ jobs:
     name: Deploy Scrape Bank Transactions
     runs-on: ubuntu-22.04
     needs: terraform
+    defaults:
+      run:
+        working-directory: ./projects/scrape-txs
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -83,3 +80,17 @@ jobs:
         run: |
           echo "ECR_REPO_URL=${{ needs.terraform.outputs.ecr_repository_scrape_txs_url }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+      - name: Build, tag, and push Docker image
+        run: ./build/build.sh
+      - name: Install Serverless standalone
+        run: curl -o- -L https://slss.io/install | bash
+      - name: Deploy with Serverless
+        run: |
+          cd ./deploy
+          serverless deploy
