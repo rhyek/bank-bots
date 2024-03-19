@@ -2,8 +2,6 @@ import { Kysely, PostgresDialect, type InsertObject } from 'kysely';
 import pg from 'pg';
 import type { DB } from './codegen';
 
-console.log('pg', pg);
-
 export type { DB, InsertObject };
 
 export const db = new Kysely<DB>({

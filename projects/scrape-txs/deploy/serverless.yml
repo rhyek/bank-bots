@@ -7,7 +7,7 @@ provider:
 functions:
   cronHandler:
     image: ${env:ECR_REPO_URL}:${env:IMAGE_TAG}
-    memorySize: 512
+    memorySize: 1024
     timeout: 300 # 5 minutes
     environment:
       DATABASE_URL: ${env:DATABASE_URL}
