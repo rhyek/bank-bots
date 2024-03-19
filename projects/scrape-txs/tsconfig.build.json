@@ -3,5 +3,8 @@
   "compilerOptions": {
     "outDir": "dist",
     "noEmit": false
+  },
+  "tsc-alias": {
+    "resolveFullPaths": true
   }
 }
