@@ -12,34 +12,33 @@ const { data: configJson } = await db
   .executeTakeFirstOrThrow();
 const config = configSchema.parse(configJson);
 
-console.log('x', config.banks.bancoIndustrialGt);
+program.option('-m, --month <months...>', 'Month(s) to scrape');
 
-// program.option('-m, --month <months...>', 'Month(s) to scrape');
+program.parse();
 
-// program.parse();
+const options = program.opts<{
+  month?: string[];
+}>();
 
-// const options = program.opts<{
-//   month?: string[];
-// }>();
+const months: Dayjs[] = [];
 
-// const months: Dayjs[] = [];
-
-// if (options.month) {
-//   months.push(...options.month.map((month) => dayjs(month)));
-// } else {
-//   const today = dayjs(new Date());
-//   months.unshift(today);
-//   if (today.date() <= 10) {
-//     months.unshift(today.subtract(1, 'month'));
-//   }
-// }
+if (options.month) {
+  months.push(...options.month.map((month) => dayjs(month)));
+} else {
+  const today = dayjs(new Date());
+  months.unshift(today);
+  if (today.date() <= 10) {
+    months.unshift(today.subtract(1, 'month'));
+  }
+}
 
 // // // console.log('config', config);
 
-// await bancoIndustrialScrape({
-//   biConfig: config.banks.bancoIndustrialGt,
-//   months,
-// });
+await bancoIndustrialScrape({
+  biConfig: config.banks.bancoIndustrialGt,
+  months,
+  isLambda: false,
+});
 
 // // await updateYnab({
 // //   ynabConfig: config.ynab,
