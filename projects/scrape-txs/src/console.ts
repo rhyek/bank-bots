@@ -32,12 +32,9 @@ if (options.month) {
   }
 }
 
-// // // console.log('config', config);
-
 await bancoIndustrialScrape({
   biConfig: config.banks.bancoIndustrialGt,
   months,
-  isLambda: false,
 });
 
 // // await updateYnab({

@@ -19,15 +19,16 @@ function waitRandomMs() {
   });
 }
 
-async function login(
-  auth: {
-    code: string;
-    username: string;
-    password: string;
-  },
-  isLambda: boolean
-) {
-  const browser = isLambda
+function isLambda() {
+  return !!process.env['AWS_LAMBDA_FUNCTION_NAME'];
+}
+
+async function login(auth: {
+  code: string;
+  username: string;
+  password: string;
+}) {
+  const browser = isLambda()
     ? ((await launchChromium({
         headless: true,
       })) as Browser)
@@ -137,18 +138,16 @@ export type BiConfig = {
 export async function bancoIndustrialScrape({
   biConfig: { auth, accounts },
   months,
-  isLambda,
 }: {
   biConfig: BiConfig;
   months: dayjs.Dayjs[];
-  isLambda: boolean;
 }) {
   console.log(
     `Scraping Banco Industrial GT transactions for months: ${months
       .map((m) => m.format('YYYY-MM'))
       .join(', ')}`
   );
-  const ctx = await login(auth, isLambda);
+  const ctx = await login(auth);
   try {
     const bankTxs: InsertObject<DB, 'bank_txs'>[] = [];
     for (const account of accounts) {

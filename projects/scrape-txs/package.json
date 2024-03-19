@@ -8,7 +8,6 @@
     "@tsconfig/node20": "~20.1.2",
     "@tsconfig/strictest": "~2.0.3",
     "@types/aws-lambda": "^8.10.136",
-    "@types/bun": "^1.0.8",
     "@types/lodash": "^4.17.0",
     "@types/node": "^20.11.20",
     "@types/pg": "^8.11.2",
@@ -17,6 +16,7 @@
     "typescript": "^5.4.2"
   },
   "dependencies": {
+    "aws-lambda-ric": "^3.1.0",
     "commander": "^12.0.0",
     "dayjs": "~1.11.10",
     "decimal.js": "^10.4.3",
