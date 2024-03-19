@@ -1,6 +1,9 @@
 {
   "name": "scrape-txs",
   "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json"
+  },
   "devDependencies": {
     "@tsconfig/node20": "~20.1.2",
     "@tsconfig/strictest": "~2.0.3",

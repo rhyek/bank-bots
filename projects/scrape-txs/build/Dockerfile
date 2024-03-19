@@ -1,10 +1,10 @@
-FROM oven/bun:1 as build
+FROM node:18-buster-slim as build
 WORKDIR /app
-COPY ./package.json ./bun.lockb ./
-RUN bun install
+COPY ./package.json ./
+RUN npm install
 COPY ./src ./src
 COPY ./tsconfig.json ./tsconfig.build.json ./
-RUN bun tsc --project tsconfig.build.json
+RUN npm run build
 
 # runner
 
@@ -21,19 +21,17 @@ RUN apt-get update && \
   libcurl4-openssl-dev \
   python3
 
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH=$PATH:/root/.bun/bin
+ENV NPM_CONFIG_CACHE=/tmp/.npm
 
 ARG FUNCTION_DIR="/function"
 RUN mkdir -p ${FUNCTION_DIR}
 WORKDIR ${FUNCTION_DIR}
 
-RUN bun install aws-lambda-ric
-
-COPY ./package.json ./bun.lockb ./
-RUN bun install --production
+COPY ./package.json ./
+RUN npm install --production
+RUN npm install aws-lambda-ric
 
 COPY --from=build /app/dist ./
 
 ENTRYPOINT ["/usr/bin/npx", "aws-lambda-ric"]
-CMD ["./lambda.handler"]
+CMD ["lambda.handler"]
