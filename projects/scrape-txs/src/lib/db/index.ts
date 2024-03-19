@@ -1,6 +1,6 @@
 import { Kysely, PostgresDialect, type InsertObject } from 'kysely';
 import { Pool } from 'pg';
-import { type DB } from './codegen';
+import type { DB } from './codegen';
 
 export type { DB, InsertObject };
 
