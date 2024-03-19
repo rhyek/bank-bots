@@ -6,10 +6,6 @@ import Decimal from 'decimal.js';
 import type { AccountType } from '../types';
 import { db, type InsertObject, type DB } from '../db';
 
-function isLambda() {
-  return !!process.env['AWS_LAMBDA_FUNCTION_NAME'];
-}
-
 function waitRandomMs() {
   const randomMilliSeconds =
     Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000;
@@ -23,12 +19,15 @@ function waitRandomMs() {
   });
 }
 
-async function login(auth: {
-  code: string;
-  username: string;
-  password: string;
-}) {
-  const browser = isLambda()
+async function login(
+  auth: {
+    code: string;
+    username: string;
+    password: string;
+  },
+  isLambda: boolean
+) {
+  const browser = isLambda
     ? ((await launchChromium({
         headless: true,
       })) as Browser)
@@ -138,16 +137,18 @@ export type BiConfig = {
 export async function bancoIndustrialScrape({
   biConfig: { auth, accounts },
   months,
+  isLambda,
 }: {
   biConfig: BiConfig;
   months: dayjs.Dayjs[];
+  isLambda: boolean;
 }) {
   console.log(
     `Scraping Banco Industrial GT transactions for months: ${months
       .map((m) => m.format('YYYY-MM'))
       .join(', ')}`
   );
-  const ctx = await login(auth);
+  const ctx = await login(auth, isLambda);
   try {
     const bankTxs: InsertObject<DB, 'bank_txs'>[] = [];
     for (const account of accounts) {

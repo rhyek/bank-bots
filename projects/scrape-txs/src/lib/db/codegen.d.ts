@@ -6,6 +6,18 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 
 export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
 
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [K in string]?: JsonValue;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
 export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
@@ -23,6 +35,13 @@ export interface BankTxs {
   tx_key: string;
 }
 
+export interface Config {
+  created_at: Generated<Timestamp>;
+  data: Json;
+  id: string;
+}
+
 export interface DB {
   bank_txs: BankTxs;
+  config: Config;
 }

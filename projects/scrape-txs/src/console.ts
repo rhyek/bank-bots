@@ -1,44 +1,51 @@
-import path from 'node:path';
 import dayjs, { Dayjs } from 'dayjs';
 import { program } from 'commander';
 // import { updateYnab } from './lib/ynab';
 import { configSchema } from './lib/config-schema';
 import { bancoIndustrialScrape } from './lib/banco-industrial/scrape';
+import { db } from './lib/db';
 
-const config = configSchema.parse(
-  await Bun.file(path.resolve(__dirname, '../config.json')).json()
-);
+const { data: configJson } = await db
+  .selectFrom('config')
+  .select('data')
+  .where('id', '=', 'general')
+  .executeTakeFirstOrThrow();
+const config = configSchema.parse(configJson);
 
-program.option('-m, --month <months...>', 'Month(s) to scrape');
+console.log('x', config.banks.bancoIndustrialGt);
 
-program.parse();
+// program.option('-m, --month <months...>', 'Month(s) to scrape');
 
-const options = program.opts<{
-  month?: string[];
-}>();
+// program.parse();
 
-const months: Dayjs[] = [];
+// const options = program.opts<{
+//   month?: string[];
+// }>();
 
-if (options.month) {
-  months.push(...options.month.map((month) => dayjs(month)));
-} else {
-  const today = dayjs(new Date());
-  months.unshift(today);
-  if (today.date() <= 10) {
-    months.unshift(today.subtract(1, 'month'));
-  }
-}
+// const months: Dayjs[] = [];
 
-// // console.log('config', config);
+// if (options.month) {
+//   months.push(...options.month.map((month) => dayjs(month)));
+// } else {
+//   const today = dayjs(new Date());
+//   months.unshift(today);
+//   if (today.date() <= 10) {
+//     months.unshift(today.subtract(1, 'month'));
+//   }
+// }
 
-await bancoIndustrialScrape({
-  biConfig: config.banks.bancoIndustrialGt,
-  months,
-});
+// // // console.log('config', config);
 
-// await updateYnab({
-//   ynabConfig: config.ynab,
-//   bankKey: 'bancoIndustrialGt',
-//   bankAccountsWithTransactions: biTransactions,
-//   dryRun: true,
+// await bancoIndustrialScrape({
+//   biConfig: config.banks.bancoIndustrialGt,
+//   months,
 // });
+
+// // await updateYnab({
+// //   ynabConfig: config.ynab,
+// //   bankKey: 'bancoIndustrialGt',
+// //   bankAccountsWithTransactions: biTransactions,
+// //   dryRun: true,
+// // });
+
+await db.destroy();
