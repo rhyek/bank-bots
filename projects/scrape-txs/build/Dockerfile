@@ -20,6 +20,7 @@ WORKDIR ${FUNCTION_DIR}
 
 COPY ./package.json ./bun.lockb ./
 RUN bun install
+RUN npm install aws-lambda-ric
 
 COPY lambda.js ./
 COPY ./src ./src
