@@ -1,4 +1,4 @@
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { program } from 'commander';
 // import { updateYnab } from './lib/ynab';
 import { configSchema } from './lib/config-schema';
@@ -20,7 +20,7 @@ const options = program.opts<{
   month?: string[];
 }>();
 
-const months: Dayjs[] = [];
+const months: dayjs.Dayjs[] = [];
 
 if (options.month) {
   months.push(...options.month.map((month) => dayjs(month)));

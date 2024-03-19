@@ -1,7 +1,7 @@
 import type dayjs from 'dayjs';
 import { chromium, type Browser, type Page } from 'playwright';
 import { launchChromium } from 'playwright-aws-lambda';
-import { groupBy } from 'lodash';
+import lodash from 'lodash';
 import Decimal from 'decimal.js';
 import type { AccountType } from '../types';
 import { db, type InsertObject, type DB } from '../db';
@@ -160,7 +160,7 @@ export async function bancoIndustrialScrape({
           );
           bankTxs.push(
             ...Object.values(
-              groupBy(
+              lodash.groupBy(
                 rawTransactions.map((tx) => {
                   const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
                   const amount =
