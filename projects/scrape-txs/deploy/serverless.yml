@@ -15,6 +15,5 @@ functions:
       # Invoke Lambda function every day at 7am Guatemala time
       - schedule:
           method: scheduler
-          rate:
-            - cron(0 7 * * ? *)
+          rate: cron(0 7 * * ? *)
           timezone: America/Guatemala
