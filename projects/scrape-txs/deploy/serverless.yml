@@ -12,5 +12,9 @@ functions:
     environment:
       DATABASE_URL: ${env:DATABASE_URL}
     events:
-      # Invoke Lambda function every day at 7am
-      - schedule: cron(0 7 * * ? *)
+      # Invoke Lambda function every day at 7am Guatemala time
+      - schedule:
+          method: scheduler
+          rate:
+            - cron(0 7 * * ? *)
+          timezone: America/Guatemala
