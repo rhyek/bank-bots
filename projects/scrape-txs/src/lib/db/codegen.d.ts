@@ -32,7 +32,6 @@ export interface BankTxs {
   doc_no: string;
   id: Generated<Int8>;
   month: string;
-  tx_key: string;
 }
 
 export interface Config {

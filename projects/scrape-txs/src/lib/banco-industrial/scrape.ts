@@ -1,8 +1,9 @@
-import type dayjs from 'dayjs';
+import dayjs from 'dayjs';
 import { chromium, type Browser, type Page } from 'playwright';
 import { launchChromium } from 'playwright-aws-lambda';
-import lodash from 'lodash';
-import Decimal from 'decimal.js';
+import { isMatching } from 'ts-pattern';
+// import lodash from 'lodash';
+// import Decimal from 'decimal.js';
 import type { AccountType } from '../types';
 import { db, type InsertObject, type DB } from '../db';
 
@@ -142,6 +143,7 @@ export async function bancoIndustrialScrape({
   biConfig: BiConfig;
   months: dayjs.Dayjs[];
 }) {
+  const bankKey = 'bancoIndustrialGt';
   console.log(
     `Scraping Banco Industrial GT transactions for months: ${months
       .map((m) => m.format('YYYY-MM'))
@@ -150,69 +152,151 @@ export async function bancoIndustrialScrape({
   const ctx = await login(auth);
   try {
     const bankTxs: InsertObject<DB, 'bank_txs'>[] = [];
+    const deleteTxIds: string[] = [];
     for (const account of accounts) {
       if (account.type === 'checking') {
         for (const monthDayJs of months) {
+          const currentTxs = await db
+            .selectFrom('bank_txs')
+            .selectAll()
+            .where('bank_key', '=', bankKey)
+            .where('account_number', '=', account.number)
+            .where('month', '=', monthDayJs.format('YYYY-MM'))
+            .execute();
           const rawTransactions = await getMonetaryAccountTransactions(
             ctx.page,
             account.number,
             monthDayJs
           );
-          bankTxs.push(
-            ...Object.values(
-              lodash.groupBy(
-                rawTransactions.map((tx) => {
-                  const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
-                  const amount =
-                    tx.credit && tx.credit !== ''
-                      ? Number(tx.credit)
-                      : -Number(tx.debit);
-                  return {
-                    bank_key: 'bancoIndustrialGt',
-                    tx_key: `bi.gt-${account.number}-${monthDayJs.format(
-                      'YYYYMMDD'
-                    )}-${tx.docNo}`,
-                    account_number: account.number,
-                    month: monthDayJs.format('YYYY-MM'),
-                    date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
-                    description: tx.description,
-                    doc_no: tx.docNo,
-                    amount,
-                  };
-                }),
-                (tx) => tx.tx_key
-              )
-            ).map((txs) => ({
-              ...txs[0],
-              description:
-                txs.find(
-                  (tx) => tx.description !== 'CONSUMO TARJETA ELECTRON VISA'
-                )?.description ?? txs[0].description,
-              amount: txs
-                .reduce((acc, tx) => acc.add(tx.amount), new Decimal(0))
-                .toDecimalPlaces(2)
-                .toNumber(),
-            }))
-          );
+          const _bankTxs = rawTransactions.map((tx) => {
+            const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
+            const amount =
+              tx.credit && tx.credit !== ''
+                ? Number(tx.credit)
+                : -Number(tx.debit);
+            return {
+              bank_key: 'bancoIndustrialGt',
+              account_number: account.number,
+              month: monthDayJs.format('YYYY-MM'),
+              date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
+              description: tx.description,
+              doc_no: tx.docNo,
+              amount,
+            };
+          });
+          const _deleteTxIds = currentTxs
+            .filter((currentTx) => {
+              const objToMatch = {
+                bank_key: currentTx.bank_key,
+                account_number: currentTx.account_number,
+                date: dayjs(currentTx.date).format('YYYY-MM-DD'),
+                doc_no: currentTx.doc_no,
+                description: currentTx.description,
+                amount: Number(currentTx.amount),
+              };
+              return !_bankTxs.some((bankTx) => isMatching(objToMatch, bankTx));
+            })
+            .map((tx) => tx.id);
+          bankTxs.push(..._bankTxs);
+          deleteTxIds.push(..._deleteTxIds);
+          // bankTxs.push(
+          //   ...rawTransactions.map((tx) => {
+          //     const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
+          //     const amount =
+          //       tx.credit && tx.credit !== ''
+          //         ? Number(tx.credit)
+          //         : -Number(tx.debit);
+          //     return {
+          //       bank_key: 'bancoIndustrialGt',
+          //       tx_key: `bi.gt-${account.number}-${monthDayJs.format(
+          //         'YYYYMMDD'
+          //       )}-${tx.docNo}-${tx.description}-${amount}`,
+          //       account_number: account.number,
+          //       month: monthDayJs.format('YYYY-MM'),
+          //       date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
+          //       description: tx.description,
+          //       doc_no: tx.docNo,
+          //       amount,
+          //     };
+          //   })
+          // );
+          // bankTxs.push(
+          //   ...Object.values(
+          //     lodash.groupBy(
+          //       rawTransactions.map((tx) => {
+          //         const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
+          //         const amount =
+          //           tx.credit && tx.credit !== ''
+          //             ? Number(tx.credit)
+          //             : -Number(tx.debit);
+          //         return {
+          //           bank_key: 'bancoIndustrialGt',
+          //           tx_key: `bi.gt-${account.number}-${monthDayJs.format(
+          //             'YYYYMMDD'
+          //           )}-${tx.docNo}`,
+          //           account_number: account.number,
+          //           month: monthDayJs.format('YYYY-MM'),
+          //           date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
+          //           description: tx.description,
+          //           doc_no: tx.docNo,
+          //           amount,
+          //         };
+          //       }),
+          //       (tx) => tx.tx_key
+          //     )
+          //   ).map((txs) => ({
+          //     ...txs[0],
+          //     description:
+          //       txs.find(
+          //         (tx) => tx.description !== 'CONSUMO TARJETA ELECTRON VISA'
+          //       )?.description ?? txs[0].description,
+          //     amount: txs
+          //       .reduce((acc, tx) => acc.add(tx.amount), new Decimal(0))
+          //       .toDecimalPlaces(2)
+          //       .toNumber(),
+          //   }))
+          // );
         }
       }
     }
-    if (bankTxs.length > 0) {
-      console.log(
-        `Inserting/updating ${bankTxs.length} Banco Industrial GT transactions...`
-      );
+    if (bankTxs.length > 0 || deleteTxIds.length > 0) {
       await db.transaction().execute(async (sqlTx) => {
-        await Promise.all(
-          bankTxs.map(async (bankTx) => {
-            await sqlTx
-              .insertInto('bank_txs')
-              .values(bankTx)
-              .onConflict((oc) =>
-                oc.column('tx_key').doUpdateSet({ amount: bankTx.amount })
-              )
-              .execute();
-          })
-        );
+        if (bankTxs.length > 0) {
+          console.log(
+            `Inserting/updating ${bankTxs.length} Banco Industrial GT transactions...`
+          );
+          await Promise.all(
+            bankTxs.map(async (bankTx) => {
+              await sqlTx
+                .insertInto('bank_txs')
+                .values(bankTx)
+                .onConflict((oc) =>
+                  oc
+                    .columns([
+                      'bank_key',
+                      'account_number',
+                      'date',
+                      'doc_no',
+                      'description',
+                      'amount',
+                    ])
+                    .doUpdateSet({ amount: bankTx.amount })
+                )
+                .execute();
+            })
+          );
+        }
+        if (deleteTxIds.length > 0) {
+          console.log(
+            `Deleting ${deleteTxIds.join(
+              ', '
+            )} Banco Industrial GT transactions...`
+          );
+          await sqlTx
+            .deleteFrom('bank_txs')
+            .where('id', 'in', deleteTxIds)
+            .execute();
+        }
       });
       console.log('Done.');
     }

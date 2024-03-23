@@ -5,4 +5,4 @@ cd $__dirname
 
 bun kysely-codegen \
   --include-pattern="public.*" \
-  --out-file src/lib/db/codegen.d.ts
+  --out-file ./codegen.d.ts
