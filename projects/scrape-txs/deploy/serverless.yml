@@ -11,6 +11,7 @@ functions:
     timeout: 300 # 5 minutes
     environment:
       DATABASE_URL: ${env:DATABASE_URL}
+    role: ${env:LAMBDA_ROLE_ARN}
     events:
       # Invoke Lambda function every day at 7am Guatemala time
       - schedule:

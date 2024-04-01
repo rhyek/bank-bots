@@ -27,6 +27,7 @@ jobs:
       CONFIG_DIRECTORY: './infra'
     outputs:
       ecr_repository_scrape_txs_url: ${{ steps.terraform-outputs.outputs.ecr_repository_scrape_txs_url }}
+      iam_lambda_role_arn: ${{ steps.terraform-outputs.outputs.iam_lambda_role_arn }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -60,6 +61,7 @@ jobs:
           workspace-id: ws-pftgvrxWKzhd2z9z
           outputs: |
             ecr_repository_scrape_txs_url
+            iam_lambda_role_arn
   deploy-scrape-txs:
     name: Deploy Scrape Bank Transactions
     runs-on: ubuntu-22.04
@@ -79,6 +81,7 @@ jobs:
       - name: Set build params
         run: |
           echo "ECR_REPO_URL=${{ needs.terraform.outputs.ecr_repository_scrape_txs_url }}" >> $GITHUB_ENV
+          echo "LAMBDA_ROLE_ARN=${{ needs.terraform.outputs.iam_lambda_role_arn }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
       - name: Expose GitHub Runtime
         uses: crazy-max/ghaction-github-runtime@v3
