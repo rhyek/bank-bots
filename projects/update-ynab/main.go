@@ -14,8 +14,8 @@ import (
 	"github.com/brunomvsouza/ynab.go"
 	"github.com/brunomvsouza/ynab.go/api"
 	"github.com/brunomvsouza/ynab.go/api/transaction"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/shopspring/decimal"
 )
 
@@ -25,7 +25,7 @@ func init() {
 }
 
 func main() {
-	db, err := sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
+	db, err := sqlx.Connect("pgx", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		logFatal(err)
 	}
