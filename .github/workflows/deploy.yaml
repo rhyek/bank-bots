@@ -126,10 +126,4 @@ jobs:
         run: |
           echo "LAMBDA_ROLE_ARN=${{ needs.terraform.outputs.iam_lambda_role_arn }}" >> $GITHUB_ENV
       - name: Deploy
-        run: |
-          aws lambda create-function --function-name update-ynab-fn \
-            --runtime provided.al2023 \
-            --handler bootstrap \
-            --architectures arm64 \
-            --role ${{ needs.terraform.outputs.iam_lambda_role_arn }} \
-            --zip-file fileb://update-ynab.zip
+        run: make deploy
