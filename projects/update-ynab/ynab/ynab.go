@@ -18,7 +18,7 @@ type AugmentedYnabTransaction struct {
 	ParsedMemo *ParsedYnabTransactionMemo
 }
 
-func UpdateYnabTxs(config types.Config, bankAccountsWithTxs []types.BankAccountWithTransactions) error {
+func UpdateYnabTxs(config *types.Config, bankAccountsWithTxs []types.BankAccountWithTransactions) error {
 	client := ynab.NewClient(config.YNAB.AccessToken)
 
 	ynabTxCreates := []transaction.PayloadTransaction{}
