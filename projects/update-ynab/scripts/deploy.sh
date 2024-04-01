@@ -9,6 +9,8 @@ if aws lambda get-function --function-name $function_name --region us-east-1 &> 
   aws lambda update-function-code \
     --function-name $function_name \
   	--zip-file fileb://$ZIPFILE
+  aws lambda wait function-updated \
+    --function-name $function_name
   aws lambda update-function-configuration \
     --function-name $function_name \
     --environment $envs
