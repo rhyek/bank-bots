@@ -17,15 +17,4 @@ export const configSchema = z.object({
       ),
     }),
   }),
-  ynab: z.object({
-    accessToken: z.string(),
-    budgetId: z.string(),
-    accountsMap: z.array(
-      z.object({
-        bankKey: z.string(),
-        bankAccountNumber: z.string(),
-        ynabAccountId: z.string(),
-      })
-    ),
-  }),
 });

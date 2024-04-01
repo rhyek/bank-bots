@@ -1,7 +1,0 @@
-api
-  update txs (month)
-  list txs (month, date range)
-
-docs:
-- AWS Lambda function URLs with .NET minimal api
-  https://zied-ben-tahar.medium.com/aws-lambda-function-urls-with-net-6-minimal-api-727b6d2087a5

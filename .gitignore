@@ -1,5 +1,2 @@
 .DS_Store
 .env.local
-**/bin
-**/obj
-node_modules

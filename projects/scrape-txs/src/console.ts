@@ -1,6 +1,5 @@
 import dayjs from 'dayjs';
 import { program } from 'commander';
-// import { updateYnab } from './lib/ynab';
 import { configSchema } from './lib/config-schema';
 import { bancoIndustrialScrape } from './lib/banco-industrial/scrape';
 import { db } from './lib/db';
@@ -36,12 +35,5 @@ await bancoIndustrialScrape({
   biConfig: config.banks.bancoIndustrialGt,
   months,
 });
-
-// // await updateYnab({
-// //   ynabConfig: config.ynab,
-// //   bankKey: 'bancoIndustrialGt',
-// //   bankAccountsWithTransactions: biTransactions,
-// //   dryRun: true,
-// // });
 
 await db.destroy();

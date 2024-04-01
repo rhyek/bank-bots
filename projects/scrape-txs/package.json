@@ -26,7 +26,6 @@
     "playwright": "1.41.1",
     "playwright-aws-lambda": "^0.10.0",
     "ts-pattern": "^5.0.8",
-    "ynab": "^2.2.0",
     "zod": "^3.22.4"
   }
 }
