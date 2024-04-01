@@ -1,8 +1,11 @@
 data "aws_iam_policy_document" "assume_role" {
   statement {
     principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
+      type = "Service"
+      identifiers = [
+        "lambda.amazonaws.com",
+        "scheduler.amazonaws.com" # for eventbridge scheduler to assume this role and exec the fn
+      ]
     }
     actions = ["sts:AssumeRole"]
     effect  = "Allow"
