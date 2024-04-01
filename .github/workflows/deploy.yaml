@@ -96,9 +96,7 @@ jobs:
       - name: Deploy with Serverless
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          cd ./deploy
-          serverless deploy
+        run: serverless deploy
   deploy-update-ynab:
     name: Deploy Update YNAB function
     runs-on: ubuntu-22.04
