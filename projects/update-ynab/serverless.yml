@@ -5,6 +5,7 @@ provider:
   name: aws
   runtime: provided.al2023
   architecture: arm64
+  deploymentMethod: direct
 
 package:
   individually: true
@@ -26,4 +27,4 @@ functions:
     package:
       patterns:
         - '!**/**'
-        - './bin/bootstrap'
+        - './bootstrap'
