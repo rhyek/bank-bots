@@ -1,4 +1,4 @@
-package utils
+package ynab
 
 import (
 	"encoding/json"
