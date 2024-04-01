@@ -126,4 +126,6 @@ jobs:
         run: |
           echo "LAMBDA_ROLE_ARN=${{ needs.terraform.outputs.iam_lambda_role_arn }}" >> $GITHUB_ENV
       - name: Deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: make deploy
