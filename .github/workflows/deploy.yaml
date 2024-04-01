@@ -71,14 +71,14 @@ jobs:
         working-directory: ./projects/scrape-txs
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_DEFAULT_REGION }}
-      - name: Set build params
+      - name: Set build/deploy params
         run: |
           echo "ECR_REPO_URL=${{ needs.terraform.outputs.ecr_repository_scrape_txs_url }}" >> $GITHUB_ENV
           echo "LAMBDA_ROLE_ARN=${{ needs.terraform.outputs.iam_lambda_role_arn }}" >> $GITHUB_ENV
@@ -99,3 +99,37 @@ jobs:
         run: |
           cd ./deploy
           serverless deploy
+  deploy-update-ynab:
+    name: Deoloy Update YNAB
+    runs-on: ubuntu-22.04
+    needs: terraform
+    defaults:
+      run:
+        working-directory: ./projects/update-ynab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '^1.22.1'
+      - name: Build
+        run: make build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+      - name: Set deploy params
+        run: |
+          echo "LAMBDA_ROLE_ARN=${{ needs.terraform.outputs.iam_lambda_role_arn }}" >> $GITHUB_ENV
+      - name: Deploy
+        run: |
+          aws lambda create-function --function-name update-ynab-fn \
+            --runtime provided.al2023 \
+            --handler bootstrap \
+            --architectures arm64 \
+            --role ${{ needs.terraform.outputs.iam_lambda_role_arn }} \
+            --zip-file fileb://update-ynab.zip
