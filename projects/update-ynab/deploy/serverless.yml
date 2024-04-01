@@ -1,0 +1,29 @@
+service: update-ynab-lambda
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: provided.al2023
+  architecture: arm64
+
+package:
+  individually: true
+
+functions:
+  cronHandler:
+    handler: bootstrap
+    memorySize: 128
+    timeout: 30 # 30 seconds
+    environment:
+      DATABASE_URL: ${env:DATABASE_URL}
+    role: ${env:LAMBDA_ROLE_ARN}
+    events:
+      # Invoke Lambda function every day at 7:30am Guatemala time
+      - schedule:
+          method: scheduler # use AWS::Scheduler::Schedule (EventBridge rule) instead of AWS::Events::Rule (CloudWatch Events rule)
+          rate: cron(30 7 * * ? *)
+          timezone: America/Guatemala # possible with AWS::Scheduler::Schedule
+    package:
+      patterns:
+        - '!**/**'
+        - './bin/bootstrap'

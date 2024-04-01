@@ -125,7 +125,13 @@ jobs:
       - name: Set deploy params
         run: |
           echo "LAMBDA_ROLE_ARN=${{ needs.terraform.outputs.iam_lambda_role_arn }}" >> $GITHUB_ENV
-      - name: Deploy
+      - name: Install Serverless
+        run: |
+          curl -o- -L https://slss.io/install | bash
+          echo "$HOME/.serverless/bin" >> $GITHUB_PATH
+      - name: Deploy with Serverless
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: make deploy
+        run: |
+          cd ./deploy
+          serverless deploy
