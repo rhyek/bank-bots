@@ -63,7 +63,7 @@ jobs:
             ecr_repository_scrape_txs_url
             iam_lambda_role_arn
   deploy-scrape-txs:
-    name: Deploy Scrape Bank Transactions
+    name: Deploy Scrape Bank Transactions function
     runs-on: ubuntu-22.04
     needs: terraform
     defaults:
@@ -100,7 +100,7 @@ jobs:
           cd ./deploy
           serverless deploy
   deploy-update-ynab:
-    name: Deoloy Update YNAB
+    name: Deploy Update YNAB function
     runs-on: ubuntu-22.04
     needs: terraform
     defaults:
