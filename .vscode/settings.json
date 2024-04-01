@@ -1,12 +1,12 @@
 {
   "dotnet.defaultSolution": "projects/BankApis.sln",
   "github.copilot.enable": {
-    "*": true
+    "*": true,
+    "go": false
   },
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter"
   },
-  "python.formatting.provider": "none",
   "cSpell.words": [
     "btns",
     "Código",
