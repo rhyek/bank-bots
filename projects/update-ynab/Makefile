@@ -9,11 +9,11 @@ deploy:
 	function_name="update-ynab-fn"
 	if aws lambda get-function --function-name $function_name --region us-east-1 &> /dev/null
 	then
-		echo "Updating function"
+		$(info Updating function)
 		aws lambda update-function-code --function-name $function_name \
 			--zip-file fileb://${zipfile}
 	else
-		echo "Creating function"
+		$(info Creating function)
 		aws lambda create-function --function-name $function_name \
 			--runtime provided.al2023 \
 			--handler bootstrap \
