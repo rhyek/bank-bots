@@ -1,4 +1,4 @@
-service: update-ynab-lambda
+service: update-ynab
 frameworkVersion: '3'
 
 provider:

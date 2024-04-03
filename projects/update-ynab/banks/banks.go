@@ -2,6 +2,8 @@ package banks
 
 import (
 	"fmt"
+	"log/slog"
+	"slices"
 	"time"
 
 	"bank-bots/update-ynab/types"
@@ -31,11 +33,13 @@ func LoadBankTxs(db *sqlx.DB) ([]types.BankAccountWithTransactions, error) {
 		fromMonth = time.Now()
 	}
 
+	slog.Info("loading bank txs", slog.String("fromMonth", fromMonth.Format("2006-01")))
+
 	bankTxs := []dbBankTx{}
 	sql := `
 		select *
 		from bank_txs
-		where month <= $1
+		where month >= $1
 		order by bank_key asc, account_number asc, date asc, doc_no asc`
 	err := db.Select(&bankTxs, sql, fromMonth.Format("2006-01"))
 	if err != nil {
@@ -83,7 +87,18 @@ func LoadBankTxs(db *sqlx.DB) ([]types.BankAccountWithTransactions, error) {
 				bankAccount.Transactions = append(bankAccount.Transactions, slice[0])
 			}
 		}
+		slices.SortFunc(bankAccount.Transactions, func(a, b types.PreparedBankTx) int {
+			return a.Date.Compare(b.Date)
+		})
 		bankAccounts = append(bankAccounts, bankAccount)
+	}
+
+	slog.Info("printing found bank txs:")
+	for _, bankAccount := range bankAccounts {
+		for _, bankTx := range bankAccount.Transactions {
+			slog.Info(fmt.Sprintf("account: %s, date: %s, doc_no: %s, amount: %d", bankAccount.Account.Number,
+				bankTx.Date.Format("2006-01-02"), bankTx.DocNo, bankTx.Amount))
+		}
 	}
 
 	return bankAccounts, nil

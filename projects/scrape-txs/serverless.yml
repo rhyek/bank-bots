@@ -1,4 +1,4 @@
-service: scrape-txs-scheduled-lambda
+service: scrape-txs-scheduled
 frameworkVersion: '3'
 
 provider:
