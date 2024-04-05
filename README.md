@@ -2,7 +2,9 @@
 
 ## Overview
 
-"Bank Bots" is a personal solution to the absence of banking APIs in Guatemala, enabling automated tracking of my bank transactions. It utilizes web scraping bots written in TypeScript, NodeJS, and using PlayWright to extract transaction data from my banks' websites and store it in a PostgreSQL database. Additionally, a Go-based program interfaces with the YNAB budgeting app via its REST API, syncing the scraped transaction data for my budget management.
+"Bank Bots" is a personal project I wrote that helps me solve the issue of needing to programmatically access my bank (Banco Industrial) account's transactions. Even though they are the biggest bank in Guatemala, they don't have an API or SDK of any sort. So I had to take matters into my own hands!
+
+It is a web scraping bot written in TypeScript, NodeJS, using PlayWright to extract the transaction data from my bank's website and stores it in a PostgreSQL database. Additionally, a Go-based program interfaces with the YNAB budgeting app via its REST API (using a Go community-built SDK), syncing the scraped transaction data for my personal budget management.
 
 The project emphasizes automation, data integration, and the use of cloud technologies to overcome local banking constraints.
 
