@@ -66,7 +66,12 @@ func work() (*string, error) {
 		return nil, err
 	}
 
-	err = ynab.UpdateYnabTxs(config, bankAccountsWithTxs)
+	err = ynab.UpdateYnabWithBankTxs(config, bankAccountsWithTxs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ynab.UpdateEmptyPayees(config)
 	if err != nil {
 		return nil, err
 	}

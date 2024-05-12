@@ -1,8 +1,11 @@
 package ynab
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"slices"
 	"time"
 
@@ -18,7 +21,7 @@ type AugmentedYnabTransaction struct {
 	ParsedMemo *ParsedYnabTransactionMemo
 }
 
-func UpdateYnabTxs(config *types.Config, bankAccountsWithTxs []types.BankAccountWithTransactions) error {
+func UpdateYnabWithBankTxs(config *types.Config, bankAccountsWithTxs []types.BankAccountWithTransactions) error {
 	client := ynab.NewClient(config.YNAB.AccessToken)
 
 	ynabTxCreates := []transaction.PayloadTransaction{}
@@ -119,5 +122,104 @@ func UpdateYnabTxs(config *types.Config, bankAccountsWithTxs []types.BankAccount
 		}
 	}
 
+	return nil
+}
+
+func UpdateEmptyPayees(config *types.Config) error {
+	ynabClient := ynab.NewClient(config.YNAB.AccessToken)
+
+	type Transaction struct {
+		Id         string `json:"id"`
+		PayeeId    string `json:"payee_id"`
+		CategoryId string `json:"category_id"`
+	}
+	type UpdateTransactionsPayload struct {
+		Transactions []Transaction `json:"transactions"`
+	}
+
+	transactions := []Transaction{}
+
+	now := time.Now()
+	sinceDate := time.Date(now.Year(), now.Month()-2, 1, 0, 0, 0, 0, time.UTC)
+
+	for _, account := range config.YNAB.AccountsMap {
+		ynabAccountId := account.YNABAccountID
+		ynabTxs, err := ynabClient.Transaction().GetTransactionsByAccount(
+			config.YNAB.BudgetID, ynabAccountId, &transaction.Filter{
+				Since: &api.Date{
+					Time: sinceDate,
+				},
+			},
+		)
+		if err != nil {
+			return err
+		}
+		sourceTxs := make([]*transaction.Transaction, len(ynabTxs))
+		copy(sourceTxs, ynabTxs)
+		slices.SortFunc(sourceTxs, func(a, b *transaction.Transaction) int {
+			return b.Date.Time.Compare(a.Date.Time)
+		})
+		for _, ynabTx := range ynabTxs {
+			if ynabTx.PayeeID != nil {
+				continue
+			}
+			parsedMemo, err := ParseYnabTransactionMemo(ynabTx.Memo)
+			if err != nil {
+				continue
+			}
+			for _, sourceTx := range sourceTxs {
+				iterParsedMemo, err := ParseYnabTransactionMemo(sourceTx.Memo)
+				if err != nil {
+					continue
+				}
+				if parsedMemo.Desc == iterParsedMemo.Desc &&
+					sourceTx.PayeeID != nil &&
+					sourceTx.CategoryID != nil {
+					slog.Info("updating payee", "tx id", ynabTx.ID, "payee id", *sourceTx.PayeeID, "category id", *sourceTx.CategoryID)
+					transactions = append(transactions, Transaction{
+						Id: ynabTx.ID,
+
+						PayeeId:    *sourceTx.PayeeID,
+						CategoryId: *sourceTx.CategoryID,
+					})
+					break
+				}
+			}
+		}
+	}
+
+	slog.Info(fmt.Sprintf("updating %v transactions with payees", len(transactions)))
+	if len(transactions) > 0 {
+		// the following is buggy. all unspecified fields are sent with "null" value instead of undefined
+		// _, err := client.Transaction().UpdateTransactions(
+		// 	config.YNAB.BudgetID,
+		// 	ynabTxUpdates,
+		// )
+		// if err != nil {
+		// 	return err
+		// }
+		payload := UpdateTransactionsPayload{
+			Transactions: transactions,
+		}
+		jsonStr, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		req, err := http.NewRequest(
+			"PATCH",
+			fmt.Sprintf("https://api.ynab.com/v1/budgets/%s/transactions", config.YNAB.BudgetID),
+			bytes.NewBuffer(jsonStr))
+		if err != nil {
+			return err
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", config.YNAB.AccessToken))
+		req.Header.Add("Content-Type", "application/json")
+		httpClient := &http.Client{}
+		res, err := httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+	}
 	return nil
 }

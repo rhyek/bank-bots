@@ -7,7 +7,8 @@ import (
 )
 
 type ParsedYnabTransactionMemo struct {
-	Ref string
+	Ref  string
+	Desc string
 }
 
 func ParseYnabTransactionMemo(memo *string) (ParsedYnabTransactionMemo, error) {
@@ -25,8 +26,12 @@ func ParseYnabTransactionMemo(memo *string) (ParsedYnabTransactionMemo, error) {
 
 	rgx := regexp.MustCompile(`ref: ([\d_]+);`)
 	if matches := rgx.FindStringSubmatch(*memo); matches != nil {
-		ref := matches[1]
-		parsed.Ref = ref
+		parsed.Ref = matches[1]
+	}
+
+	rgx = regexp.MustCompile(`desc: (.+?);`)
+	if matches := rgx.FindStringSubmatch(*memo); matches != nil {
+		parsed.Desc = matches[1]
 	}
 
 	return parsed, nil
