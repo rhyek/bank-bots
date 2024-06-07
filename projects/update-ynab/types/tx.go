@@ -1,8 +1,11 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 type PreparedBankTx struct {
+	BankTx      DbBankTx
 	Ref         string
 	Date        time.Time
 	DocNo       string
@@ -15,6 +18,5 @@ type BankAccountWithTransactions struct {
 	Account struct {
 		Number string
 	}
-	Transactions      []PreparedBankTx
-	TransactionsByKey map[string][]PreparedBankTx
+	Transactions []PreparedBankTx
 }
