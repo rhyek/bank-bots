@@ -50,12 +50,13 @@ func LoadBankTxs(db *sqlx.DB) ([]types.BankAccountWithTransactions, error) {
 		sameRefCount := 0
 		for _, iterTx := range bankAccount.Transactions {
 			iterRef := fmt.Sprintf("%s_%s", iterTx.Date.Format("20060102"), iterTx.DocNo)
-			if bankTx != iterTx.BankTx && ref == iterRef {
+			if bankTx.Id != iterTx.BankTx.Id && ref == iterRef {
 				sameRefCount += 1
 			}
 		}
 		if sameRefCount > 0 {
 			ref = fmt.Sprintf("%s(%d)", ref, sameRefCount+1)
+			slog.Info("found duplicate doc no", "docno", bankTx.DocNo, "new ref", ref)
 		}
 		bankAccount.Transactions = append(bankAccount.Transactions, types.PreparedBankTx{
 			BankTx:      bankTx,

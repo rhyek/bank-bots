@@ -24,7 +24,7 @@ func ParseYnabTransactionMemo(memo *string) (ParsedYnabTransactionMemo, error) {
 		}
 	}
 
-	rgx := regexp.MustCompile(`ref: ([\d_]+);`)
+	rgx := regexp.MustCompile(`ref: ([\d_\(\)]+);`)
 	if matches := rgx.FindStringSubmatch(*memo); matches != nil {
 		parsed.Ref = matches[1]
 	}
