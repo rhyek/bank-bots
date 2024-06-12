@@ -1,29 +1,37 @@
 import dayjs from 'dayjs';
-import { chromium, type Browser, type Page } from 'playwright';
-import { launchChromium } from 'playwright-aws-lambda';
+import { type Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { AccountType } from '../types';
 import { db, type InsertObject, type DB } from '../db';
-import { isLambda, waitRandomMs } from '../utils';
+import { waitRandomMs } from '../utils';
 
-async function login(auth: {
-  code: string;
-  username: string;
-  password: string;
+export type BiConfig = {
+  auth: {
+    code: string;
+    username: string;
+    password: string;
+  };
+  accounts: {
+    type: AccountType;
+    number: string;
+  }[];
+};
+
+export async function bancoIndustrialScrape({
+  biConfig: { auth, accounts },
+  months,
+  page,
+}: {
+  biConfig: BiConfig;
+  months: dayjs.Dayjs[];
+  page: Page;
 }) {
-  const browser = isLambda()
-    ? ((await launchChromium({
-        headless: true,
-      })) as Browser)
-    : await chromium.launch({
-        headless: false,
-      });
-  const context = await browser.newContext({
-    userAgent:
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-  });
-  const page = await context.newPage();
-
+  const bankKey = process.env.BANK_KEY;
+  console.log(
+    `Scraping Banco Industrial GT transactions for months: ${months
+      .map((m) => m.format('YYYY-MM'))
+      .join(', ')}`
+  );
   await page.goto(
     'https://www.bienlinea.bi.com.gt/InicioSesion/Inicio/Autenticar'
   );
@@ -37,7 +45,58 @@ async function login(auth: {
   await page.waitForURL(
     'https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard'
   );
-  return { browser, context, page };
+  const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
+  const deleteTxIds: string[] = [];
+  for (const account of accounts) {
+    if (account.type === 'checking') {
+      for (const monthDayJs of months) {
+        const currentTxs = await db
+          .selectFrom('bank_txs')
+          .selectAll()
+          .where('bank_key', '=', bankKey)
+          .where('account_number', '=', account.number)
+          .where('month', '=', monthDayJs.format('YYYY-MM'))
+          .execute();
+        const rawTransactions = await getMonetaryAccountTransactions(
+          page,
+          account.number,
+          monthDayJs
+        );
+        const _bankTxs = rawTransactions.map((tx) => {
+          const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
+          const amount =
+            tx.credit && tx.credit !== ''
+              ? Number(tx.credit)
+              : -Number(tx.debit);
+          return {
+            bank_key: bankKey,
+            account_number: account.number,
+            month: monthDayJs.format('YYYY-MM'),
+            date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
+            description: tx.description,
+            doc_no: tx.docNo,
+            amount,
+          };
+        });
+        const _deleteTxIds = currentTxs
+          .filter((currentTx) => {
+            const objToMatch = {
+              bank_key: currentTx.bank_key,
+              account_number: currentTx.account_number,
+              date: dayjs(currentTx.date).format('YYYY-MM-DD'),
+              doc_no: currentTx.doc_no,
+              description: currentTx.description,
+              amount: Number(currentTx.amount),
+            };
+            return !_bankTxs.some((bankTx) => isMatching(objToMatch, bankTx));
+          })
+          .map((tx) => tx.id);
+        createTxs.push(..._bankTxs);
+        deleteTxIds.push(..._deleteTxIds);
+      }
+    }
+  }
+  return { createTxs, deleteTxIds };
 }
 
 async function getMonetaryAccountTransactions(
@@ -104,89 +163,4 @@ async function getMonetaryAccountTransactions(
     );
   });
   return transactions;
-}
-
-export type BiConfig = {
-  auth: {
-    code: string;
-    username: string;
-    password: string;
-  };
-  accounts: {
-    type: AccountType;
-    number: string;
-  }[];
-};
-
-export async function bancoIndustrialScrape({
-  biConfig: { auth, accounts },
-  months,
-}: {
-  biConfig: BiConfig;
-  months: dayjs.Dayjs[];
-}) {
-  const bankKey = process.env.BANK_KEY;
-  console.log(
-    `Scraping Banco Industrial GT transactions for months: ${months
-      .map((m) => m.format('YYYY-MM'))
-      .join(', ')}`
-  );
-  const ctx = await login(auth);
-  try {
-    const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
-    const deleteTxIds: string[] = [];
-    for (const account of accounts) {
-      if (account.type === 'checking') {
-        for (const monthDayJs of months) {
-          const currentTxs = await db
-            .selectFrom('bank_txs')
-            .selectAll()
-            .where('bank_key', '=', bankKey)
-            .where('account_number', '=', account.number)
-            .where('month', '=', monthDayJs.format('YYYY-MM'))
-            .execute();
-          const rawTransactions = await getMonetaryAccountTransactions(
-            ctx.page,
-            account.number,
-            monthDayJs
-          );
-          const _bankTxs = rawTransactions.map((tx) => {
-            const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
-            const amount =
-              tx.credit && tx.credit !== ''
-                ? Number(tx.credit)
-                : -Number(tx.debit);
-            return {
-              bank_key: bankKey,
-              account_number: account.number,
-              month: monthDayJs.format('YYYY-MM'),
-              date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
-              description: tx.description,
-              doc_no: tx.docNo,
-              amount,
-            };
-          });
-          const _deleteTxIds = currentTxs
-            .filter((currentTx) => {
-              const objToMatch = {
-                bank_key: currentTx.bank_key,
-                account_number: currentTx.account_number,
-                date: dayjs(currentTx.date).format('YYYY-MM-DD'),
-                doc_no: currentTx.doc_no,
-                description: currentTx.description,
-                amount: Number(currentTx.amount),
-              };
-              return !_bankTxs.some((bankTx) => isMatching(objToMatch, bankTx));
-            })
-            .map((tx) => tx.id);
-          createTxs.push(..._bankTxs);
-          deleteTxIds.push(..._deleteTxIds);
-        }
-      }
-    }
-    return { createTxs, deleteTxIds };
-  } finally {
-    await ctx.context.close();
-    await ctx.browser.close();
-  }
 }

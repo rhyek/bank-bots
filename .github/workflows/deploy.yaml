@@ -28,6 +28,7 @@ jobs:
     outputs:
       ecr_repository_scrape_txs_url: ${{ steps.terraform-outputs.outputs.ecr_repository_scrape_txs_url }}
       iam_lambda_role_arn: ${{ steps.terraform-outputs.outputs.iam_lambda_role_arn }}
+      playwright_traces_s3_bucket_id: ${{ steps.terraform-outputs.outputs.playwright_traces_s3_bucket_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -62,6 +63,7 @@ jobs:
           outputs: |
             ecr_repository_scrape_txs_url
             iam_lambda_role_arn
+            playwright_traces_s3_bucket_id
   deploy-scrape-txs:
     name: Deploy Scrape Bank Transactions function
     runs-on: ubuntu-22.04
@@ -82,6 +84,7 @@ jobs:
         run: |
           echo "ECR_REPO_URL=${{ needs.terraform.outputs.ecr_repository_scrape_txs_url }}" >> $GITHUB_ENV
           echo "LAMBDA_ROLE_ARN=${{ needs.terraform.outputs.iam_lambda_role_arn }}" >> $GITHUB_ENV
+          echo "PLAYWRIGHT_TRACES_S3_BUCKET_ID=${{ needs.terraform.outputs.playwright_traces_s3_bucket_id }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
       - name: Expose GitHub Runtime
         uses: crazy-max/ghaction-github-runtime@v3
@@ -96,6 +99,9 @@ jobs:
       - name: Deploy with Serverless
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MAILER_SMTP_ACCOUNT: ${{ secrets.MAILER_SMTP_ACCOUNT }}
+          MAILER_SMTP_PASSWORD: ${{ secrets.MAILER_SMTP_PASSWORD }}
+          MAILER_ME: ${{ secrets.MAILER_ME }}
         run: serverless deploy
   deploy-update-ynab:
     name: Deploy Update YNAB function

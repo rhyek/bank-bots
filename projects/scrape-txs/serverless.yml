@@ -3,6 +3,12 @@ frameworkVersion: '3'
 
 provider:
   name: aws
+  environment:
+    DATABASE_URL: ${env:DATABASE_URL}
+    MAILER_SMTP_ACCOUNT: ${env:MAILER_SMTP_ACCOUNT}
+    MAILER_SMTP_PASSWORD: ${env:MAILER_SMTP_PASSWORD}
+    MAILER_ME: ${env:MAILER_ME}
+    PLAYWRIGHT_TRACES_S3_BUCKET_ID: ${env:PLAYWRIGHT_TRACES_S3_BUCKET_ID}
 
 functions:
   bancoIndustrialGtHandler:
@@ -10,7 +16,6 @@ functions:
     memorySize: 1024
     timeout: 300 # 5 minutes
     environment:
-      DATABASE_URL: ${env:DATABASE_URL}
       BANK_KEY: bancoIndustrialGt
     role: ${env:LAMBDA_ROLE_ARN}
     events:
@@ -24,7 +29,6 @@ functions:
     memorySize: 1024
     timeout: 300 # 5 minutes
     environment:
-      DATABASE_URL: ${env:DATABASE_URL}
       BANK_KEY: bacGt
     role: ${env:LAMBDA_ROLE_ARN}
     events:
