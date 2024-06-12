@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat.js';
-import { type Page } from 'playwright';
+import { type BrowserContext, type Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import { db, type DB, type InsertObject } from '../db';
 import { waitRandomMs } from '../utils';
@@ -33,6 +33,22 @@ export async function bacGtScrape({
   );
   const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
   const deleteTxIds: string[] = [];
+
+  await page.setExtraHTTPHeaders({
+    Accept:
+      'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'Accept-Encoding': 'gzip, deflate, br, zstd',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Sec-Ch-Ua':
+      '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"macOS"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+  });
   await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
   await page
@@ -64,6 +80,7 @@ export async function bacGtScrape({
       'https://www1.sucursalelectronica.com/ebac/module/consolidatedQuery/consolidatedQuery.go'
     );
     if (account.type === 'checking') {
+      await waitRandomMs();
       await page
         .locator('.bel-card')
         .filter({ has: page.getByText('Cuentas bancarias') })

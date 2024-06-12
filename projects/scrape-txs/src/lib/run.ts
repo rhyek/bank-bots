@@ -28,7 +28,7 @@ export async function run(months: dayjs.Dayjs[]) {
       });
   const context = await browser.newContext({
     userAgent:
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
   });
   if (isLambda()) {
     await context.tracing.start({
@@ -42,7 +42,6 @@ export async function run(months: dayjs.Dayjs[]) {
   let createTxs: InsertObject<DB, 'bank_txs'>[];
   let deleteTxIds: string[];
   try {
-    console.log('beginning');
     const result = await (async () => {
       if (process.env.BANK_KEY === 'bancoIndustrialGt') {
         return await bancoIndustrialScrape({
