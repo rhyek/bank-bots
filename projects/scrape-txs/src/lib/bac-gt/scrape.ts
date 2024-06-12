@@ -33,10 +33,18 @@ export async function bacGtScrape({
   );
   const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
   const deleteTxIds: string[] = [];
-  await page.goto('https://www1.sucursalelectronica.com/redir/showLogin.go');
-  await page.locator('#navbarDropdownCountry').click();
+  await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
-  await page.locator('#navbarDropdownMenu').getByText('Guatemala').click();
+  await page
+    .locator('.country__button')
+    .filter({ hasText: 'Guatemala' })
+    .click();
+  await page.waitForURL('https://www.baccredomatic.com/es-gt');
+  await waitRandomMs();
+  await page
+    .locator('.secondary-menu__item')
+    .filter({ hasText: 'Banca en Línea' })
+    .click();
   await waitRandomMs();
   await page
     .getByRole('textbox', { name: 'Usuario' })
@@ -46,11 +54,12 @@ export async function bacGtScrape({
     .getByRole('textbox', { name: 'Contraseña' })
     .fill(config.auth.password);
   await waitRandomMs();
-  await page.locator('#confirm').click();
+  await page.locator('.login-form__submit-btn').click();
   await page.waitForURL(
     'https://www1.sucursalelectronica.com/ebac/module/consolidatedQuery/consolidatedQuery.go'
   );
   for (const account of config.accounts) {
+    await waitRandomMs();
     await page.goto(
       'https://www1.sucursalelectronica.com/ebac/module/consolidatedQuery/consolidatedQuery.go'
     );
