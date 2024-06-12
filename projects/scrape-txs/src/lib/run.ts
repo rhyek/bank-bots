@@ -1,8 +1,8 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import type dayjs from 'dayjs';
 import fs from 'node:fs/promises';
-import { chromium, errors as playwrightErrors, type Browser } from 'playwright';
-import { launchChromium } from 'playwright-aws-lambda';
+import { chromium, type Browser } from 'playwright';
+import lambdaChromium from '@sparticuz/chromium';
 import { z } from 'zod';
 import { bacGtScrape } from './bac-gt/scrape';
 import { bancoIndustrialScrape } from './banco-industrial/scrape';
@@ -20,7 +20,9 @@ export async function run(months: dayjs.Dayjs[]) {
   z.enum(['bancoIndustrialGt', 'bacGt'] as const).parse(process.env.BANK_KEY);
 
   const browser = isLambda()
-    ? ((await launchChromium({
+    ? ((await chromium.launch({
+        args: lambdaChromium.args,
+        executablePath: await lambdaChromium.executablePath(),
         headless: true,
       })) as Browser)
     : await chromium.launch({

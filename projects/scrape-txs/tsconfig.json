@@ -18,7 +18,9 @@
     // Best practices
     "strict": true,
     "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    "allowSyntheticDefaultImports": true
 
     // Some stricter flags
     // "noUnusedLocals": true,
