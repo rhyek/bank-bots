@@ -1,5 +1,4 @@
 resource "aws_s3_bucket" "playwright_traces" {
-  bucket = "bank-bots-playwright-traces"
 }
 
 resource "aws_s3_bucket_ownership_controls" "playwright_traces" {
