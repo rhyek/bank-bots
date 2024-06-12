@@ -62,9 +62,9 @@ export async function run(months: dayjs.Dayjs[]) {
     })();
     createTxs = result.createTxs;
     deleteTxIds = result.deleteTxIds;
-  } catch (error) {
+  } catch (error: any) {
     console.log('1');
-    if (error instanceof playwrightErrors.TimeoutError && isLambda()) {
+    if (error.constructor?.name === 'TimeoutError' && isLambda()) {
       console.log('2');
       const zipExtension = '.zip';
       const traceAbsolutePath = `/tmp/trace${zipExtension}`;
