@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat.js';
-import { type BrowserContext, type Page } from 'playwright';
+import { type Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import { db, type DB, type InsertObject } from '../db';
 import { waitRandomMs } from '../utils';
@@ -48,6 +48,14 @@ export async function bacGtScrape({
     'Sec-Fetch-Site': 'none',
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
+  });
+  await page.route('https://www.baccredomatic.com/', async (route) => {
+    const headers = Object.assign({}, route.request().headers(), {
+      Accept:
+        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+      'Accept-Encoding': 'gzip, deflate, br, zstd',
+    });
+    await route.continue({ headers });
   });
   await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
