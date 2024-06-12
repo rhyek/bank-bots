@@ -2,27 +2,9 @@ import dayjs from 'dayjs';
 import { chromium, type Browser, type Page } from 'playwright';
 import { launchChromium } from 'playwright-aws-lambda';
 import { isMatching } from 'ts-pattern';
-// import lodash from 'lodash';
-// import Decimal from 'decimal.js';
 import type { AccountType } from '../types';
 import { db, type InsertObject, type DB } from '../db';
-
-function waitRandomMs() {
-  const randomMilliSeconds =
-    Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000;
-
-  return new Promise<void>((resolve) => {
-    console.log(`Waiting for ${randomMilliSeconds} ms...`);
-    setTimeout(() => {
-      console.log('Done waiting.');
-      resolve();
-    }, randomMilliSeconds);
-  });
-}
-
-function isLambda() {
-  return !!process.env['AWS_LAMBDA_FUNCTION_NAME'];
-}
+import { isLambda, waitRandomMs } from '../utils';
 
 async function login(auth: {
   code: string;
@@ -143,7 +125,7 @@ export async function bancoIndustrialScrape({
   biConfig: BiConfig;
   months: dayjs.Dayjs[];
 }) {
-  const bankKey = 'bancoIndustrialGt';
+  const bankKey = process.env.BANK_KEY;
   console.log(
     `Scraping Banco Industrial GT transactions for months: ${months
       .map((m) => m.format('YYYY-MM'))
@@ -151,7 +133,7 @@ export async function bancoIndustrialScrape({
   );
   const ctx = await login(auth);
   try {
-    const bankTxs: InsertObject<DB, 'bank_txs'>[] = [];
+    const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
     const deleteTxIds: string[] = [];
     for (const account of accounts) {
       if (account.type === 'checking') {
@@ -175,7 +157,7 @@ export async function bancoIndustrialScrape({
                 ? Number(tx.credit)
                 : -Number(tx.debit);
             return {
-              bank_key: 'bancoIndustrialGt',
+              bank_key: bankKey,
               account_number: account.number,
               month: monthDayJs.format('YYYY-MM'),
               date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
@@ -197,109 +179,12 @@ export async function bancoIndustrialScrape({
               return !_bankTxs.some((bankTx) => isMatching(objToMatch, bankTx));
             })
             .map((tx) => tx.id);
-          bankTxs.push(..._bankTxs);
+          createTxs.push(..._bankTxs);
           deleteTxIds.push(..._deleteTxIds);
-          // bankTxs.push(
-          //   ...rawTransactions.map((tx) => {
-          //     const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
-          //     const amount =
-          //       tx.credit && tx.credit !== ''
-          //         ? Number(tx.credit)
-          //         : -Number(tx.debit);
-          //     return {
-          //       bank_key: 'bancoIndustrialGt',
-          //       tx_key: `bi.gt-${account.number}-${monthDayJs.format(
-          //         'YYYYMMDD'
-          //       )}-${tx.docNo}-${tx.description}-${amount}`,
-          //       account_number: account.number,
-          //       month: monthDayJs.format('YYYY-MM'),
-          //       date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
-          //       description: tx.description,
-          //       doc_no: tx.docNo,
-          //       amount,
-          //     };
-          //   })
-          // );
-          // bankTxs.push(
-          //   ...Object.values(
-          //     lodash.groupBy(
-          //       rawTransactions.map((tx) => {
-          //         const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
-          //         const amount =
-          //           tx.credit && tx.credit !== ''
-          //             ? Number(tx.credit)
-          //             : -Number(tx.debit);
-          //         return {
-          //           bank_key: 'bancoIndustrialGt',
-          //           tx_key: `bi.gt-${account.number}-${monthDayJs.format(
-          //             'YYYYMMDD'
-          //           )}-${tx.docNo}`,
-          //           account_number: account.number,
-          //           month: monthDayJs.format('YYYY-MM'),
-          //           date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
-          //           description: tx.description,
-          //           doc_no: tx.docNo,
-          //           amount,
-          //         };
-          //       }),
-          //       (tx) => tx.tx_key
-          //     )
-          //   ).map((txs) => ({
-          //     ...txs[0],
-          //     description:
-          //       txs.find(
-          //         (tx) => tx.description !== 'CONSUMO TARJETA ELECTRON VISA'
-          //       )?.description ?? txs[0].description,
-          //     amount: txs
-          //       .reduce((acc, tx) => acc.add(tx.amount), new Decimal(0))
-          //       .toDecimalPlaces(2)
-          //       .toNumber(),
-          //   }))
-          // );
         }
       }
     }
-    if (bankTxs.length > 0 || deleteTxIds.length > 0) {
-      await db.transaction().execute(async (sqlTx) => {
-        if (bankTxs.length > 0) {
-          console.log(
-            `Inserting/updating ${bankTxs.length} Banco Industrial GT transactions...`
-          );
-          await Promise.all(
-            bankTxs.map(async (bankTx) => {
-              await sqlTx
-                .insertInto('bank_txs')
-                .values(bankTx)
-                .onConflict((oc) =>
-                  oc
-                    .columns([
-                      'bank_key',
-                      'account_number',
-                      'date',
-                      'doc_no',
-                      'description',
-                      'amount',
-                    ])
-                    .doUpdateSet({ amount: bankTx.amount })
-                )
-                .execute();
-            })
-          );
-        }
-        if (deleteTxIds.length > 0) {
-          console.log(
-            `Deleting ${deleteTxIds.join(
-              ', '
-            )} Banco Industrial GT transactions...`
-          );
-          await sqlTx
-            .deleteFrom('bank_txs')
-            .where('id', 'in', deleteTxIds)
-            .execute();
-        }
-      });
-      console.log('Done.');
-    }
+    return { createTxs, deleteTxIds };
   } finally {
     await ctx.context.close();
     await ctx.browser.close();

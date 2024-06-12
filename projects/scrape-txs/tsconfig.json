@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "incremental": true,
     // Enable latest features
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
@@ -17,11 +18,11 @@
     // Best practices
     "strict": true,
     "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
+    "noFallthroughCasesInSwitch": true
 
     // Some stricter flags
-    "noUnusedLocals": true,
-    "noUnusedParameters": true
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true
     // "noPropertyAccessFromIndexSignature": true
   },
   "include": ["**/*.ts"]

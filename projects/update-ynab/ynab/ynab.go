@@ -56,6 +56,9 @@ func UpdateYnabWithBankTxs(config *types.Config, bankAccountsWithTxs []types.Ban
 
 		ynabTxs := []AugmentedYnabTransaction{}
 		for _, ynabTx := range _ynabTxs {
+			if ynabTx.Memo == nil {
+				continue
+			}
 			parsedMemo, err := ParseYnabTransactionMemo(ynabTx.Memo)
 			if err != nil {
 				return err
@@ -163,11 +166,17 @@ func UpdateEmptyPayees(config *types.Config) error {
 			if ynabTx.PayeeID != nil {
 				continue
 			}
+			if ynabTx.Memo == nil {
+				continue
+			}
 			parsedMemo, err := ParseYnabTransactionMemo(ynabTx.Memo)
 			if err != nil {
 				continue
 			}
 			for _, sourceTx := range sourceTxs {
+				if sourceTx.Memo == nil {
+					continue
+				}
 				iterParsedMemo, err := ParseYnabTransactionMemo(sourceTx.Memo)
 				if err != nil {
 					continue

@@ -66,7 +66,6 @@ func LoadBankTxs(db *sqlx.DB) ([]types.BankAccountWithTransactions, error) {
 			Description: bankTx.Description,
 			Amount:      bankTx.Amount.Mul(decimal.NewFromInt(1_000)).IntPart(),
 		})
-		slog.Info("tx size", "s", len(bankAccount.Transactions))
 	}
 
 	bankAccounts := []types.BankAccountWithTransactions{}

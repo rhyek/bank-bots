@@ -1,15 +1,6 @@
-import dayjs from 'dayjs';
 import { program } from 'commander';
-import { configSchema } from './lib/config-schema';
-import { bancoIndustrialScrape } from './lib/banco-industrial/scrape';
-import { db } from './lib/db';
-
-const { data: configJson } = await db
-  .selectFrom('config')
-  .select('data')
-  .where('id', '=', 'general')
-  .executeTakeFirstOrThrow();
-const config = configSchema.parse(configJson);
+import dayjs from 'dayjs';
+import { run } from './lib/run';
 
 program.option('-m, --month <months...>', 'Month(s) to scrape');
 
@@ -20,7 +11,6 @@ const options = program.opts<{
 }>();
 
 const months: dayjs.Dayjs[] = [];
-
 if (options.month) {
   months.push(...options.month.map((month) => dayjs(month)));
 } else {
@@ -31,9 +21,4 @@ if (options.month) {
   }
 }
 
-await bancoIndustrialScrape({
-  biConfig: config.banks.bancoIndustrialGt,
-  months,
-});
-
-await db.destroy();
+await run(months);

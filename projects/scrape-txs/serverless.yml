@@ -5,12 +5,27 @@ provider:
   name: aws
 
 functions:
-  cronHandler:
+  bancoIndustrialGtHandler:
     image: ${env:ECR_REPO_URL}:${env:IMAGE_TAG}
     memorySize: 1024
     timeout: 300 # 5 minutes
     environment:
       DATABASE_URL: ${env:DATABASE_URL}
+      BANK_KEY: bancoIndustrialGt
+    role: ${env:LAMBDA_ROLE_ARN}
+    events:
+      # Invoke Lambda function every day at 7am Guatemala time
+      - schedule:
+          method: scheduler # use AWS::Scheduler::Schedule (EventBridge rule) instead of AWS::Events::Rule (CloudWatch Events rule)
+          rate: cron(0 7 * * ? *)
+          timezone: America/Guatemala # possible with AWS::Scheduler::Schedule
+  bacGtHandler:
+    image: ${env:ECR_REPO_URL}:${env:IMAGE_TAG}
+    memorySize: 1024
+    timeout: 300 # 5 minutes
+    environment:
+      DATABASE_URL: ${env:DATABASE_URL}
+      BANK_KEY: bacGt
     role: ${env:LAMBDA_ROLE_ARN}
     events:
       # Invoke Lambda function every day at 7am Guatemala time

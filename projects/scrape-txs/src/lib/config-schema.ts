@@ -16,5 +16,17 @@ export const configSchema = z.object({
         })
       ),
     }),
+    bacGt: z.object({
+      auth: z.object({
+        username: z.string(),
+        password: z.string(),
+      }),
+      accounts: z.array(
+        z.object({
+          type: z.enum(['checking', 'creditcard']),
+          number: z.string(),
+        })
+      ),
+    }),
   }),
 });
