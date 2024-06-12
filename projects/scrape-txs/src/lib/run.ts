@@ -42,6 +42,7 @@ export async function run(months: dayjs.Dayjs[]) {
   let createTxs: InsertObject<DB, 'bank_txs'>[];
   let deleteTxIds: string[];
   try {
+    console.log('beginning');
     const result = await (async () => {
       if (process.env.BANK_KEY === 'bancoIndustrialGt') {
         return await bancoIndustrialScrape({
@@ -62,7 +63,9 @@ export async function run(months: dayjs.Dayjs[]) {
     createTxs = result.createTxs;
     deleteTxIds = result.deleteTxIds;
   } catch (error) {
+    console.log('1');
     if (error instanceof playwrightErrors.TimeoutError && isLambda()) {
+      console.log('2');
       const zipExtension = '.zip';
       const traceAbsolutePath = `/tmp/trace${zipExtension}`;
       await context.tracing.stop({ path: traceAbsolutePath });
