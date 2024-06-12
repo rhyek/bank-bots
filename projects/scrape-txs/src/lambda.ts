@@ -13,10 +13,9 @@ export const handler: ScheduledHandler = async (_event) => {
   try {
     await run(months);
   } catch (error: any) {
-    const emailSubject = `Scrape bank txs failed`;
-    const emailBody = `Error:
-${error.stack}
-`;
+    console.error(error);
+    const emailSubject = `Scrape bank txs failed for ${process.env.BANK_KEY}`;
+    const emailBody = `Error:\n${error.message}`;
     await mailer.sendMail({
       to: process.env.MAILER_ME,
       subject: emailSubject,
