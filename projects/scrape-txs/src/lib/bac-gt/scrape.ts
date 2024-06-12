@@ -49,14 +49,15 @@ export async function bacGtScrape({
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
   });
-  // await page.route('https://www.baccredomatic.com/', async (route) => {
-  //   const headers = Object.assign({}, route.request().headers(), {
-  //     Accept:
-  //       'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-  //     'Accept-Encoding': 'gzip, deflate, br, zstd',
-  //   });
-  //   await route.continue({ headers });
-  // });
+  await page.route('https://www.baccredomatic.com/', async (route) => {
+    const headers = Object.assign({}, route.request().headers(), {
+      Accept:
+        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+      'Accept-Encoding': 'gzip, deflate, br, zstd',
+    });
+    console.log('hi from router handler!');
+    await route.continue({ headers });
+  });
   await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
   await page
