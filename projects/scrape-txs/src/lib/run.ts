@@ -19,15 +19,18 @@ export async function run(months: dayjs.Dayjs[]) {
   const config = configSchema.parse(configJson);
   z.enum(['bancoIndustrialGt', 'bacGt'] as const).parse(process.env.BANK_KEY);
 
-  const browser = isLambda()
-    ? ((await chromium.launch({
-        args: lambdaChromium.args,
-        executablePath: await lambdaChromium.executablePath(),
-        headless: true,
-      })) as Browser)
-    : await chromium.launch({
-        headless: false,
-      });
+  // const browser = isLambda()
+  //   ? ((await chromium.launch({
+  //       args: lambdaChromium.args,
+  //       executablePath: await lambdaChromium.executablePath(),
+  //       headless: true,
+  //     })) as Browser)
+  //   : await chromium.launch({
+  //       headless: false,
+  //     });
+  const browser = await chromium.launch({
+    headless: false,
+  });
   const context = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
