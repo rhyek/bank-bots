@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "start": "node ./dist/console.js"
+    "start": "tsx --inspect=0 ./src/console.ts"
   },
   "devDependencies": {
     "@tsconfig/node20": "~20.1.2",
@@ -15,6 +15,7 @@
     "@types/pg": "^8.11.2",
     "kysely-codegen": "^0.14.0",
     "tsc-alias": "^1.8.8",
+    "tsx": "^4.15.2",
     "typescript": "^5.4.2"
   },
   "dependencies": {

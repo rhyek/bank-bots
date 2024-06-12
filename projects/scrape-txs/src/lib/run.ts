@@ -18,7 +18,7 @@ export async function run(months: dayjs.Dayjs[]) {
     .executeTakeFirstOrThrow();
   const config = configSchema.parse(configJson);
   z.enum(['bancoIndustrialGt', 'bacGt'] as const).parse(process.env.BANK_KEY);
-
+  console.log('chromium args', lambdaChromium.args);
   const browser = isLambda()
     ? await chromium.launch({
         args: lambdaChromium.args,
