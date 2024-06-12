@@ -43,19 +43,42 @@ resource "aws_s3_bucket_policy" "playwright_traces" {
   policy = data.aws_iam_policy_document.playwright_traces_bucket_policy.json
 }
 
-data "aws_iam_policy_document" "playwright_traces_put_object_policy" {
-  statement {
-    actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.playwright_traces.arn}/*"]
-    effect    = "Allow"
-    principals {
-      type        = "AWS"
-      identifiers = [var.lambda_role_arn]
-    }
-  }
+//
+
+resource "aws_iam_policy" "lambda_s3_policy" {
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = "s3:PutObject"
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.playwright_traces.arn}/*"
+      }
+    ]
+  })
 }
 
-resource "aws_s3_bucket_policy" "playwright_traces_put_object_policy" {
-  bucket = aws_s3_bucket.playwright_traces.id
-  policy = data.aws_iam_policy_document.playwright_traces_put_object_policy.json
+# Attach the policy to the role
+resource "aws_iam_role_policy_attachment" "lambda_s3_policy_attachment" {
+  role       = var.lambda_role_name
+  policy_arn = aws_iam_policy.lambda_s3_policy.arn
 }
+
+//
+
+# data "aws_iam_policy_document" "playwright_traces_put_object_policy" {
+#   statement {
+#     actions   = ["s3:PutObject"]
+#     resources = ["${aws_s3_bucket.playwright_traces.arn}/*"]
+#     effect    = "Allow"
+#     principals {
+#       type        = "AWS"
+#       identifiers = [var.lambda_role_arn]
+#     }
+#   }
+# }
+
+# resource "aws_s3_bucket_policy" "playwright_traces_put_object_policy" {
+#   bucket = aws_s3_bucket.playwright_traces.id
+#   policy = data.aws_iam_policy_document.playwright_traces_put_object_policy.json
+# }
