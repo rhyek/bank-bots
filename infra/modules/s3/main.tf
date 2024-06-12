@@ -55,8 +55,7 @@ data "aws_iam_policy_document" "playwright_traces_put_object_policy" {
   }
 }
 
-resource "aws_iam_policy" "playwright_traces_put_object_policy" {
-  name   = "playwright-traces-put-object-policy"
-  path   = "/"
+resource "aws_s3_bucket_policy" "playwright_traces_put_object_policy" {
+  bucket = aws_s3_bucket.playwright_traces.id
   policy = data.aws_iam_policy_document.playwright_traces_put_object_policy.json
 }
