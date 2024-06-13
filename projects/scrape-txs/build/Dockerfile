@@ -8,7 +8,9 @@ RUN npm run build
 
 # runner
 
-FROM mcr.microsoft.com/playwright:v1.42.1-jammy
+# https://mcr.microsoft.com/en-us/product/playwright/tags
+# FROM mcr.microsoft.com/playwright:v1.42.1-jammy
+FROM mcr.microsoft.com/playwright:v1.44.1-jammy
 
 RUN apt-get update && \
   apt-get install -y \
