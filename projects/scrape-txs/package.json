@@ -6,8 +6,6 @@
     "start": "tsx --inspect=0 ./src/console.ts"
   },
   "devDependencies": {
-    "@tsconfig/node20": "~20.1.2",
-    "@tsconfig/strictest": "~2.0.3",
     "@types/aws-lambda": "^8.10.136",
     "@types/lodash": "^4.17.0",
     "@types/node": "^20.11.20",
@@ -29,7 +27,6 @@
     "nodemailer": "^6.9.13",
     "pg": "^8.11.3",
     "playwright": "1.44.1",
-    "playwright-aws-lambda": "^0.10.0",
     "ts-pattern": "^5.0.8",
     "zod": "^3.22.4"
   }
