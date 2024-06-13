@@ -34,36 +34,43 @@ export async function bacGtScrape({
   const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
   const deleteTxIds: string[] = [];
 
-  await page.setExtraHTTPHeaders({
-    Accept:
-      'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-    'Accept-Encoding': 'gzip, deflate, br, zstd',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Sec-Ch-Ua':
-      '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
-    'Sec-Ch-Ua-Mobile': '?0',
-    'Sec-Ch-Ua-Platform': '"macOS"',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Sec-Fetch-User': '?1',
-    'Upgrade-Insecure-Requests': '1',
-  });
-  // await page.route(/https:\/\/www.baccredomatic.com\/$/, async (route) => {
-  //   if (route.request().resourceType() === 'document') {
-  //     const headers = Object.assign({}, route.request().headers(), {
-  //       // Host: 'www.baccredomatic.com',
-  //       Accept:
-  //         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-  //       'Accept-Encoding': 'gzip, deflate, br, zstd',
-  //       Connection: 'keep-alive',
-  //     });
-  //     console.log('hi from router handler!');
-  //     await route.continue({ headers });
-  //   } else {
-  //     await route.continue();
-  //   }
+  // await page.setExtraHTTPHeaders({
+  //   Accept:
+  //     'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+  //   'Accept-Encoding': 'gzip, deflate, br, zstd',
+  //   'Accept-Language': 'en-US,en;q=0.9',
+  //   'Sec-Ch-Ua':
+  //     '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
+  //   'Sec-Ch-Ua-Mobile': '?0',
+  //   'Sec-Ch-Ua-Platform': '"macOS"',
+  //   'Sec-Fetch-Dest': 'document',
+  //   'Sec-Fetch-Mode': 'navigate',
+  //   'Sec-Fetch-Site': 'none',
+  //   'Sec-Fetch-User': '?1',
+  //   'Upgrade-Insecure-Requests': '1',
   // });
+  await page.route(/https:\/\/www.baccredomatic.com\/$/, async (route) => {
+    if (route.request().resourceType() === 'document') {
+      const headers = Object.assign(route.request().headers(), {
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Ch-Ua':
+          '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"macOS"',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+      });
+      await route.continue({ headers });
+    } else {
+      await route.continue();
+    }
+  });
   await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
   await page
