@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"slices"
 	"time"
 
@@ -21,11 +22,20 @@ type AugmentedYnabTransaction struct {
 	ParsedMemo *ParsedYnabTransactionMemo
 }
 
-func UpdateYnabWithBankTxs(config *types.Config, bankAccountsWithTxs []types.BankAccountWithTransactions) error {
+func UpdateYnabWithBankTxs(config *types.Config, bankAccountsWithTxs []types.BankAccountWithTransactions, fromMonth time.Time) error {
 	client := ynab.NewClient(config.YNAB.AccessToken)
 
 	ynabTxCreates := []transaction.PayloadTransaction{}
 	ynabTxUpdates := []transaction.PayloadTransaction{}
+
+	type DeleteTransaction struct {
+		Id        string                `json:"id"`
+		FlagColor transaction.FlagColor `json:"flag_color"`
+	}
+	type DeleteTransactionsPayload struct {
+		Transactions []DeleteTransaction `json:"transactions"`
+	}
+	ynabTxDeletes := []DeleteTransaction{}
 
 	for _, bankAccount := range bankAccountsWithTxs {
 		if len(bankAccount.Transactions) == 0 {
@@ -69,9 +79,10 @@ func UpdateYnabWithBankTxs(config *types.Config, bankAccountsWithTxs []types.Ban
 			})
 		}
 
+		// upserts
 		for _, bankTx := range bankAccount.Transactions {
-			idx := slices.IndexFunc(ynabTxs, func(e AugmentedYnabTransaction) bool {
-				return e.ParsedMemo.Ref == bankTx.Ref || e.ParsedMemo.Ref == bankTx.DocNo
+			idx := slices.IndexFunc(ynabTxs, func(ynabTx AugmentedYnabTransaction) bool {
+				return ynabTx.ParsedMemo.Ref == bankTx.Ref || ynabTx.ParsedMemo.Ref == bankTx.DocNo
 			})
 			if idx == -1 {
 				slog.Info(fmt.Sprintf("creating transaction: %+v", bankTx))
@@ -102,6 +113,37 @@ func UpdateYnabWithBankTxs(config *types.Config, bankAccountsWithTxs []types.Ban
 				}
 			}
 		}
+		// deletes
+		rgx := regexp.MustCompile(`\d{8,}_\d+(\(\d+\))?$`)
+		isSameOrFutureMonth := func(fromMonth, t time.Time) bool {
+			fromYear, fromMonthNum, _ := fromMonth.Date()
+			tYear, tMonthNum, _ := t.Date()
+
+			if tYear > fromYear {
+				return true
+			} else if tYear == fromYear && tMonthNum >= fromMonthNum {
+				return true
+			}
+			return false
+		}
+		for _, ynabTx := range ynabTxs {
+			if !isSameOrFutureMonth(fromMonth, ynabTx.Tx.Date.Time) {
+				continue
+			}
+			if !rgx.MatchString(ynabTx.ParsedMemo.Ref) {
+				continue
+			}
+			idx := slices.IndexFunc(bankAccount.Transactions, func(bankTx types.PreparedBankTx) bool {
+				return ynabTx.ParsedMemo.Ref == bankTx.Ref || ynabTx.ParsedMemo.Ref == bankTx.DocNo
+			})
+			if idx == -1 {
+				slog.Warn(fmt.Sprintf("marking transaction for deletion: %+v", ynabTx.Tx), "ref", ynabTx.ParsedMemo.Ref)
+				ynabTxDeletes = append(ynabTxDeletes, DeleteTransaction{
+					Id:        ynabTx.Tx.ID,
+					FlagColor: transaction.FlagColorRed,
+				})
+			}
+		}
 	}
 
 	slog.Info(fmt.Sprintf("creating %v transactions", len(ynabTxCreates)))
@@ -123,6 +165,31 @@ func UpdateYnabWithBankTxs(config *types.Config, bankAccountsWithTxs []types.Ban
 		if err != nil {
 			return err
 		}
+	}
+	slog.Info(fmt.Sprintf("deleting %v transactions", len(ynabTxDeletes)))
+	if len(ynabTxDeletes) > 0 {
+		payload := DeleteTransactionsPayload{
+			Transactions: ynabTxDeletes,
+		}
+		jsonStr, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		req, err := http.NewRequest(
+			"PATCH",
+			fmt.Sprintf("https://api.ynab.com/v1/budgets/%s/transactions", config.YNAB.BudgetID),
+			bytes.NewBuffer(jsonStr))
+		if err != nil {
+			return err
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", config.YNAB.AccessToken))
+		req.Header.Add("Content-Type", "application/json")
+		httpClient := &http.Client{}
+		res, err := httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
 	}
 
 	return nil

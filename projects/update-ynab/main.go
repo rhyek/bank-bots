@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"time"
 
 	"bank-bots/update-ynab/banks"
 	"bank-bots/update-ynab/types"
@@ -61,12 +62,20 @@ func work() (*string, error) {
 		return nil, err
 	}
 
-	bankAccountsWithTxs, err := banks.LoadBankTxs(db)
+	var fromMonth time.Time
+	if time.Now().Day() <= 10 {
+		year, month, day := time.Now().Date()
+		fromMonth = time.Date(year, month-1, day, 0, 0, 0, 0, time.UTC)
+	} else {
+		fromMonth = time.Now()
+	}
+
+	bankAccountsWithTxs, err := banks.LoadBankTxs(db, fromMonth)
 	if err != nil {
 		return nil, err
 	}
 
-	err = ynab.UpdateYnabWithBankTxs(config, bankAccountsWithTxs)
+	err = ynab.UpdateYnabWithBankTxs(config, bankAccountsWithTxs, fromMonth)
 	if err != nil {
 		return nil, err
 	}

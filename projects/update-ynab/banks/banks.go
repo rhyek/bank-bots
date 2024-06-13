@@ -11,15 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func LoadBankTxs(db *sqlx.DB) ([]types.BankAccountWithTransactions, error) {
-	var fromMonth time.Time
-	if time.Now().Day() <= 10 {
-		year, month, day := time.Now().Date()
-		fromMonth = time.Date(year, month-1, day, 0, 0, 0, 0, time.UTC)
-	} else {
-		fromMonth = time.Now()
-	}
-
+func LoadBankTxs(db *sqlx.DB, fromMonth time.Time) ([]types.BankAccountWithTransactions, error) {
 	slog.Info("loading bank txs", slog.String("fromMonth", fromMonth.Format("2006-01")))
 
 	bankTxs := []types.DbBankTx{}
@@ -76,13 +68,13 @@ func LoadBankTxs(db *sqlx.DB) ([]types.BankAccountWithTransactions, error) {
 		bankAccounts = append(bankAccounts, *bankAccount)
 	}
 
-	slog.Info("printing found bank txs:")
-	for _, bankAccount := range bankAccounts {
-		for _, bankTx := range bankAccount.Transactions {
-			slog.Info(fmt.Sprintf("account: %s, date: %s, doc_no: %s, amount: %d", bankAccount.Account.Number,
-				bankTx.Date.Format("2006-01-02"), bankTx.DocNo, bankTx.Amount))
-		}
-	}
+	// slog.Info("printing found bank txs:")
+	// for _, bankAccount := range bankAccounts {
+	// 	for _, bankTx := range bankAccount.Transactions {
+	// 		slog.Info(fmt.Sprintf("account: %s, date: %s, doc_no: %s, amount: %d", bankAccount.Account.Number,
+	// 			bankTx.Date.Format("2006-01-02"), bankTx.DocNo, bankTx.Amount))
+	// 	}
+	// }
 
 	return bankAccounts, nil
 }
