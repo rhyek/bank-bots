@@ -57,12 +57,13 @@ export async function bacGtScrape({
   await waitRandomMs();
   await page.locator('.login-form__submit-btn').click();
   await page.waitForURL(
-    'https://www1.sucursalelectronica.com/ebac/module/consolidatedQuery/consolidatedQuery.go'
+    '**/ebac/module/consolidatedQuery/consolidatedQuery.go'
   );
+  const host = await page.evaluate(() => window.location.host);
   for (const account of config.accounts) {
     await waitRandomMs();
     await page.goto(
-      'https://www1.sucursalelectronica.com/ebac/module/consolidatedQuery/consolidatedQuery.go'
+      `https://${host}/ebac/module/consolidatedQuery/consolidatedQuery.go`
     );
     if (account.type === 'checking') {
       await waitRandomMs();
@@ -76,7 +77,7 @@ export async function bacGtScrape({
         .locator(`form[name^="BankAccountBalanceItem"] > button`)
         .click();
       await page.waitForURL(
-        'https://www1.sucursalelectronica.com/ebac/module/accountbalance/accountBalance.go'
+        `https://${host}/ebac/module/accountbalance/accountBalance.go`
       );
       for (const monthDayJs of months) {
         const currentTxs = await db
