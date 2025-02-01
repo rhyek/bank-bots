@@ -112,22 +112,27 @@ View trace: ${viewTraceUrl}\
         );
         await Promise.all(
           createTxs.map(async (bankTx) => {
-            await sqlTx
-              .insertInto('bank_txs')
-              .values(bankTx)
-              .onConflict((oc) =>
-                oc
-                  .columns([
-                    'bank_key',
-                    'account_number',
-                    'date',
-                    'doc_no',
-                    'description',
-                    'amount',
-                  ])
-                  .doUpdateSet({ amount: bankTx.amount })
-              )
-              .execute();
+            try {
+              await sqlTx
+                .insertInto('bank_txs')
+                .values(bankTx)
+                .onConflict((oc) =>
+                  oc
+                    .columns([
+                      'bank_key',
+                      'account_number',
+                      'date',
+                      'doc_no',
+                      'description',
+                      'amount',
+                    ])
+                    .doUpdateSet({ amount: bankTx.amount })
+                )
+                .execute();
+            } catch (error) {
+              console.error('Failed to insert/update tx', bankTx);
+              throw error;
+            }
           })
         );
       }

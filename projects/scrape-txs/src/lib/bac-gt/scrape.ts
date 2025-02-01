@@ -123,20 +123,25 @@ export async function bacGtScrape({
                 .replace(/[+,]/g, ''),
             }));
           })
-        ).map((tx) => {
-          const date = dayjs(tx.date, 'DD/MM/YYYY');
-          const debit = parseFloat(tx.debit);
-          const credit = parseFloat(tx.credit);
-          return {
-            bank_key: bankKey,
-            account_number: account.number,
-            month: monthDayJs.format('YYYY-MM'),
-            date: date.format('YYYY-MM-DD'),
-            description: tx.description,
-            doc_no: tx.docNo,
-            amount: debit ? -Number(debit) : credit,
-          };
-        });
+        )
+          .map((tx) => {
+            if (tx.description === 'No hay detalle de movimientos') {
+              return null;
+            }
+            const date = dayjs(tx.date, 'DD/MM/YYYY');
+            const debit = parseFloat(tx.debit);
+            const credit = parseFloat(tx.credit);
+            return {
+              bank_key: bankKey,
+              account_number: account.number,
+              month: monthDayJs.format('YYYY-MM'),
+              date: date.format('YYYY-MM-DD'),
+              description: tx.description,
+              doc_no: tx.docNo,
+              amount: debit ? -Number(debit) : credit,
+            };
+          })
+          .filter((tx) => !!tx);
         createTxs.push(...transactions);
         deleteTxIds.push(
           ...currentTxs

@@ -4,7 +4,6 @@ go 1.21.2
 
 require (
 	github.com/aws/aws-lambda-go v1.46.0
-	github.com/brunomvsouza/ynab.go v1.4.0
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/shopspring/decimal v1.3.1
