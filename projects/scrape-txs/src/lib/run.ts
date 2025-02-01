@@ -1,12 +1,12 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import lambdaChromium from '@sparticuz/chromium';
 import type dayjs from 'dayjs';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
-import lambdaChromium from '@sparticuz/chromium';
 import { z } from 'zod';
 import { bacScrape } from './bac/scrape';
 import { bancoIndustrialScrape } from './banco-industrial/scrape';
-import { bacSchema, configSchema } from './config-schema';
+import { configSchema } from './config-schema';
 import { db, type DB, type InsertObject } from './db';
 import { isLambda } from './utils';
 
