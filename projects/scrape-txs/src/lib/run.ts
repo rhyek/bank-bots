@@ -4,20 +4,20 @@ import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
 import lambdaChromium from '@sparticuz/chromium';
 import { z } from 'zod';
-import { bacGtScrape } from './bac-gt/scrape';
+import { bacScrape } from './bac/scrape';
 import { bancoIndustrialScrape } from './banco-industrial/scrape';
-import { configSchema } from './config-schema';
+import { bacSchema, configSchema } from './config-schema';
 import { db, type DB, type InsertObject } from './db';
 import { isLambda } from './utils';
 
 export async function run(months: dayjs.Dayjs[]) {
+  const bankKey = z.string().parse(process.env.BANK_KEY);
   const { data: configJson } = await db
     .selectFrom('config')
     .select('data')
     .where('id', '=', 'general')
     .executeTakeFirstOrThrow();
   const config = configSchema.parse(configJson);
-  z.enum(['bancoIndustrialGt', 'bacGt'] as const).parse(process.env.BANK_KEY);
   console.log('chromium args', lambdaChromium.args);
   const browser = isLambda()
     ? await chromium.launch({
@@ -45,20 +45,21 @@ export async function run(months: dayjs.Dayjs[]) {
   let deleteTxIds: string[];
   try {
     const result = await (async () => {
-      if (process.env.BANK_KEY === 'bancoIndustrialGt') {
+      if (bankKey === 'bancoIndustrialGt') {
         return await bancoIndustrialScrape({
           biConfig: config.banks.bancoIndustrialGt,
           months,
           page,
         });
-      } else if (process.env.BANK_KEY === 'bacGt') {
-        return await bacGtScrape({
-          config: config.banks.bacGt,
+      } else if (['bacGt', 'bacCr'].includes(bankKey)) {
+        return await bacScrape({
+          bankKey,
+          config: config.banks[bankKey as 'bacGt' | 'bacCr'],
           months,
           page,
         });
       } else {
-        throw new Error(`Unknown bank key: ${process.env.BANK_KEY}`);
+        throw new Error(`Unknown bank key: ${bankKey}`);
       }
     })();
     createTxs = result.createTxs;
@@ -70,9 +71,7 @@ export async function run(months: dayjs.Dayjs[]) {
       await context.tracing.stop({ path: traceAbsolutePath });
       const buffer = await fs.readFile(traceAbsolutePath);
       const s3Client = new S3Client({});
-      const objectKey = `${new Date().getTime()}_${
-        process.env.BANK_KEY
-      }${zipExtension}`;
+      const objectKey = `${new Date().getTime()}_${bankKey}${zipExtension}`;
       // AWS_REGION is provided by lambda: https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-runtime
       const region = process.env.AWS_REGION!;
       const bucket = process.env.PLAYWRIGHT_TRACES_S3_BUCKET_ID;
@@ -108,7 +107,7 @@ View trace: ${viewTraceUrl}\
     await db.transaction().execute(async (sqlTx) => {
       if (createTxs.length > 0) {
         console.log(
-          `Inserting/updating ${createTxs.length} ${process.env.BANK_KEY} transactions...`
+          `Inserting/updating ${createTxs.length} ${bankKey} transactions...`
         );
         await Promise.all(
           createTxs.map(async (bankTx) => {
@@ -138,9 +137,7 @@ View trace: ${viewTraceUrl}\
       }
       if (deleteTxIds.length > 0) {
         console.log(
-          `Deleting ${deleteTxIds.join(', ')} ${
-            process.env.BANK_KEY
-          } transactions...`
+          `Deleting ${deleteTxIds.join(', ')} ${bankKey} transactions...`
         );
         await sqlTx
           .deleteFrom('bank_txs')

@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --project tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "start": "tsx --inspect=0 ./src/console.ts"
+    "start": "tsx ./src/console.ts"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.136",
