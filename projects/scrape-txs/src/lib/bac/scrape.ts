@@ -148,7 +148,7 @@ export async function bacScrape({
         accountScrapedTxs.push(...scrapedConfirmedTxs);
       }
       // retenidos y diferidos
-      await page.getByText('Retenidos y Diferidos').click();
+      await page.getByText('Retenidos y Diferidos', { exact: true }).click();
       // compras recientes y sobregiros
       await page.locator('#recentPurchasesTable').isVisible();
       await page.waitForLoadState('networkidle');
