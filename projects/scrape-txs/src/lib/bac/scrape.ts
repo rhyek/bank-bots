@@ -34,9 +34,9 @@ export async function bacScrape({
     .locator('.country__button')
     .filter({ hasText: config.country })
     .click();
-  await page.waitForURL('https://www.baccredomatic.com/**', {
-    waitUntil: 'networkidle',
-  });
+  // await page.waitForURL('https://www.baccredomatic.com/**', {
+  //   waitUntil: 'networkidle',
+  // });
   await waitRandomMs();
   await page
     .locator('.secondary-menu__item')
@@ -147,117 +147,117 @@ export async function bacScrape({
           .filter((tx) => !!tx);
         accountScrapedTxs.push(...scrapedConfirmedTxs);
       }
-      // retenidos y diferidos
-      await page.getByText('Retenidos y Diferidos', { exact: true }).click();
-      // compras recientes y sobregiros
-      await page.locator('#recentPurchasesTable').isVisible();
-      await page.waitForLoadState('networkidle');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // // retenidos y diferidos
+      // await page.getByText('Retenidos y Diferidos', { exact: true }).click();
+      // // compras recientes y sobregiros
+      // await page.locator('#recentPurchasesTable').isVisible();
+      // await page.waitForLoadState('networkidle');
+      // await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      const recentPurchases = (
-        await page.evaluate(() => {
-          return Array.from(
-            document.querySelectorAll('#recentPurchasesTable tbody tr')
-          ).map((tr) => {
-            try {
-              return {
-                date: tr
-                  .querySelector('td:nth-of-type(1)')!
-                  .textContent!.trim(),
-                docNo: tr
-                  .querySelector('td:nth-of-type(2)')!
-                  .textContent!.trim(),
-                description: tr
-                  .querySelector('td:nth-of-type(3)')!
-                  .textContent!.trim(),
-                debit: tr
-                  .querySelector('td:nth-of-type(4)')!
-                  .textContent!.trim()
-                  .replace(/,/g, ''),
-              };
-            } catch {
-              return null;
-            }
-          });
-        })
-      )
-        .map((tx) => {
-          if (!tx) {
-            return null;
-          }
-          const date = dayjs(`${tx.date}/${dayjs().year()}`, 'DD/MM/YYYY');
-          if (!months.some((m) => m.isSame(date, 'month'))) {
-            return null;
-          }
-          const debit = parseFloat(tx.debit);
-          if (!debit || isNaN(debit)) {
-            return null;
-          }
-          return {
-            bank_key: bankKey,
-            account_number: account.number,
-            month: date.format('YYYY-MM'),
-            date: date.format('YYYY-MM-DD'),
-            description: tx.description,
-            doc_no: tx.docNo,
-            amount: -Number(debit),
-          };
-        })
-        .filter((tx) => !!tx);
-      accountScrapedTxs.push(...recentPurchases);
+      // const recentPurchases = (
+      //   await page.evaluate(() => {
+      //     return Array.from(
+      //       document.querySelectorAll('#recentPurchasesTable tbody tr')
+      //     ).map((tr) => {
+      //       try {
+      //         return {
+      //           date: tr
+      //             .querySelector('td:nth-of-type(1)')!
+      //             .textContent!.trim(),
+      //           docNo: tr
+      //             .querySelector('td:nth-of-type(2)')!
+      //             .textContent!.trim(),
+      //           description: tr
+      //             .querySelector('td:nth-of-type(3)')!
+      //             .textContent!.trim(),
+      //           debit: tr
+      //             .querySelector('td:nth-of-type(4)')!
+      //             .textContent!.trim()
+      //             .replace(/,/g, ''),
+      //         };
+      //       } catch {
+      //         return null;
+      //       }
+      //     });
+      //   })
+      // )
+      //   .map((tx) => {
+      //     if (!tx) {
+      //       return null;
+      //     }
+      //     const date = dayjs(`${tx.date}/${dayjs().year()}`, 'DD/MM/YYYY');
+      //     if (!months.some((m) => m.isSame(date, 'month'))) {
+      //       return null;
+      //     }
+      //     const debit = parseFloat(tx.debit);
+      //     if (!debit || isNaN(debit)) {
+      //       return null;
+      //     }
+      //     return {
+      //       bank_key: bankKey,
+      //       account_number: account.number,
+      //       month: date.format('YYYY-MM'),
+      //       date: date.format('YYYY-MM-DD'),
+      //       description: tx.description,
+      //       doc_no: tx.docNo,
+      //       amount: -Number(debit),
+      //     };
+      //   })
+      //   .filter((tx) => !!tx);
+      // accountScrapedTxs.push(...recentPurchases);
 
-      // retenidos y deferidos
-      const retainedAndDeferred = (
-        await page.evaluate(() => {
-          return Array.from(
-            document.querySelectorAll('#retainedAndDeferredTable tbody tr')
-          ).map((tr) => {
-            try {
-              return {
-                date: tr
-                  .querySelector('td:nth-of-type(1)')!
-                  .textContent!.trim(),
-                docNo: tr
-                  .querySelector('td:nth-of-type(3)')!
-                  .textContent!.trim(),
-                description: tr
-                  .querySelector('td:nth-of-type(4)')!
-                  .textContent!.trim(),
-                debit: tr
-                  .querySelector('td:nth-of-type(5)')!
-                  .textContent!.trim()
-                  .replace(/,/g, ''),
-              };
-            } catch {
-              return null;
-            }
-          });
-        })
-      )
-        .map((tx) => {
-          if (!tx) {
-            return null;
-          }
-          const date = dayjs(tx.date, 'DD/MM/YYYY');
-          if (!months.some((m) => m.isSame(date, 'month'))) {
-            return null;
-          }
-          const debit = parseFloat(tx.debit);
-          if (!debit || isNaN(debit)) {
-            return null;
-          }
-          return {
-            bank_key: bankKey,
-            account_number: account.number,
-            month: date.format('YYYY-MM'),
-            date: date.format('YYYY-MM-DD'),
-            description: tx.description,
-            doc_no: tx.docNo,
-            amount: -Number(debit),
-          };
-        })
-        .filter((tx) => !!tx);
-      accountScrapedTxs.push(...retainedAndDeferred);
+      // // retenidos y deferidos
+      // const retainedAndDeferred = (
+      //   await page.evaluate(() => {
+      //     return Array.from(
+      //       document.querySelectorAll('#retainedAndDeferredTable tbody tr')
+      //     ).map((tr) => {
+      //       try {
+      //         return {
+      //           date: tr
+      //             .querySelector('td:nth-of-type(1)')!
+      //             .textContent!.trim(),
+      //           docNo: tr
+      //             .querySelector('td:nth-of-type(3)')!
+      //             .textContent!.trim(),
+      //           description: tr
+      //             .querySelector('td:nth-of-type(4)')!
+      //             .textContent!.trim(),
+      //           debit: tr
+      //             .querySelector('td:nth-of-type(5)')!
+      //             .textContent!.trim()
+      //             .replace(/,/g, ''),
+      //         };
+      //       } catch {
+      //         return null;
+      //       }
+      //     });
+      //   })
+      // )
+      //   .map((tx) => {
+      //     if (!tx) {
+      //       return null;
+      //     }
+      //     const date = dayjs(tx.date, 'DD/MM/YYYY');
+      //     if (!months.some((m) => m.isSame(date, 'month'))) {
+      //       return null;
+      //     }
+      //     const debit = parseFloat(tx.debit);
+      //     if (!debit || isNaN(debit)) {
+      //       return null;
+      //     }
+      //     return {
+      //       bank_key: bankKey,
+      //       account_number: account.number,
+      //       month: date.format('YYYY-MM'),
+      //       date: date.format('YYYY-MM-DD'),
+      //       description: tx.description,
+      //       doc_no: tx.docNo,
+      //       amount: -Number(debit),
+      //     };
+      //   })
+      //   .filter((tx) => !!tx);
+      // accountScrapedTxs.push(...retainedAndDeferred);
 
       deleteTxIds.push(
         ...accountCurrentTxs

@@ -141,7 +141,6 @@ async function getMonetaryAccountTransactions(
   await waitRandomMs();
 
   await page.getByRole('button', { name: 'Consultar' }).click();
-  await page.pause();
   await page.waitForURL(
     'https://www.bienlinea.bi.com.gt/InformacionCuentas/Monetario/InformacionCuentasMonetaria/ConsultaPersonalizada**'
   );
