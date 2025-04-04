@@ -2,5 +2,6 @@
 
 ```bash
 BANK_KEY=bacGt pnpm start
+BANK_KEY=bacCr pnpm start
 BANK_KEY=bancoIndustrialGt pnpm start
 ```

@@ -34,9 +34,7 @@ export async function bacScrape({
     .locator('.country__button')
     .filter({ hasText: config.country })
     .click();
-  // await page.waitForURL('https://www.baccredomatic.com/**', {
-  //   waitUntil: 'networkidle',
-  // });
+  await page.waitForLoadState('networkidle');
   await waitRandomMs();
   await page
     .locator('.secondary-menu__item')
