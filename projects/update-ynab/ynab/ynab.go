@@ -188,13 +188,113 @@ func UpdateYnabWithBankTxs(
 	return nil
 }
 
+type TransactionWithExtra struct {
+	tx         Transaction
+	parsedMemo *ParsedYnabTransactionMemo
+}
+
+type Matcher func(tx TransactionWithExtra) bool
+
+var matchers = []Matcher{
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(`(?i)\bsan martin\b`, tx.parsedMemo.Desc)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(`(?i)\bcpx\b`, tx.parsedMemo.Desc)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(`(?i)\bspotify\b`, tx.parsedMemo.Desc)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(`(?i)\bSEGUROS EL_A\b`, tx.parsedMemo.Desc)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(`(?i)\bvolaris\b`, tx.parsedMemo.Desc)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bfarmacia galeno\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bamazon(\.com|\sMKTPL)\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bstarbucks\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bI/T-\d+ I000\d+\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bPAGO TARJETA\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\buber.+(trip|rides)\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bmcdonalds\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bpollo campero\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bcafe barista\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+	func(tx TransactionWithExtra) bool {
+		matched, _ := regexp.MatchString(
+			`(?i)\bcemaco\b`,
+			tx.parsedMemo.Desc,
+		)
+		return matched
+	},
+}
+
 func UpdateEmptyPayees(config *types.Config) error {
 	client := NewClient(config.YNAB.AccessToken)
 
 	transactions := []map[string]any{}
 
 	now := time.Now()
-	sinceDate := time.Date(now.Year(), now.Month()-2, 1, 0, 0, 0, 0, time.UTC)
+	sinceDate := time.Date(now.Year(), now.Month()-3, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, account := range config.YNAB.AccountsMap {
 		ynabAccountId := account.YNABAccountID
@@ -206,54 +306,77 @@ func UpdateEmptyPayees(config *types.Config) error {
 		if err != nil {
 			return err
 		}
-		sourceTxs := make([]Transaction, len(ynabTxs))
-		copy(sourceTxs, ynabTxs)
-		slices.SortFunc(sourceTxs, func(a, b Transaction) int {
-			if b.Date > a.Date {
+		targetTxs := make([]TransactionWithExtra, len(ynabTxs))
+		for _, tx := range ynabTxs {
+			var parsedMemo *ParsedYnabTransactionMemo
+			if tx.Memo != nil {
+				_parsedMemo, err := ParseYnabTransactionMemo(tx.Memo)
+				if err == nil {
+					parsedMemo = &_parsedMemo
+				}
+			}
+			targetTxs = append(targetTxs, TransactionWithExtra{
+				tx:         tx,
+				parsedMemo: parsedMemo,
+			})
+		}
+		sourceTxs := []TransactionWithExtra{}
+		for _, targetTx := range targetTxs {
+			if targetTx.tx.PayeeID == nil || targetTx.tx.CategoryID == nil ||
+				targetTx.parsedMemo == nil {
+				continue
+			}
+			sourceTxs = append(sourceTxs, targetTx)
+		}
+		slices.SortFunc(sourceTxs, func(a, b TransactionWithExtra) int {
+			if b.tx.Date > a.tx.Date {
 				return 1
-			} else if b.Date < a.Date {
+			} else if b.tx.Date < a.tx.Date {
 				return -1
 			}
 			return 0
 		})
-		for _, ynabTx := range ynabTxs {
-			if ynabTx.PayeeID != nil {
+		for _, targetTx := range targetTxs {
+			if targetTx.tx.PayeeID != nil {
 				continue
 			}
-			if ynabTx.Memo == nil {
+			if targetTx.parsedMemo == nil {
 				continue
 			}
-			parsedMemo, err := ParseYnabTransactionMemo(ynabTx.Memo)
-			if err != nil {
-				continue
+			// find with equal description
+			foundIndex := slices.IndexFunc(sourceTxs, func(sourceTx TransactionWithExtra) bool {
+				return targetTx.parsedMemo.Desc == sourceTx.parsedMemo.Desc
+			})
+			// find with similar description
+			if foundIndex == -1 {
+				for _, matcher := range matchers {
+					if matcher(targetTx) {
+						foundIndex = slices.IndexFunc(
+							sourceTxs,
+							func(sourceTx TransactionWithExtra) bool {
+								return matcher(sourceTx)
+							},
+						)
+					}
+				}
 			}
-			for _, sourceTx := range sourceTxs {
-				if sourceTx.Memo == nil {
-					continue
-				}
-				iterParsedMemo, err := ParseYnabTransactionMemo(sourceTx.Memo)
-				if err != nil {
-					continue
-				}
-				if parsedMemo.Desc == iterParsedMemo.Desc &&
-					sourceTx.PayeeID != nil &&
-					sourceTx.CategoryID != nil {
-					slog.Info(
-						"updating payee",
-						"tx id",
-						ynabTx.ID,
-						"payee id",
-						*sourceTx.PayeeID,
-						"category id",
-						*sourceTx.CategoryID,
-					)
-					transactions = append(transactions, map[string]any{
-						"id":          ynabTx.ID,
-						"payee_id":    *sourceTx.PayeeID,
-						"category_id": *sourceTx.CategoryID,
-					})
-					break
-				}
+
+			if foundIndex > -1 {
+				sourceTx := sourceTxs[foundIndex]
+				slog.Info(
+					"updating payee",
+					"tx id",
+					targetTx.tx.ID,
+					"payee id",
+					*sourceTx.tx.PayeeID,
+					"category id",
+					*sourceTx.tx.CategoryID,
+				)
+				transactions = append(transactions, map[string]any{
+					"id":          targetTx.tx.ID,
+					"payee_id":    *sourceTx.tx.PayeeID,
+					"category_id": *sourceTx.tx.CategoryID,
+				})
 			}
 		}
 	}
