@@ -92,6 +92,26 @@ type Transaction struct {
 	Subtransactions         []any   `json:"subtransactions"`
 }
 
+func (c *Client) GetTransactions(
+	budgetID string,
+	since time.Time,
+) ([]Transaction, error) {
+	path := fmt.Sprintf("/budgets/%s/transactions", budgetID)
+	payload := map[string]any{
+		"since_date": since.Format("2006-01-02"),
+	}
+	var result struct {
+		Data struct {
+			Transactions    []Transaction `json:"transactions"`
+			ServerKnowledge int           `json:"server_knowledge"`
+		} `json:"data"`
+	}
+	if err := c.DoReq("GET", path, payload, &result); err != nil {
+		return nil, err
+	}
+	return result.Data.Transactions, nil
+}
+
 func (c *Client) GetAccountTransactions(
 	budgetID string,
 	accountID string,
