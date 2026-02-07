@@ -30,10 +30,10 @@ export async function bancoIndustrialScrape({
   console.log(
     `Scraping Banco Industrial GT transactions for months: ${months
       .map((m) => m.format('YYYY-MM'))
-      .join(', ')}`
+      .join(', ')}`,
   );
   await page.goto(
-    'https://www.bienlinea.bi.com.gt/InicioSesion/Inicio/Autenticar'
+    'https://www.bienlinea.bi.com.gt/InicioSesion/Inicio/Autenticar',
   );
   await page.getByRole('textbox', { name: 'Código' }).fill(auth.code);
   await waitRandomMs();
@@ -42,8 +42,9 @@ export async function bancoIndustrialScrape({
   await page.getByPlaceholder('Contraseña').fill(auth.password);
   await waitRandomMs();
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+
   await page.waitForURL(
-    'https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard'
+    'https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard',
   );
   const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
   const deleteTxIds: string[] = [];
@@ -60,7 +61,7 @@ export async function bancoIndustrialScrape({
         const rawTransactions = await getMonetaryAccountTransactions(
           page,
           account.number,
-          monthDayJs
+          monthDayJs,
         );
         const _bankTxs = rawTransactions.map((tx) => {
           const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
@@ -102,14 +103,14 @@ export async function bancoIndustrialScrape({
 async function getMonetaryAccountTransactions(
   page: Page,
   accountNumber: string,
-  monthDayJs: dayjs.Dayjs
+  monthDayJs: dayjs.Dayjs,
 ) {
   await waitRandomMs();
   await page.getByRole('link', { name: 'Información de cuentas' }).click();
   await waitRandomMs();
   await page.getByRole('link', { name: 'Monetarias' }).click();
   await page.waitForURL(
-    'https://www.bienlinea.bi.com.gt/InformacionCuentas/Monetario/InformacionCuentasMonetaria/**'
+    'https://www.bienlinea.bi.com.gt/InformacionCuentas/Monetario/InformacionCuentasMonetaria/**',
   );
   await waitRandomMs();
   await page
@@ -120,7 +121,7 @@ async function getMonetaryAccountTransactions(
   await waitRandomMs();
   await page.getByRole('link', { name: 'HISTÓRICO' }).click();
   await page.waitForURL(
-    'https://www.bienlinea.bi.com.gt/InformacionCuentas/Monetario/InformacionCuentasMonetaria/Historico**'
+    'https://www.bienlinea.bi.com.gt/InformacionCuentas/Monetario/InformacionCuentasMonetaria/Historico**',
   );
   await waitRandomMs();
   await page.getByRole('link', { name: 'Personalizado' }).click();
@@ -142,7 +143,7 @@ async function getMonetaryAccountTransactions(
 
   await page.getByRole('button', { name: 'Consultar' }).click();
   await page.waitForURL(
-    'https://www.bienlinea.bi.com.gt/InformacionCuentas/Monetario/InformacionCuentasMonetaria/ConsultaPersonalizada**'
+    'https://www.bienlinea.bi.com.gt/InformacionCuentas/Monetario/InformacionCuentasMonetaria/ConsultaPersonalizada**',
   );
   const transactions = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('.tbl-report tbody tr')).map(
@@ -159,7 +160,7 @@ async function getMonetaryAccountTransactions(
           .querySelector('td:nth-child(6)')!
           .textContent!.trim()
           .replace(/,/g, ''),
-      })
+      }),
     );
   });
   return transactions;
