@@ -11,7 +11,7 @@ export const bacSchema = z.object({
     z.object({
       type: z.enum(['checking', 'creditcard']),
       number: z.string(),
-    })
+    }),
   ),
 });
 
@@ -27,7 +27,7 @@ export const configSchema = z.object({
         z.object({
           type: z.nativeEnum(AccountType),
           number: z.string(),
-        })
+        }),
       ),
     }),
     bacGt: bacSchema,

@@ -1,0 +1,9 @@
+# Build + cache output (mirror eslint.config.ts globalIgnores)
+**/dist
+**/build
+
+# Generated — never hand-formatted
+**/lib/db/codegen.d.ts
+
+# Lockfiles
+pnpm-lock.yaml

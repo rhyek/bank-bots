@@ -2,3 +2,5 @@
 .env.local
 tmp/*
 .idea
+node_modules/
+storage/
