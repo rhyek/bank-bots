@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat.js';
-import { type Page } from 'playwright';
+import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { z } from 'zod';
 import type { bacSchema } from '../config-schema';
@@ -23,36 +23,24 @@ export async function bacScrape({
   console.log(
     `Scraping BAC ${config.country} transactions for months: ${months
       .map((m) => m.format('YYYY-MM'))
-      .join(', ')}`
+      .join(', ')}`,
   );
   const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
   const deleteTxIds: string[] = [];
 
   await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
-  await page
-    .locator('[data-country]')
-    .filter({ hasText: config.country })
-    .click();
+  await page.locator('[data-country]').filter({ hasText: config.country }).click();
   await page.waitForLoadState('networkidle');
   await waitRandomMs();
-  await page
-    .locator('.secondary-menu__item')
-    .filter({ hasText: 'Banca en Línea' })
-    .click();
+  await page.locator('.secondary-menu__item').filter({ hasText: 'Banca en Línea' }).click();
   await waitRandomMs();
-  await page
-    .getByRole('textbox', { name: 'Usuario' })
-    .fill(config.auth.username);
+  await page.getByRole('textbox', { name: 'Usuario' }).fill(config.auth.username);
   await waitRandomMs();
-  await page
-    .getByRole('textbox', { name: 'Contraseña' })
-    .fill(config.auth.password);
+  await page.getByRole('textbox', { name: 'Contraseña' }).fill(config.auth.password);
   await waitRandomMs();
-  await page.locator('.login-form__submit-btn').click();
-  await page.waitForURL(
-    '**/ebac/module/consolidatedQuery/consolidatedQuery.go'
-  );
+  await page.locator('#confirm').click();
+  await page.waitForURL('**/ebac/module/consolidatedQuery/consolidatedQuery.go');
   const host = await page.evaluate(() => window.location.host);
   for (const account of config.accounts) {
     const accountScrapedTxs: InsertObject<DB, 'bank_txs'>[] = [];
@@ -64,14 +52,12 @@ export async function bacScrape({
       .where(
         'month',
         'in',
-        months.map((m) => m.format('YYYY-MM'))
+        months.map((m) => m.format('YYYY-MM')),
       )
       .execute();
 
     await waitRandomMs();
-    await page.goto(
-      `https://${host}/ebac/module/consolidatedQuery/consolidatedQuery.go`
-    );
+    await page.goto(`https://${host}/ebac/module/consolidatedQuery/consolidatedQuery.go`);
     if (account.type === 'checking') {
       await waitRandomMs();
       await page
@@ -83,17 +69,11 @@ export async function bacScrape({
         })
         .locator(`form[name^="BankAccountBalanceItem"] > button`)
         .click();
-      await page.waitForURL(
-        `https://${host}/ebac/module/accountbalance/accountBalance.go`
-      );
+      await page.waitForURL(`https://${host}/ebac/module/accountbalance/accountBalance.go`);
       for (const monthDayJs of months) {
         await waitRandomMs();
-        let monthStr = monthDayJs
-          .toDate()
-          .toLocaleDateString('es-ES', { month: 'long' });
-        monthStr = `${monthStr[0].toUpperCase()}${monthStr
-          .slice(1)
-          .toLowerCase()}`;
+        let monthStr = monthDayJs.toDate().toLocaleDateString('es-ES', { month: 'long' });
+        monthStr = `${monthStr[0].toUpperCase()}${monthStr.slice(1).toLowerCase()}`;
         // confirmadas
         await page.locator('#selectMonthLabel').click();
         await waitRandomMs();
@@ -105,19 +85,12 @@ export async function bacScrape({
         const scrapedConfirmedTxs = (
           await page.evaluate(() => {
             return Array.from(
-              document.querySelectorAll(
-                '#transactionTable1 tbody tr:not(.bel-table_row__neutral)'
-              )
+              document.querySelectorAll('#transactionTable1 tbody tr:not(.bel-table_row__neutral)'),
             ).map((tr) => ({
               date: tr.querySelector('td:nth-of-type(1)')!.textContent!.trim(),
               docNo: tr.querySelector('td:nth-of-type(2)')!.textContent!.trim(),
-              description: tr
-                .querySelector('td:nth-of-type(3)')!
-                .textContent!.trim(),
-              debit: tr
-                .querySelector('td:nth-of-type(4)')!
-                .textContent!.trim()
-                .replace(/,/g, ''),
+              description: tr.querySelector('td:nth-of-type(3)')!.textContent!.trim(),
+              debit: tr.querySelector('td:nth-of-type(4)')!.textContent!.trim().replace(/,/g, ''),
               credit: tr
                 .querySelector('td:nth-of-type(5)')!
                 .textContent!.trim()
@@ -268,11 +241,9 @@ export async function bacScrape({
               description: currentTx.description,
               amount: Number(currentTx.amount),
             };
-            return !accountScrapedTxs.some((bankTx) =>
-              isMatching(objToMatch, bankTx)
-            );
+            return !accountScrapedTxs.some((bankTx) => isMatching(objToMatch, bankTx));
           })
-          .map((tx) => tx.id)
+          .map((tx) => tx.id),
       );
       createTxs.push(...accountScrapedTxs);
     }

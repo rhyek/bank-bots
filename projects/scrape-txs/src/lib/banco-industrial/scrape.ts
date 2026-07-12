@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { type Page } from 'playwright';
+import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { AccountType } from '../types';
 import { db, type InsertObject, type DB } from '../db';
@@ -18,23 +18,22 @@ export type BiConfig = {
 };
 
 export async function bancoIndustrialScrape({
+  bankKey,
   biConfig: { auth, accounts },
   months,
   page,
 }: {
+  bankKey: string;
   biConfig: BiConfig;
   months: dayjs.Dayjs[];
   page: Page;
 }) {
-  const bankKey = process.env.BANK_KEY;
   console.log(
     `Scraping Banco Industrial GT transactions for months: ${months
       .map((m) => m.format('YYYY-MM'))
       .join(', ')}`,
   );
-  await page.goto(
-    'https://www.bienlinea.bi.com.gt/InicioSesion/Inicio/Autenticar',
-  );
+  await page.goto('https://www.bienlinea.bi.com.gt/InicioSesion/Inicio/Autenticar');
   await page.getByRole('textbox', { name: 'Código' }).fill(auth.code);
   await waitRandomMs();
   await page.getByRole('textbox', { name: 'Usuario' }).fill(auth.username);
@@ -43,9 +42,7 @@ export async function bancoIndustrialScrape({
   await waitRandomMs();
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
-  await page.waitForURL(
-    'https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard',
-  );
+  await page.waitForURL('https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard');
   const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
   const deleteTxIds: string[] = [];
   for (const account of accounts) {
@@ -63,12 +60,9 @@ export async function bancoIndustrialScrape({
           account.number,
           monthDayJs,
         );
-        const _bankTxs = rawTransactions.map((tx) => {
+        const _bankTxs: InsertObject<DB, 'bank_txs'>[] = rawTransactions.map((tx) => {
           const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
-          const amount =
-            tx.credit && tx.credit !== ''
-              ? Number(tx.credit)
-              : -Number(tx.debit);
+          const amount = tx.credit && tx.credit !== '' ? Number(tx.credit) : -Number(tx.debit);
           return {
             bank_key: bankKey,
             account_number: account.number,
@@ -127,18 +121,14 @@ async function getMonetaryAccountTransactions(
   await page.getByRole('link', { name: 'Personalizado' }).click();
   await waitRandomMs();
 
-  await page
-    .locator('#txtFechaInicial')
-    .evaluate((el: HTMLInputElement, dateStr) => {
-      el.value = dateStr;
-    }, monthDayJs.startOf('month').format('DD/MM/YYYY'));
+  await page.locator('#txtFechaInicial').evaluate((el: HTMLInputElement, dateStr) => {
+    el.value = dateStr;
+  }, monthDayJs.startOf('month').format('DD/MM/YYYY'));
   await waitRandomMs();
 
-  await page
-    .locator('#txtFechaFinal')
-    .evaluate((el: HTMLInputElement, dateStr) => {
-      el.value = dateStr;
-    }, monthDayJs.endOf('month').format('DD/MM/YYYY'));
+  await page.locator('#txtFechaFinal').evaluate((el: HTMLInputElement, dateStr) => {
+    el.value = dateStr;
+  }, monthDayJs.endOf('month').format('DD/MM/YYYY'));
   await waitRandomMs();
 
   await page.getByRole('button', { name: 'Consultar' }).click();
@@ -146,22 +136,14 @@ async function getMonetaryAccountTransactions(
     'https://www.bienlinea.bi.com.gt/InformacionCuentas/Monetario/InformacionCuentasMonetaria/ConsultaPersonalizada**',
   );
   const transactions = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('.tbl-report tbody tr')).map(
-      (tr) => ({
-        date: tr.querySelector('td:nth-child(1)')!.textContent!.trim(),
-        type: tr.querySelector('td:nth-child(2)')!.textContent!.trim(),
-        description: tr.querySelector('td:nth-child(3)')!.textContent!.trim(),
-        docNo: tr.querySelector('td:nth-child(4)')!.textContent!.trim(),
-        debit: tr
-          .querySelector('td:nth-child(5)')!
-          .textContent!.trim()
-          .replace(/,/g, ''),
-        credit: tr
-          .querySelector('td:nth-child(6)')!
-          .textContent!.trim()
-          .replace(/,/g, ''),
-      }),
-    );
+    return Array.from(document.querySelectorAll('.tbl-report tbody tr')).map((tr) => ({
+      date: tr.querySelector('td:nth-child(1)')!.textContent!.trim(),
+      type: tr.querySelector('td:nth-child(2)')!.textContent!.trim(),
+      description: tr.querySelector('td:nth-child(3)')!.textContent!.trim(),
+      docNo: tr.querySelector('td:nth-child(4)')!.textContent!.trim(),
+      debit: tr.querySelector('td:nth-child(5)')!.textContent!.trim().replace(/,/g, ''),
+      credit: tr.querySelector('td:nth-child(6)')!.textContent!.trim().replace(/,/g, ''),
+    }));
   });
   return transactions;
 }

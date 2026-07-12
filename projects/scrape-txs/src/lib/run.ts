@@ -1,60 +1,58 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import lambdaChromium from '@sparticuz/chromium';
-import type dayjs from 'dayjs';
 import fs from 'node:fs/promises';
+import path from 'node:path';
+import type dayjs from 'dayjs';
 import { chromium } from 'playwright';
 import { z } from 'zod';
 import { bacScrape } from './bac/scrape';
 import { bancoIndustrialScrape } from './banco-industrial/scrape';
 import { configSchema } from './config-schema';
 import { db, type DB, type InsertObject } from './db';
-import { isLambda } from './utils';
 
-export async function run(months: dayjs.Dayjs[]) {
-  const bankKey = z.string().parse(process.env.BANK_KEY);
+export async function run(
+  months: dayjs.Dayjs[],
+  bankKeyInput: string | undefined,
+  traceDir = path.join('storage', 'playwright-traces'),
+) {
+  const bankKey = z.string().parse(bankKeyInput);
   const { data: configJson } = await db
     .selectFrom('config')
     .select('data')
     .where('id', '=', 'general')
     .executeTakeFirstOrThrow();
   const config = configSchema.parse(configJson);
-  console.log('chromium args', lambdaChromium.args);
   const browserArgs = ['--deny-permission-prompts'];
-  const browser = isLambda()
-    ? await chromium.launch({
-        args: [...lambdaChromium.args, ...browserArgs],
-        executablePath: await lambdaChromium.executablePath(),
-        headless: true,
-      })
-    : await chromium.launch({
-        args: browserArgs,
-        headless: false,
-      });
-  const context = await browser.newContext({
-    userAgent:
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  const browser = await chromium.launch({
+    args: browserArgs,
+    headless: false,
   });
-  if (isLambda()) {
-    await context.tracing.start({
-      screenshots: true,
-      snapshots: true,
-      sources: true,
-    });
-  }
   let createTxs: InsertObject<DB, 'bank_txs'>[];
   let deleteTxIds: string[];
-  const maxAttempts = isLambda() ? 3 : 2;
+  const maxAttempts = 2;
   let attempt = 0;
 
   try {
     while (true) {
       attempt++;
       console.log(`Attempt ${attempt} to scrape ${bankKey} transactions...`);
-      const page = await context.newPage();
+      // A fresh context per attempt so a retry doesn't inherit cookies/storage from the
+      // failed one. BAC, for example, sets a country-preference cookie on the first attempt
+      // that would otherwise redirect the retry's `goto` away from the home page its
+      // country-selector step expects, making the retry fail at a misleading step.
+      const context = await browser.newContext({
+        userAgent:
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      });
       try {
+        await context.tracing.start({
+          screenshots: true,
+          snapshots: true,
+          sources: true,
+        });
+        const page = await context.newPage();
         const result = await (async () => {
           if (bankKey === 'bancoIndustrialGt') {
             return await bancoIndustrialScrape({
+              bankKey,
               biConfig: config.banks.bancoIndustrialGt,
               months,
               page,
@@ -73,60 +71,36 @@ export async function run(months: dayjs.Dayjs[]) {
         createTxs = result.createTxs;
         deleteTxIds = result.deleteTxIds;
         break;
-      } catch (error: any) {
-        if (attempt < maxAttempts) {
-          console.warn(
-            `Attempt ${attempt} failed with error: ${error.message}. Retrying...`,
-          );
-          continue;
+      } catch (error) {
+        // Only persist a trace once we're giving up. Earlier attempts' traces are discarded
+        // when their context closes in the `finally` below.
+        if (attempt >= maxAttempts) {
+          try {
+            await fs.mkdir(traceDir, { recursive: true });
+            const tracePath = path.join(traceDir, `${Date.now()}_${bankKey}.zip`);
+            await context.tracing.stop({ path: tracePath });
+            console.error(`Saved Playwright trace to ${tracePath}`);
+          } catch (traceError) {
+            console.error('Failed to save Playwright trace', traceError);
+          }
+          throw error;
         }
-        if (error.constructor?.name === 'TimeoutError' && isLambda()) {
-          const zipExtension = '.zip';
-          const traceAbsolutePath = `/tmp/trace${zipExtension}`;
-          await context.tracing.stop({ path: traceAbsolutePath });
-          const buffer = await fs.readFile(traceAbsolutePath);
-          const s3Client = new S3Client({});
-          const objectKey = `${new Date().getTime()}_${bankKey}${zipExtension}`;
-          // AWS_REGION is provided by lambda: https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-runtime
-          const region = process.env.AWS_REGION!;
-          const bucket = process.env.PLAYWRIGHT_TRACES_S3_BUCKET_ID;
-          const command = new PutObjectCommand({
-            Bucket: bucket,
-            Key: objectKey,
-            Body: buffer,
-          });
-          await s3Client.send(command);
-          const objectUrl = `https://${bucket}.s3.${region}.amazonaws.com/${encodeURIComponent(
-            objectKey,
-          )}`;
-          const viewTraceUrl = `https://trace.playwright.dev/?trace=${objectUrl}`;
-          throw new Error(
-            `
-    Trace file: ${objectUrl}
-
-    View trace: ${viewTraceUrl}\
-    `,
-            {
-              cause: error,
-            },
-          );
-        }
-        throw error;
+        console.warn(
+          `Attempt ${attempt} failed with error: ${(error as Error).message}. Retrying...`,
+        );
+        continue;
       } finally {
-        await page.close();
+        await context.close();
       }
     }
   } finally {
-    await context.close();
     await browser.close();
   }
 
   if (createTxs.length > 0 || deleteTxIds.length > 0) {
     await db.transaction().execute(async (sqlTx) => {
       if (createTxs.length > 0) {
-        console.log(
-          `Inserting/updating ${createTxs.length} ${bankKey} transactions...`,
-        );
+        console.log(`Inserting/updating ${createTxs.length} ${bankKey} transactions...`);
         await Promise.all(
           createTxs.map(async (bankTx) => {
             try {
@@ -154,13 +128,8 @@ export async function run(months: dayjs.Dayjs[]) {
         );
       }
       if (deleteTxIds.length > 0) {
-        console.log(
-          `Deleting ${deleteTxIds.join(', ')} ${bankKey} transactions...`,
-        );
-        await sqlTx
-          .deleteFrom('bank_txs')
-          .where('id', 'in', deleteTxIds)
-          .execute();
+        console.log(`Deleting ${deleteTxIds.join(', ')} ${bankKey} transactions...`);
+        await sqlTx.deleteFrom('bank_txs').where('id', 'in', deleteTxIds).execute();
       }
     });
     console.log('Done.');
