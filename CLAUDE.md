@@ -72,7 +72,10 @@ Key files:
 - `src/lib/bac/scrape.ts`, `src/lib/banco-industrial/scrape.ts` — the per-bank Playwright flows.
 - `src/lib/config-schema.ts` — Zod schema validating `config.data` (only the `banks` object; it
   intentionally ignores `ynab`).
-- `src/lib/db/` — Kysely + `pg` client; `codegen.d.ts` is the generated DB table types.
+- `src/lib/db/` — Drizzle ORM client (`drizzle-orm/node-postgres`) over `pg`. `schema.ts` is the
+  source of truth (bootstrapped once via `drizzle-kit pull`, then evolved code-first). Reads use the
+  RQB (`db.query.*`); writes/tx use the core API (`insert().onConflictDoUpdate()`, `delete()`,
+  `db.transaction()`). Migrations live in `projects/scrape-txs/drizzle/` (see "Running things").
 
 **Months**: if none passed, defaults to the current month (plus the previous month if today's day
 ≤ 10, to catch late-posting transactions).
@@ -84,8 +87,9 @@ present on the bank site) and removes them — so a scrape reconciles a month, i
 
 ## Database schema (Supabase Postgres)
 
-**`bank_txs`** — one row per bank transaction. `id bigint` PK (auto). No currency column — amounts
-are stored as the bank's raw number (GTQ or USD depending on the account).
+**`bank_txs`** — one row per bank transaction. `id bigint` PK (auto). Amounts are stored as the
+bank's raw number; the `currency` column labels which currency that number is in (`NOT NULL DEFAULT
+'USD'` — see the currency gotcha below).
 
 | column | type | notes |
 | --- | --- | --- |
@@ -97,6 +101,7 @@ are stored as the bank's raw number (GTQ or USD depending on the account).
 | `doc_no` | text | bank's document number (often non-unique / generic) |
 | `description` | text | bank's description |
 | `amount` | numeric | negative = debit, positive = credit |
+| `currency` | text | currency of `amount`; `NOT NULL DEFAULT 'USD'` (scrapers don't set it yet) |
 | `created_at` | timestamptz | `now()` on insert (not touched on conflict-update) |
 
 Unique index `bank_txs_unique_cols` on `(bank_key, account_number, date, doc_no, description,
@@ -164,6 +169,13 @@ pnpm devtooie cmd scrape-txs -c start --log-dir "$RUN_DIR" -- --bank-key <bankKe
 pnpm -C projects/scrape-txs run typecheck
 ( cd projects/update-ynab && go build ./... && go vet ./... )
 
+# DB migrations (scrape-txs, Drizzle) — edit src/lib/db/schema.ts, then with DATABASE_URL in env:
+pnpm -C projects/scrape-txs db:generate   # diff schema.ts → new drizzle/NNNN_*.sql migration
+pnpm -C projects/scrape-txs db:migrate    # apply pending migrations (tracked in drizzle.__drizzle_migrations)
+# pnpm -C projects/scrape-txs db:pull      # (rarely) re-introspect the live DB back into schema.ts
+# The pre-existing tables were baselined into Drizzle's journal once via drizzle/stamp_baseline.sql,
+# so `migrate` skips the 0000 baseline and only applies later migrations (e.g. 0001_add_currency).
+
 # YNAB sync (Go) — normal recent-month run
 ( cd projects/update-ynab && DATABASE_URL=… go run . )
 # YNAB backfill of one account's full history from a month
@@ -181,8 +193,11 @@ Inspect the DB directly with `psql "$DATABASE_URL"` (grab `DATABASE_URL` from `.
 - **`storage/`** is gitignored (traces, run logs). Never commit trace zips.
 - **Never handle bank passwords / the YNAB token in plaintext.** Credential changes are done by the
   owner directly (e.g. a `psql` update they run themselves).
-- **Currencies aren't tracked** in `bank_txs` — GTQ and USD accounts both store raw numbers. Keep
-  this in mind for any budgeting-backend work.
+- **Currency** has a column (`bank_txs.currency`, `NOT NULL DEFAULT 'USD'`) but isn't meaningfully
+  populated yet: the scrapers insert without setting it, so **every** row takes the `USD` default —
+  including GTQ accounts, whose raw GTQ numbers are currently mislabelled `USD`. Making it real
+  (set `currency` per account, sourced from config, in the scrapers) is future budgeting-backend
+  work. Amounts remain the bank's raw number regardless.
 - Adding a new account = add it to the bank's `config.banks.<key>.accounts`, scrape it, then (for
   the YNAB era) create a YNAB account + `accountsMap` entry, and backfill with `cmd/backfill`.
 - No AI attribution in commits/PRs (owner preference). Node scripts are authored as `.ts`.

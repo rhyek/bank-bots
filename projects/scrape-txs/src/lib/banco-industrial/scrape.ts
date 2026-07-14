@@ -1,8 +1,8 @@
-import dayjs from 'dayjs';
+import type dayjs from 'dayjs';
 import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { AccountType } from '../types';
-import { db, type InsertObject, type DB } from '../db';
+import { db, type bankTxs } from '../db';
 import { waitRandomMs } from '../utils';
 
 export type BiConfig = {
@@ -43,45 +43,46 @@ export async function bancoIndustrialScrape({
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForURL('https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard');
-  const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
-  const deleteTxIds: string[] = [];
+  const createTxs: (typeof bankTxs.$inferInsert)[] = [];
+  const deleteTxIds: number[] = [];
   for (const account of accounts) {
     if (account.type === 'checking') {
       for (const monthDayJs of months) {
-        const currentTxs = await db
-          .selectFrom('bank_txs')
-          .selectAll()
-          .where('bank_key', '=', bankKey)
-          .where('account_number', '=', account.number)
-          .where('month', '=', monthDayJs.format('YYYY-MM'))
-          .execute();
+        const currentTxs = await db.query.bankTxs.findMany({
+          where: (t, { and, eq }) =>
+            and(
+              eq(t.bankKey, bankKey),
+              eq(t.accountNumber, account.number),
+              eq(t.month, monthDayJs.format('YYYY-MM')),
+            ),
+        });
         const rawTransactions = await getMonetaryAccountTransactions(
           page,
           account.number,
           monthDayJs,
         );
-        const _bankTxs: InsertObject<DB, 'bank_txs'>[] = rawTransactions.map((tx) => {
+        const _bankTxs: (typeof bankTxs.$inferInsert)[] = rawTransactions.map((tx) => {
           const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
           const amount = tx.credit && tx.credit !== '' ? Number(tx.credit) : -Number(tx.debit);
           return {
-            bank_key: bankKey,
-            account_number: account.number,
+            bankKey,
+            accountNumber: account.number,
             month: monthDayJs.format('YYYY-MM'),
             date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
             description: tx.description,
-            doc_no: tx.docNo,
+            docNo: tx.docNo,
             amount,
           };
         });
         const _deleteTxIds = currentTxs
           .filter((currentTx) => {
             const objToMatch = {
-              bank_key: currentTx.bank_key,
-              account_number: currentTx.account_number,
-              date: dayjs(currentTx.date).format('YYYY-MM-DD'),
-              doc_no: currentTx.doc_no,
+              bankKey: currentTx.bankKey,
+              accountNumber: currentTx.accountNumber,
+              date: currentTx.date,
+              docNo: currentTx.docNo,
               description: currentTx.description,
-              amount: Number(currentTx.amount),
+              amount: currentTx.amount,
             };
             return !_bankTxs.some((bankTx) => isMatching(objToMatch, bankTx));
           })

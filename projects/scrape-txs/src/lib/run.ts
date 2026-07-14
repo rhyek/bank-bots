@@ -1,12 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type dayjs from 'dayjs';
+import { inArray } from 'drizzle-orm';
 import { chromium } from 'playwright';
 import { z } from 'zod';
 import { bacScrape } from './bac/scrape';
 import { bancoIndustrialScrape } from './banco-industrial/scrape';
 import { configSchema } from './config-schema';
-import { db, type DB, type InsertObject } from './db';
+import { bankTxs, db, pool } from './db';
 
 export async function run(
   months: dayjs.Dayjs[],
@@ -14,19 +15,21 @@ export async function run(
   traceDir = path.join('storage', 'playwright-traces'),
 ) {
   const bankKey = z.string().parse(bankKeyInput);
-  const { data: configJson } = await db
-    .selectFrom('config')
-    .select('data')
-    .where('id', '=', 'general')
-    .executeTakeFirstOrThrow();
-  const config = configSchema.parse(configJson);
+  const configRow = await db.query.config.findFirst({
+    where: (c, { eq }) => eq(c.id, 'general'),
+    columns: { data: true },
+  });
+  if (!configRow) {
+    throw new Error("config row 'general' not found");
+  }
+  const config = configSchema.parse(configRow.data);
   const browserArgs = ['--deny-permission-prompts'];
   const browser = await chromium.launch({
     args: browserArgs,
     headless: false,
   });
-  let createTxs: InsertObject<DB, 'bank_txs'>[];
-  let deleteTxIds: string[];
+  let createTxs: (typeof bankTxs.$inferInsert)[];
+  let deleteTxIds: number[];
   const maxAttempts = 2;
   let attempt = 0;
 
@@ -98,28 +101,26 @@ export async function run(
   }
 
   if (createTxs.length > 0 || deleteTxIds.length > 0) {
-    await db.transaction().execute(async (sqlTx) => {
+    await db.transaction(async (tx) => {
       if (createTxs.length > 0) {
         console.log(`Inserting/updating ${createTxs.length} ${bankKey} transactions...`);
         await Promise.all(
           createTxs.map(async (bankTx) => {
             try {
-              await sqlTx
-                .insertInto('bank_txs')
+              await tx
+                .insert(bankTxs)
                 .values(bankTx)
-                .onConflict((oc) =>
-                  oc
-                    .columns([
-                      'bank_key',
-                      'account_number',
-                      'date',
-                      'doc_no',
-                      'description',
-                      'amount',
-                    ])
-                    .doUpdateSet({ amount: bankTx.amount }),
-                )
-                .execute();
+                .onConflictDoUpdate({
+                  target: [
+                    bankTxs.bankKey,
+                    bankTxs.accountNumber,
+                    bankTxs.date,
+                    bankTxs.docNo,
+                    bankTxs.description,
+                    bankTxs.amount,
+                  ],
+                  set: { amount: bankTx.amount },
+                });
             } catch (error) {
               console.error('Failed to insert/update tx', bankTx);
               throw error;
@@ -129,11 +130,11 @@ export async function run(
       }
       if (deleteTxIds.length > 0) {
         console.log(`Deleting ${deleteTxIds.join(', ')} ${bankKey} transactions...`);
-        await sqlTx.deleteFrom('bank_txs').where('id', 'in', deleteTxIds).execute();
+        await tx.delete(bankTxs).where(inArray(bankTxs.id, deleteTxIds));
       }
     });
     console.log('Done.');
   }
 
-  await db.destroy();
+  await pool.end();
 }

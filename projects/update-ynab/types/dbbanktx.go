@@ -15,5 +15,6 @@ type DbBankTx struct {
 	DocNo         string `db:"doc_no"`
 	Description   string
 	Amount        decimal.Decimal
+	Currency      string    `db:"currency"`
 	CreatedAt     time.Time `db:"created_at"`
 }

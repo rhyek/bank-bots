@@ -4,7 +4,7 @@ import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { z } from 'zod';
 import type { bacSchema } from '../config-schema';
-import { db, type DB, type InsertObject } from '../db';
+import { db, type bankTxs } from '../db';
 import { waitRandomMs } from '../utils';
 
 dayjs.extend(customParseFormat);
@@ -25,8 +25,8 @@ export async function bacScrape({
       .map((m) => m.format('YYYY-MM'))
       .join(', ')}`,
   );
-  const createTxs: InsertObject<DB, 'bank_txs'>[] = [];
-  const deleteTxIds: string[] = [];
+  const createTxs: (typeof bankTxs.$inferInsert)[] = [];
+  const deleteTxIds: number[] = [];
 
   await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
@@ -43,18 +43,18 @@ export async function bacScrape({
   await page.waitForURL('**/ebac/module/consolidatedQuery/consolidatedQuery.go');
   const host = await page.evaluate(() => window.location.host);
   for (const account of config.accounts) {
-    const accountScrapedTxs: InsertObject<DB, 'bank_txs'>[] = [];
-    const accountCurrentTxs = await db
-      .selectFrom('bank_txs')
-      .selectAll()
-      .where('bank_key', '=', bankKey)
-      .where('account_number', '=', account.number)
-      .where(
-        'month',
-        'in',
-        months.map((m) => m.format('YYYY-MM')),
-      )
-      .execute();
+    const accountScrapedTxs: (typeof bankTxs.$inferInsert)[] = [];
+    const accountCurrentTxs = await db.query.bankTxs.findMany({
+      where: (t, { and, eq, inArray }) =>
+        and(
+          eq(t.bankKey, bankKey),
+          eq(t.accountNumber, account.number),
+          inArray(
+            t.month,
+            months.map((m) => m.format('YYYY-MM')),
+          ),
+        ),
+    });
 
     await waitRandomMs();
     await page.goto(`https://${host}/ebac/module/consolidatedQuery/consolidatedQuery.go`);
@@ -106,12 +106,12 @@ export async function bacScrape({
             const debit = parseFloat(tx.debit);
             const credit = parseFloat(tx.credit);
             return {
-              bank_key: bankKey,
-              account_number: account.number,
+              bankKey,
+              accountNumber: account.number,
               month: monthDayJs.format('YYYY-MM'),
               date: date.format('YYYY-MM-DD'),
               description: tx.description,
-              doc_no: tx.docNo,
+              docNo: tx.docNo,
               amount: debit ? -Number(debit) : credit,
             };
           })
@@ -234,12 +234,12 @@ export async function bacScrape({
         ...accountCurrentTxs
           .filter((currentTx) => {
             const objToMatch = {
-              bank_key: currentTx.bank_key,
-              account_number: currentTx.account_number,
-              date: dayjs(currentTx.date).format('YYYY-MM-DD'),
-              doc_no: currentTx.doc_no,
+              bankKey: currentTx.bankKey,
+              accountNumber: currentTx.accountNumber,
+              date: currentTx.date,
+              docNo: currentTx.docNo,
               description: currentTx.description,
-              amount: Number(currentTx.amount),
+              amount: currentTx.amount,
             };
             return !accountScrapedTxs.some((bankTx) => isMatching(objToMatch, bankTx));
           })

@@ -3,7 +3,10 @@
   "type": "module",
   "scripts": {
     "start": "node --import @swc-node/register/esm-register src/console.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:pull": "drizzle-kit pull",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "devDependencies": {
     "@swc-node/register": "^1.11.1",
@@ -11,13 +14,13 @@
     "@types/node": "^26.1.1",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.20.0",
-    "kysely-codegen": "^0.20.0",
+    "drizzle-kit": "^0.31.10",
     "typescript": "~6.0.3"
   },
   "dependencies": {
     "commander": "^15.0.0",
     "dayjs": "~1.11.21",
-    "kysely": "^0.29.3",
+    "drizzle-orm": "^0.45.2",
     "nodemailer": "^9.0.3",
     "pg": "^8.22.0",
     "playwright": "1.61.1",
