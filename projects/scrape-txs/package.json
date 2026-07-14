@@ -3,26 +3,20 @@
   "type": "module",
   "scripts": {
     "start": "node --import @swc-node/register/esm-register src/console.ts",
-    "typecheck": "tsc --noEmit",
-    "db:pull": "drizzle-kit pull",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@swc-node/register": "^1.11.1",
     "@swc/core": "^1.15.43",
     "@types/node": "^26.1.1",
     "@types/nodemailer": "^8.0.1",
-    "@types/pg": "^8.20.0",
-    "drizzle-kit": "^0.31.10",
     "typescript": "~6.0.3"
   },
   "dependencies": {
+    "@bank-bots/db": "workspace:*",
     "commander": "^15.0.0",
     "dayjs": "~1.11.21",
-    "drizzle-orm": "^0.45.2",
     "nodemailer": "^9.0.3",
-    "pg": "^8.22.0",
     "playwright": "1.61.1",
     "ts-pattern": "^5.9.0",
     "zod": "^4.4.3"

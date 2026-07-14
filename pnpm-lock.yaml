@@ -55,23 +55,42 @@ importers:
         specifier: ^8.63.0
         version: 8.63.0(eslint@10.7.0(jiti@2.7.0))(typescript@6.0.3)
 
+  projects/db:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.1.1
+        version: 26.1.1
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+
   projects/scrape-txs:
     dependencies:
+      '@bank-bots/db':
+        specifier: workspace:*
+        version: link:../db
       commander:
         specifier: ^15.0.0
         version: 15.0.0
       dayjs:
         specifier: ~1.11.21
         version: 1.11.21
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
       nodemailer:
         specifier: ^9.0.3
         version: 9.0.3
-      pg:
-        specifier: ^8.22.0
-        version: 8.22.0
       playwright:
         specifier: 1.61.1
         version: 1.61.1
@@ -94,12 +113,6 @@ importers:
       '@types/nodemailer':
         specifier: ^8.0.1
         version: 8.0.1
-      '@types/pg':
-        specifier: ^8.20.0
-        version: 8.20.0
-      drizzle-kit:
-        specifier: ^0.31.10
-        version: 0.31.10
       typescript:
         specifier: ~6.0.3
         version: 6.0.3

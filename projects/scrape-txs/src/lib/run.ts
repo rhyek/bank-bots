@@ -1,13 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type dayjs from 'dayjs';
-import { inArray } from 'drizzle-orm';
 import { chromium } from 'playwright';
 import { z } from 'zod';
 import { bacScrape } from './bac/scrape';
 import { bancoIndustrialScrape } from './banco-industrial/scrape';
 import { configSchema } from './config-schema';
-import { bankTxs, db, pool } from './db';
+import { bankTxs, db, inArray, pool, sql } from '@bank-bots/db';
 
 export async function run(
   months: dayjs.Dayjs[],
@@ -104,29 +103,24 @@ export async function run(
     await db.transaction(async (tx) => {
       if (createTxs.length > 0) {
         console.log(`Inserting/updating ${createTxs.length} ${bankKey} transactions...`);
-        await Promise.all(
-          createTxs.map(async (bankTx) => {
-            try {
-              await tx
-                .insert(bankTxs)
-                .values(bankTx)
-                .onConflictDoUpdate({
-                  target: [
-                    bankTxs.bankKey,
-                    bankTxs.accountNumber,
-                    bankTxs.date,
-                    bankTxs.docNo,
-                    bankTxs.description,
-                    bankTxs.amount,
-                  ],
-                  set: { amount: bankTx.amount },
-                });
-            } catch (error) {
-              console.error('Failed to insert/update tx', bankTx);
-              throw error;
-            }
-          }),
-        );
+        // One batched multi-row upsert. (Not `Promise.all` of per-row inserts: that fires
+        // concurrent queries on the transaction's single client, which pg deprecates and removes
+        // in pg@9.) `excluded.amount` is the incoming value — a no-op today since amount is part of
+        // the conflict key, but it keeps the "update amount on conflict" intent if the key changes.
+        await tx
+          .insert(bankTxs)
+          .values(createTxs)
+          .onConflictDoUpdate({
+            target: [
+              bankTxs.bankKey,
+              bankTxs.accountNumber,
+              bankTxs.date,
+              bankTxs.docNo,
+              bankTxs.description,
+              bankTxs.amount,
+            ],
+            set: { amount: sql`excluded.amount` },
+          });
       }
       if (deleteTxIds.length > 0) {
         console.log(`Deleting ${deleteTxIds.join(', ')} ${bankKey} transactions...`);

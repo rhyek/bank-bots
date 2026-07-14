@@ -1,4 +1,5 @@
 packages:
+  - 'projects/db'
   - 'projects/scrape-txs'
 allowBuilds:
   '@swc/core': true

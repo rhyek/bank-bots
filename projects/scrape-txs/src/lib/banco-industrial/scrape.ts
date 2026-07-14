@@ -2,7 +2,7 @@ import type dayjs from 'dayjs';
 import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { AccountType } from '../types';
-import { db, type bankTxs } from '../db';
+import { db, type bankTxs } from '@bank-bots/db';
 import { waitRandomMs } from '../utils';
 
 export type BiConfig = {

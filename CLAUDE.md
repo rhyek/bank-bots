@@ -39,7 +39,8 @@ handler. Treat the scheduling/deploy story as in flux; the data pipeline below i
 
 | Path | What |
 | --- | --- |
-| `projects/scrape-txs/` | TypeScript Playwright scraper (run via Node + `@swc-node/register`). |
+| `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs (and the planned web app). |
+| `projects/scrape-txs/` | TypeScript Playwright scraper (run via Node + `@swc-node/register`). Imports `@bank-bots/db`. |
 | `projects/update-ynab/` | Go program that syncs `bank_txs` → YNAB. |
 | `infra/` | Terraform for AWS (ECR/IAM/S3/Lambda). Currently being removed/reworked. |
 | `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
@@ -72,10 +73,16 @@ Key files:
 - `src/lib/bac/scrape.ts`, `src/lib/banco-industrial/scrape.ts` — the per-bank Playwright flows.
 - `src/lib/config-schema.ts` — Zod schema validating `config.data` (only the `banks` object; it
   intentionally ignores `ynab`).
-- `src/lib/db/` — Drizzle ORM client (`drizzle-orm/node-postgres`) over `pg`. `schema.ts` is the
-  source of truth (bootstrapped once via `drizzle-kit pull`, then evolved code-first). Reads use the
-  RQB (`db.query.*`); writes/tx use the core API (`insert().onConflictDoUpdate()`, `delete()`,
-  `db.transaction()`). Migrations live in `projects/scrape-txs/drizzle/` (see "Running things").
+- DB access is via the shared **`@bank-bots/db`** package (`projects/db`), not a local module. It
+  owns the Drizzle client (`drizzle-orm/node-postgres` over `pg`), `schema.ts` (the source of truth,
+  bootstrapped once via `drizzle-kit pull`, then evolved code-first), the migrations (`drizzle/`),
+  and drizzle-kit. It also re-exports the drizzle-orm query operators (`inArray`, `eq`, …) so it's
+  the sole owner of `drizzle-orm` (avoids duplicate-instance type clashes under pnpm). The scraper
+  imports `{ db, bankTxs, inArray, … }` from `@bank-bots/db`; reads use the RQB (`db.query.*`),
+  writes/tx use the core API (`insert().onConflictDoUpdate()`, `delete()`, `db.transaction()`). It's
+  consumed as **TS source** — no build/emit, so no `.js` extensions in its imports; consumers
+  transpile it (scrape-txs via swc-node, the web app via Vite). Not a devtooie package (no process);
+  the workspace link + package `exports` wire it in.
 
 **Months**: if none passed, defaults to the current month (plus the previous month if today's day
 ≤ 10, to catch late-posting transactions).
@@ -165,14 +172,16 @@ scraper is registered as a package with a one-shot `start` command.
 RUN_DIR="$PWD/storage/scrape-txs/run/<bankKey>-$(date +%Y%m%d-%H%M%S)"
 pnpm devtooie cmd scrape-txs -c start --log-dir "$RUN_DIR" -- --bank-key <bankKey> [--month 2026-05 2026-06] --trace-dir "$RUN_DIR"
 
-# Typecheck / build
+# Typecheck
+pnpm -C projects/db run typecheck          # @bank-bots/db (source-only lib)
 pnpm -C projects/scrape-txs run typecheck
 ( cd projects/update-ynab && go build ./... && go vet ./... )
 
-# DB migrations (scrape-txs, Drizzle) — edit src/lib/db/schema.ts, then with DATABASE_URL in env:
-pnpm -C projects/scrape-txs db:generate   # diff schema.ts → new drizzle/NNNN_*.sql migration
-pnpm -C projects/scrape-txs db:migrate    # apply pending migrations (tracked in drizzle.__drizzle_migrations)
-# pnpm -C projects/scrape-txs db:pull      # (rarely) re-introspect the live DB back into schema.ts
+# DB migrations (Drizzle) — live in @bank-bots/db. Edit projects/db/src/schema.ts, then with
+# DATABASE_URL in env (`set -a; . .env.local; set +a` from the repo root):
+pnpm -C projects/db db:generate   # diff schema.ts → new drizzle/NNNN_*.sql migration
+pnpm -C projects/db db:migrate    # apply pending migrations (tracked in drizzle.__drizzle_migrations)
+# pnpm -C projects/db db:pull      # (rarely) re-introspect the live DB back into schema.ts
 # The pre-existing tables were baselined into Drizzle's journal once via drizzle/stamp_baseline.sql,
 # so `migrate` skips the 0000 baseline and only applies later migrations (e.g. 0001_add_currency).
 

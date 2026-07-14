@@ -4,7 +4,7 @@ import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { z } from 'zod';
 import type { bacSchema } from '../config-schema';
-import { db, type bankTxs } from '../db';
+import { db, type bankTxs } from '@bank-bots/db';
 import { waitRandomMs } from '../utils';
 
 dayjs.extend(customParseFormat);
