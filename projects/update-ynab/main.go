@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"bank-bots/update-ynab/types"
 	"bank-bots/update-ynab/ynab"
 
-	"github.com/aws/aws-lambda-go/lambda"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 )
@@ -21,19 +19,12 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	slog.SetDefault(logger)
 
-	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" { // is lambda
-		// https://docs.aws.amazon.com/lambda/latest/dg/golang-handler.html
-		lambda.Start(func(ctx context.Context) (*string, error) {
-			return work()
-		})
-	} else { // is console
-		msg, err := work()
-		if err != nil {
-			slog.Error(err.Error())
-			os.Exit(1)
-		}
-		slog.Info(*msg)
+	msg, err := work()
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
+	slog.Info(*msg)
 }
 
 func loadConfig(db *sqlx.DB) (*types.Config, error) {
