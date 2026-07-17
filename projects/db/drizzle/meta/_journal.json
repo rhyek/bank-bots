@@ -15,6 +15,48 @@
       "when": 1784044907788,
       "tag": "0001_add_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784073922600,
+      "tag": "0002_add_bank_account_payee_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784074399660,
+      "tag": "0003_finalize_bank_tx",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784164334184,
+      "tag": "0004_drop_bank_tx_currency",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784241207938,
+      "tag": "0005_add_bank_account_running_balance",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784242137705,
+      "tag": "0006_amount_and_balance_to_cents",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784251650294,
+      "tag": "0007_add_replica_timestamps_and_triggers",
+      "breakpoints": true
     }
   ]
 }

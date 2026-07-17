@@ -1,0 +1,1 @@
+ALTER TABLE "bank_tx" DROP COLUMN "currency";
