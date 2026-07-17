@@ -5,30 +5,35 @@ syncs them into **YNAB** (You Need A Budget). It exists because these banks have
 / API, so transactions are scraped from their online-banking web UIs with a headless browser,
 normalized into Postgres, and then reconciled into a YNAB budget.
 
-> **Heads up (planned work):** the YNAB layer (`projects/update-ynab` + the `ynab` config block) is
-> slated to be **replaced** with a different budgeting backend. Everything up to and including the
-> `bank_txs` table is the stable core; the YNAB piece is the swappable part. This doc spells out the
-> whole pipeline so that replacement can be scoped cleanly.
+> **Heads up (migration in progress):** the YNAB layer is being **replaced** with a different
+> budgeting backend. As the first step, all YNAB **payees + categories** and each transaction's
+> **payee/category mapping** have been mirrored into Postgres (`payee`, `category_group`, `category`
+> tables + `bank_tx.payee_id`/`category_id`; run once via the backfill script below).
+> `projects/update-ynab` (Go) + the `ynab` config block are now **legacy/reference only** — kept for
+> now, not run; the daily YNAB sync is retired. Everything up to and including the `bank_tx` table is
+> the stable core.
 
 ## Architecture at a glance
 
 ```
-   ┌─────────────────────┐        ┌──────────────────┐        ┌──────────────────────┐
-   │  scrape-txs (TS)     │        │  Postgres        │        │  update-ynab (Go)    │
-   │  Playwright scraper  │ ─────▶ │  (Supabase)      │ ─────▶ │  reconcile → YNAB    │
-   │  per bank login      │ upsert │  bank_txs, config│  read  │  via YNAB REST API   │
-   └─────────────────────┘        └──────────────────┘        └──────────────────────┘
-         reads config                                              reads config.ynab
-         (bank creds)                                              (token + accountsMap)
+   ┌─────────────────────┐        ┌─────────────────────────┐        ┌──────────────────────┐
+   │  scrape-txs (TS)     │        │  Postgres (Supabase)    │        │  update-ynab (Go)    │
+   │  Playwright scraper  │ ─────▶ │  bank_account, bank_tx, │  ····▶ │  YNAB sync (LEGACY,  │
+   │  per bank login      │ upsert │  payee, category, config│        │  retired / reference)│
+   └─────────────────────┘        └─────────────────────────┘        └──────────────────────┘
+         reads config                       ▲
+         (bank creds)      backfill-ynab-mappings.ts (one-shot: YNAB payees/categories/mappings)
 ```
 
 1. **Scrape** — `scrape-txs` logs into one bank (selected by a bank key), scrapes each account's
-   transactions for the target month(s), and **upserts** them into `bank_txs`.
-2. **Store** — Postgres is the source of truth. One flat `bank_txs` table keyed by
-   `(bank_key, account_number, …)`; a single-row `config` table holds all bank credentials + the
-   YNAB config as JSON.
-3. **Sync** — `update-ynab` reads `bank_txs`, matches each account to a YNAB account via
-   `config.ynab.accountsMap`, and creates/updates transactions in YNAB (idempotent, memo-based).
+   transactions for the target month(s), resolves each account to its `bank_account.id`, and
+   **upserts** them into `bank_tx`.
+2. **Store** — Postgres is the source of truth. `bank_tx` (one row per transaction, keyed by
+   `bank_account_id`) + `bank_account` (the account registry) + `payee`/`category_group`/`category`
+   (imported from YNAB); a single-row `config` table holds all bank credentials + the (legacy) YNAB
+   config as JSON.
+3. **Sync (retired)** — `update-ynab` historically read `bank_txs` and pushed to YNAB. It's kept as
+   reference only; the payee/category mappings it produced now live in `bank_tx` directly.
 
 Both run on a **daily schedule** (historically AWS Lambda, ~13:00 UTC; on-failure the scraper emails
 an alert). The deployment is mid-migration toward local/devtooie execution — `scrape-txs/lambda.ts`
@@ -53,7 +58,7 @@ Three "bank keys", each = one bank login. `scrape-txs` picks one per run.
 | Bank key | Bank / country | Login flow | Config accounts |
 | --- | --- | --- | --- |
 | `bancoIndustrialGt` | Banco Industrial, Guatemala | `bienlinea.bi.com.gt` (código + usuario + contraseña) | `3250099185` (checking) |
-| `bacGt` | BAC Credomatic, Guatemala | `baccredomatic.com` → pick country → "Banca en Línea" → `sucursalelectronica.com` login | `904201043` (GTQ checking), `CR07010200009697902868` (USD checking) |
+| `bacGt` | BAC Credomatic, Guatemala | `baccredomatic.com` → pick country → "Banca en Línea" → `sucursalelectronica.com` login | `904201043` (USD checking), `CR07010200009697902868` (USD checking) |
 | `bacCr` | BAC Credomatic, Costa Rica | same code as bacGt, `country: 'Costa Rica'` | `CR93010200009615666272` (USD checking) |
 
 `bacGt` and `bacCr` share `src/lib/bac/scrape.ts`; `bancoIndustrialGt` has its own
@@ -78,7 +83,7 @@ Key files:
   bootstrapped once via `drizzle-kit pull`, then evolved code-first), the migrations (`drizzle/`),
   and drizzle-kit. It also re-exports the drizzle-orm query operators (`inArray`, `eq`, …) so it's
   the sole owner of `drizzle-orm` (avoids duplicate-instance type clashes under pnpm). The scraper
-  imports `{ db, bankTxs, inArray, … }` from `@bank-bots/db`; reads use the RQB (`db.query.*`),
+  imports `{ db, bankTx, inArray, … }` from `@bank-bots/db`; reads use the RQB (`db.query.*`),
   writes/tx use the core API (`insert().onConflictDoUpdate()`, `delete()`, `db.transaction()`). It's
   consumed as **TS source** — no build/emit, so no `.js` extensions in its imports; consumers
   transpile it (scrape-txs via swc-node, the web app via Vite). Not a devtooie package (no process);
@@ -87,34 +92,63 @@ Key files:
 **Months**: if none passed, defaults to the current month (plus the previous month if today's day
 ≤ 10, to catch late-posting transactions).
 
-**Upsert semantics** (`run.ts`): insert into `bank_txs`; on conflict against the
-`(bank_key, account_number, date, doc_no, description, amount)` unique index, only `amount` is
-updated. It also computes deletes (transactions in the DB for the scraped months that are no longer
-present on the bank site) and removes them — so a scrape reconciles a month, it doesn't just append.
+**Upsert semantics** (`run.ts` + the per-bank scrapers): each account is first resolved to its
+`bank_account.id` (`ensureBankAccount()` upserts the registry row). Insert into `bank_tx`; on
+conflict against the `(bank_account_id, date, doc_no, description, amount)` unique index, only
+`amount` is updated (this leaves any backfilled `payee_id`/`category_id` intact on re-scrape). It
+also computes deletes (transactions in the DB for the scraped months that are no longer present on
+the bank site) and removes them — so a scrape reconciles a month, it doesn't just append.
 
 ## Database schema (Supabase Postgres)
 
-**`bank_txs`** — one row per bank transaction. `id bigint` PK (auto). Amounts are stored as the
-bank's raw number; the `currency` column labels which currency that number is in (`NOT NULL DEFAULT
-'USD'` — see the currency gotcha below).
+Five tables, all **singular**. **RLS is disabled** (the DB is reached only via a direct Postgres
+connection, which bypasses RLS). Ids: `bank_tx.id` is a `bigint` identity; `bank_account.id` is a
+**uuidv7** (generated app-side via the schema's `$defaultFn` — PG 15 has no `uuidv7()`);
+`payee`/`category`/`category_group` ids are the **YNAB uuids** they were imported from.
+
+**`bank_account`** — canonical account registry. `config.banks.<key>.accounts` still drives which
+accounts get scraped + their credentials; this table gives each `(bank_key, account_number)` a stable
+id that `bank_tx` references. Unique index `bank_account_unique_cols` on `(bank_key, account_number)`.
+The scraper upserts rows here at scrape time via `ensureBankAccount()`.
+
+| column | type | notes |
+| --- | --- | --- |
+| `id` | uuid | primary key (uuidv7, app-generated) |
+| `bank_key` | text | e.g. `bacGt` |
+| `account_number` | text | e.g. `904201043`, `CR93…` |
+| `type` | text | `checking` (from config) |
+| `currency` | text | `'USD'` for all rows (every tracked account is USD) |
+| `created_at` | timestamptz | `now()` |
+
+**`bank_tx`** — one row per bank transaction (renamed from `bank_txs`; `bank_key`/`account_number`
+replaced by the `bank_account_id` FK). Amounts are the bank's raw number (currency lives on `bank_account`).
 
 | column | type | notes |
 | --- | --- | --- |
 | `id` | bigint | primary key, auto-generated |
-| `bank_key` | text | e.g. `bacGt` |
-| `account_number` | text | e.g. `904201043`, `CR93…` |
+| `bank_account_id` | uuid | **NOT NULL** FK → `bank_account.id` |
 | `month` | text | `YYYY-MM` (the statement month scraped) |
 | `date` | date | transaction date |
 | `doc_no` | text | bank's document number (often non-unique / generic) |
 | `description` | text | bank's description |
 | `amount` | numeric | negative = debit, positive = credit |
-| `currency` | text | currency of `amount`; `NOT NULL DEFAULT 'USD'` (scrapers don't set it yet) |
+| `payee_id` | text | nullable FK → `payee.id`; backfilled from YNAB |
+| `category_id` | text | nullable FK → `category.id`; backfilled from YNAB |
+| `transfer_bank_account_id` | uuid | nullable FK → `bank_account.id`; the *other* account for a transfer (payee/category stay null) |
 | `created_at` | timestamptz | `now()` on insert (not touched on conflict-update) |
 
-Unique index `bank_txs_unique_cols` on `(bank_key, account_number, date, doc_no, description,
-amount)` — the upsert conflict target and the effective natural key. (`doc_no` alone isn't unique,
-so the sync layer derives a per-account `ref` = `YYYYMMDD_docno` with a `(n)` suffix for
-same-day/doc collisions — see below.)
+Unique index `bank_tx_unique_cols` on `(bank_account_id, date, doc_no, description, amount)` — the
+upsert conflict target and effective natural key.
+
+**`payee`** (`id`, `name`), **`category_group`** (`id`, `name`, `hidden`), **`category`** (`id`,
+`name`, `group_id` → `category_group`, `hidden`) — imported wholesale from YNAB by the **backfill
+script** (`projects/scrape-txs/src/scripts/backfill-ynab-mappings.ts`, run once, idempotent). It also
+sets `bank_tx.payee_id`/`category_id` for every YNAB tx that had **both** a payee and a category,
+matching it back to a `bank_tx` by `(bank_account, date, doc_no, amount)` — using the YNAB tx's own
+date/amount + the `doc_no` parsed from its memo `ref: <YYYYMMDD_docno>`. (Only YNAB txs that had been
+synced survive to match, so older `bank_tx` rows with no YNAB counterpart stay unmapped. This budget
+had **no** native YNAB transfers, so `transfer_bank_account_id` is unset everywhere today — the
+column + logic exist for the new backend.)
 
 **`config`** — single row, `id = 'general'`, `data json`. The whole app config lives in this JSON
 blob (bank credentials + YNAB settings). Shape:
@@ -137,10 +171,13 @@ blob (bank credentials + YNAB settings). Shape:
 > `DATABASE_URL` + the YNAB token/budget. Never print these; when reading `config.data` in shell,
 > redact `auth` and `accessToken`.
 
-## Component 2 — `update-ynab` (the YNAB sync) — *to be replaced*
+## Component 2 — `update-ynab` (the YNAB sync) — *legacy / retired*
 
-Go program (module `bank-bots/update-ynab`). Reads `config` + `bank_txs`, pushes to YNAB via its
-REST API. Entry: `main.go` (`work()`), runnable as a Lambda or CLI.
+Go program (module `bank-bots/update-ynab`). Historically read `config` + `bank_txs` and pushed to
+YNAB via its REST API (entry `main.go` `work()`). **Kept for reference only and no longer run** — it
+still queries the old `bank_txs` table (now `bank_tx`, with `bank_key`/`account_number` replaced by
+`bank_account_id`), so it won't work against the current schema without changes. The per-tx
+payee/category assignments it produced now live directly in `bank_tx` (see the backfill script).
 
 - **Account matching** (`ynab/ynab.go`): for each `(bank_key, account_number)` group with
   transactions, find the `config.ynab.accountsMap` entry with the same `bankKey` +
@@ -183,12 +220,18 @@ pnpm -C projects/db db:generate   # diff schema.ts → new drizzle/NNNN_*.sql mi
 pnpm -C projects/db db:migrate    # apply pending migrations (tracked in drizzle.__drizzle_migrations)
 # pnpm -C projects/db db:pull      # (rarely) re-introspect the live DB back into schema.ts
 # The pre-existing tables were baselined into Drizzle's journal once via drizzle/stamp_baseline.sql,
-# so `migrate` skips the 0000 baseline and only applies later migrations (e.g. 0001_add_currency).
+# so `migrate` skips the 0000 baseline and only applies later migrations.
+# NOTE: `db:generate` needs a TTY to resolve renames (table/column) and refuses to run in a
+# non-interactive shell. For a rename or a data-preserving migration, hand-author the .sql and
+# transform the previous meta/NNNN_snapshot.json — see 0003_finalize_bank_tx for the pattern
+# (split the additive part into a normal `generate`, then a hand-written finalize; validate the
+# hand-authored snapshot by re-running `db:generate` and expecting "No schema changes").
 
-# YNAB sync (Go) — normal recent-month run
-( cd projects/update-ynab && DATABASE_URL=… go run . )
-# YNAB backfill of one account's full history from a month
-( cd projects/update-ynab && DATABASE_URL=… BACKFILL_FROM_MONTH=2026-04 BACKFILL_BANK_KEY=bacGt BACKFILL_ACCOUNT_NUMBER=904201043 go run ./cmd/backfill )
+# Import YNAB payees/categories + per-tx mappings into Postgres (one-shot, idempotent).
+# Needs DATABASE_URL + YNAB_ACCESS_TOKEN + YNAB_BUDGET_ID in env (source .env.local).
+pnpm -C projects/scrape-txs run backfill-ynab-mappings
+
+# update-ynab (Go) is legacy/retired (see Component 2) — targets the old `bank_txs` schema, not run.
 ```
 
 Inspect the DB directly with `psql "$DATABASE_URL"` (grab `DATABASE_URL` from `.env.local`).
@@ -202,11 +245,12 @@ Inspect the DB directly with `psql "$DATABASE_URL"` (grab `DATABASE_URL` from `.
 - **`storage/`** is gitignored (traces, run logs). Never commit trace zips.
 - **Never handle bank passwords / the YNAB token in plaintext.** Credential changes are done by the
   owner directly (e.g. a `psql` update they run themselves).
-- **Currency** has a column (`bank_txs.currency`, `NOT NULL DEFAULT 'USD'`) but isn't meaningfully
-  populated yet: the scrapers insert without setting it, so **every** row takes the `USD` default —
-  including GTQ accounts, whose raw GTQ numbers are currently mislabelled `USD`. Making it real
-  (set `currency` per account, sourced from config, in the scrapers) is future budgeting-backend
-  work. Amounts remain the bank's raw number regardless.
-- Adding a new account = add it to the bank's `config.banks.<key>.accounts`, scrape it, then (for
-  the YNAB era) create a YNAB account + `accountsMap` entry, and backfill with `cmd/backfill`.
+- **Currency** — **every account currently tracked is USD-denominated**. Currency lives once, on
+  `bank_account.currency` (`'USD'` for all rows); `bank_tx` has **no** currency column (dropped in
+  migration 0004 as redundant — an account is single-currency). If a non-USD account is ever added,
+  set its `bank_account.currency`. Amounts are the bank's raw number regardless.
+- Adding a new account = add it to the bank's `config.banks.<key>.accounts`, then scrape it — the
+  scraper auto-creates the `bank_account` registry row (`ensureBankAccount`) and stamps
+  `bank_account_id`. (The old YNAB step — create a YNAB account + `accountsMap` entry + `cmd/backfill`
+  — is retired.)
 - No AI attribution in commits/PRs (owner preference). Node scripts are authored as `.ts`.
