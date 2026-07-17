@@ -2,7 +2,8 @@ import type dayjs from 'dayjs';
 import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { AccountType } from '../types';
-import { db, type bankTxs } from '@bank-bots/db';
+import { db, type bankTx } from '@bank-bots/db';
+import { ensureBankAccount } from '../bank-accounts';
 import { waitRandomMs } from '../utils';
 
 export type BiConfig = {
@@ -43,48 +44,53 @@ export async function bancoIndustrialScrape({
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForURL('https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard');
-  const createTxs: (typeof bankTxs.$inferInsert)[] = [];
+  const createTxs: (typeof bankTx.$inferInsert)[] = [];
   const deleteTxIds: number[] = [];
   for (const account of accounts) {
     if (account.type === 'checking') {
+      const bankAccountId = await ensureBankAccount({
+        bankKey,
+        accountNumber: account.number,
+        type: account.type,
+      });
       for (const monthDayJs of months) {
-        const currentTxs = await db.query.bankTxs.findMany({
+        const currentTxs = await db.query.bankTx.findMany({
           where: (t, { and, eq }) =>
-            and(
-              eq(t.bankKey, bankKey),
-              eq(t.accountNumber, account.number),
-              eq(t.month, monthDayJs.format('YYYY-MM')),
-            ),
+            and(eq(t.bankAccountId, bankAccountId), eq(t.month, monthDayJs.format('YYYY-MM'))),
         });
         const rawTransactions = await getMonetaryAccountTransactions(
           page,
           account.number,
           monthDayJs,
         );
-        const _bankTxs: (typeof bankTxs.$inferInsert)[] = rawTransactions.map((tx) => {
+        const _bankTxs: (typeof bankTx.$inferInsert)[] = rawTransactions.map((tx) => {
           const [_, dateStr] = tx.date.match(/(\d\d)\s-\s(\d\d)/)!;
-          const amount = tx.credit && tx.credit !== '' ? Number(tx.credit) : -Number(tx.debit);
+          const amountCents =
+            tx.credit && tx.credit !== ''
+              ? Math.round(Number(tx.credit) * 100)
+              : -Math.round(Number(tx.debit) * 100);
           return {
-            bankKey,
-            accountNumber: account.number,
+            bankAccountId,
             month: monthDayJs.format('YYYY-MM'),
             date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
             description: tx.description,
             docNo: tx.docNo,
-            amount,
+            amountCents,
           };
         });
         const _deleteTxIds = currentTxs
           .filter((currentTx) => {
+            // Never delete manual reconciliation rows — they aren't on the bank statement, so the
+            // scrape would otherwise wipe them (and un-reconcile the account) on every run.
+            if (currentTx.docNo === 'RECONCILE') return false;
             const objToMatch = {
-              bankKey: currentTx.bankKey,
-              accountNumber: currentTx.accountNumber,
+              bankAccountId: currentTx.bankAccountId,
               date: currentTx.date,
               docNo: currentTx.docNo,
               description: currentTx.description,
-              amount: currentTx.amount,
+              amountCents: currentTx.amountCents,
             };
-            return !_bankTxs.some((bankTx) => isMatching(objToMatch, bankTx));
+            return !_bankTxs.some((scrapedTx) => isMatching(objToMatch, scrapedTx));
           })
           .map((tx) => tx.id);
         createTxs.push(..._bankTxs);

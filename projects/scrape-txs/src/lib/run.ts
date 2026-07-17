@@ -6,13 +6,14 @@ import { z } from 'zod';
 import { bacScrape } from './bac/scrape';
 import { bancoIndustrialScrape } from './banco-industrial/scrape';
 import { configSchema } from './config-schema';
-import { bankTxs, db, inArray, pool, sql } from '@bank-bots/db';
+import { bankAccount, bankTx, db, eq, inArray, pool, sql } from '@bank-bots/db';
 
 export async function run(
   months: dayjs.Dayjs[],
   bankKeyInput: string | undefined,
-  traceDir = path.join('storage', 'playwright-traces'),
+  opts: { traceDir?: string; jsonPath?: string; accountNumber?: string } = {},
 ) {
+  const { traceDir = path.join('storage', 'playwright-traces'), jsonPath, accountNumber } = opts;
   const bankKey = z.string().parse(bankKeyInput);
   const configRow = await db.query.config.findFirst({
     where: (c, { eq }) => eq(c.id, 'general'),
@@ -27,8 +28,9 @@ export async function run(
     args: browserArgs,
     headless: false,
   });
-  let createTxs: (typeof bankTxs.$inferInsert)[];
+  let createTxs: (typeof bankTx.$inferInsert)[];
   let deleteTxIds: number[];
+  let runningBalances: Record<string, number>;
   const maxAttempts = 2;
   let attempt = 0;
 
@@ -53,16 +55,28 @@ export async function run(
         const page = await context.newPage();
         const result = await (async () => {
           if (bankKey === 'bancoIndustrialGt') {
+            const biConfig = config.banks.bancoIndustrialGt;
             return await bancoIndustrialScrape({
               bankKey,
-              biConfig: config.banks.bancoIndustrialGt,
+              biConfig: accountNumber
+                ? {
+                    ...biConfig,
+                    accounts: biConfig.accounts.filter((a) => a.number === accountNumber),
+                  }
+                : biConfig,
               months,
               page,
             });
           } else if (['bacGt', 'bacCr'].includes(bankKey)) {
+            const bankConfig = config.banks[bankKey as 'bacGt' | 'bacCr'];
             return await bacScrape({
               bankKey,
-              config: config.banks[bankKey as 'bacGt' | 'bacCr'],
+              config: accountNumber
+                ? {
+                    ...bankConfig,
+                    accounts: bankConfig.accounts.filter((a) => a.number === accountNumber),
+                  }
+                : bankConfig,
               months,
               page,
             });
@@ -72,6 +86,8 @@ export async function run(
         })();
         createTxs = result.createTxs;
         deleteTxIds = result.deleteTxIds;
+        runningBalances =
+          'runningBalances' in result ? (result.runningBalances as Record<string, number>) : {};
         break;
       } catch (error) {
         // Only persist a trace once we're giving up. Earlier attempts' traces are discarded
@@ -99,6 +115,28 @@ export async function run(
     await browser.close();
   }
 
+  // Dry run: dump scraped txs to JSON grouped by account + month, and do NOT touch the DB.
+  if (jsonPath) {
+    const byAccount = new Map<string, Record<string, unknown[]>>();
+    for (const tx of createTxs) {
+      const months = byAccount.get(tx.bankAccountId) ?? {};
+      (months[tx.month] ??= []).push({
+        date: tx.date,
+        docNo: tx.docNo,
+        description: tx.description,
+        amountCents: tx.amountCents,
+      });
+      byAccount.set(tx.bankAccountId, months);
+    }
+    const out = [...byAccount.entries()].map(([account_id, months]) => ({ account_id, months }));
+    await fs.writeFile(jsonPath, JSON.stringify(out, null, 2));
+    console.log(
+      `--json: wrote ${createTxs.length} scraped txs for ${out.length} account(s) to ${jsonPath} (no DB write; ${deleteTxIds.length} deletes skipped).`,
+    );
+    await pool.end();
+    return;
+  }
+
   if (createTxs.length > 0 || deleteTxIds.length > 0) {
     await db.transaction(async (tx) => {
       if (createTxs.length > 0) {
@@ -108,26 +146,35 @@ export async function run(
         // in pg@9.) `excluded.amount` is the incoming value — a no-op today since amount is part of
         // the conflict key, but it keeps the "update amount on conflict" intent if the key changes.
         await tx
-          .insert(bankTxs)
+          .insert(bankTx)
           .values(createTxs)
           .onConflictDoUpdate({
             target: [
-              bankTxs.bankKey,
-              bankTxs.accountNumber,
-              bankTxs.date,
-              bankTxs.docNo,
-              bankTxs.description,
-              bankTxs.amount,
+              bankTx.bankAccountId,
+              bankTx.date,
+              bankTx.docNo,
+              bankTx.description,
+              bankTx.amountCents,
             ],
-            set: { amount: sql`excluded.amount` },
+            set: { amountCents: sql`excluded.amount_cents` },
           });
       }
       if (deleteTxIds.length > 0) {
         console.log(`Deleting ${deleteTxIds.join(', ')} ${bankKey} transactions...`);
-        await tx.delete(bankTxs).where(inArray(bankTxs.id, deleteTxIds));
+        await tx.delete(bankTx).where(inArray(bankTx.id, deleteTxIds));
       }
     });
     console.log('Done.');
+  }
+
+  if (Object.keys(runningBalances).length > 0) {
+    for (const [accountId, balance] of Object.entries(runningBalances)) {
+      await db
+        .update(bankAccount)
+        .set({ runningBalanceCents: balance })
+        .where(eq(bankAccount.id, accountId));
+    }
+    console.log(`Updated running_balance for ${Object.keys(runningBalances).length} account(s).`);
   }
 
   await pool.end();

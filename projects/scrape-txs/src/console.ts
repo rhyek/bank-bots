@@ -12,6 +12,14 @@ program.option(
   '-t, --trace-dir <dir>',
   'Directory to save the Playwright trace into on failure (default: storage/playwright-traces)',
 );
+program.option(
+  '-j, --json <path>',
+  'Dry run: write the scraped txs to this JSON file instead of writing to the DB',
+);
+program.option(
+  '-a, --account <accountNumber>',
+  'Only scrape this account number (must belong to the selected bank key)',
+);
 
 program.parse();
 
@@ -19,6 +27,8 @@ const options = program.opts<{
   month?: string[];
   bankKey?: string;
   traceDir?: string;
+  json?: string;
+  account?: string;
 }>();
 
 const bankKey = options.bankKey ?? process.env.BANK_KEY;
@@ -35,7 +45,11 @@ if (options.month) {
 }
 
 try {
-  await run(months, bankKey, options.traceDir);
+  await run(months, bankKey, {
+    traceDir: options.traceDir,
+    jsonPath: options.json,
+    accountNumber: options.account,
+  });
 } catch (error) {
   console.error(error);
   const emailSubject = `Scrape bank txs failed for ${bankKey}`;

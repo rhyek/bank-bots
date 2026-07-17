@@ -4,7 +4,8 @@ import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { z } from 'zod';
 import type { bacSchema } from '../config-schema';
-import { db, type bankTxs } from '@bank-bots/db';
+import { db, type bankTx } from '@bank-bots/db';
+import { ensureBankAccount } from '../bank-accounts';
 import { waitRandomMs } from '../utils';
 
 dayjs.extend(customParseFormat);
@@ -25,8 +26,11 @@ export async function bacScrape({
       .map((m) => m.format('YYYY-MM'))
       .join(', ')}`,
   );
-  const createTxs: (typeof bankTxs.$inferInsert)[] = [];
+  const createTxs: (typeof bankTx.$inferInsert)[] = [];
   const deleteTxIds: number[] = [];
+  // running_balance_cents = the last row's "Balance" (in cents) on the current month, per account.
+  const runningBalances: Record<string, number> = {};
+  const currentMonth = dayjs().format('YYYY-MM');
 
   await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
@@ -40,15 +44,40 @@ export async function bacScrape({
   await page.getByRole('textbox', { name: 'Contraseña' }).fill(config.auth.password);
   await waitRandomMs();
   await page.locator('#confirm').click();
-  await page.waitForURL('**/ebac/module/consolidatedQuery/consolidatedQuery.go');
+  // BAC blocks concurrent sessions: if a session is already open (a prior run/login didn't press
+  // SALIR, or the owner is logged in elsewhere) login lands on a full "AVISO DE SESIONES ACTIVAS"
+  // page (`/ebac/common/showSessionRestriction.go`) instead of the dashboard. Its CONTINUAR control
+  // is a <div class="button-form button-position-right">Continuar</div> (not a button/link — so
+  // match it by tag+text). Wait for whichever comes first — that page or the dashboard — and click
+  // CONTINUAR to take over the session.
+  const dashboardUrl = '**/ebac/module/consolidatedQuery/consolidatedQuery.go';
+  const continuarBtn = page.locator('div.button-form').filter({ hasText: 'Continuar' });
+  const outcome = await Promise.race([
+    continuarBtn
+      .waitFor({ state: 'visible', timeout: 30000 })
+      .then(() => 'modal' as const)
+      .catch(() => 'timeout' as const),
+    page
+      .waitForURL(dashboardUrl, { timeout: 30000 })
+      .then(() => 'dashboard' as const)
+      .catch(() => 'timeout' as const),
+  ]);
+  if (outcome === 'modal') {
+    await continuarBtn.click();
+  }
+  await page.waitForURL(dashboardUrl);
   const host = await page.evaluate(() => window.location.host);
   for (const account of config.accounts) {
-    const accountScrapedTxs: (typeof bankTxs.$inferInsert)[] = [];
-    const accountCurrentTxs = await db.query.bankTxs.findMany({
+    const bankAccountId = await ensureBankAccount({
+      bankKey,
+      accountNumber: account.number,
+      type: account.type,
+    });
+    const accountScrapedTxs: (typeof bankTx.$inferInsert)[] = [];
+    const accountCurrentTxs = await db.query.bankTx.findMany({
       where: (t, { and, eq, inArray }) =>
         and(
-          eq(t.bankKey, bankKey),
-          eq(t.accountNumber, account.number),
+          eq(t.bankAccountId, bankAccountId),
           inArray(
             t.month,
             months.map((m) => m.format('YYYY-MM')),
@@ -106,17 +135,32 @@ export async function bacScrape({
             const debit = parseFloat(tx.debit);
             const credit = parseFloat(tx.credit);
             return {
-              bankKey,
-              accountNumber: account.number,
+              bankAccountId,
               month: monthDayJs.format('YYYY-MM'),
               date: date.format('YYYY-MM-DD'),
               description: tx.description,
               docNo: tx.docNo,
-              amount: debit ? -Number(debit) : credit,
+              amountCents: debit ? -Math.round(debit * 100) : Math.round(credit * 100),
             };
           })
           .filter((tx) => !!tx);
         accountScrapedTxs.push(...scrapedConfirmedTxs);
+
+        // Capture the ledger balance from the current month's statement: the last data row's
+        // "Balance" column (td:6). This is Saldo disponible + Retenido — reconcile vs SUM(bank_tx).
+        if (monthDayJs.format('YYYY-MM') === currentMonth) {
+          const lastBalance = await page.evaluate(() => {
+            const rows = document.querySelectorAll(
+              '#transactionTable1 tbody tr:not(.bel-table_row__neutral)',
+            );
+            const cell = rows[rows.length - 1]?.querySelector('td:nth-of-type(6)');
+            return cell?.textContent?.trim() ?? null;
+          });
+          const dollars = lastBalance ? parseFloat(lastBalance.replace(/,/g, '')) : NaN;
+          if (!Number.isNaN(dollars)) {
+            runningBalances[bankAccountId] = Math.round(dollars * 100);
+          }
+        }
       }
       // // retenidos y diferidos
       // await page.getByText('Retenidos y Diferidos', { exact: true }).click();
@@ -233,15 +277,17 @@ export async function bacScrape({
       deleteTxIds.push(
         ...accountCurrentTxs
           .filter((currentTx) => {
+            // Never delete manual reconciliation rows — they aren't on the bank statement, so the
+            // scrape would otherwise wipe them (and un-reconcile the account) on every run.
+            if (currentTx.docNo === 'RECONCILE') return false;
             const objToMatch = {
-              bankKey: currentTx.bankKey,
-              accountNumber: currentTx.accountNumber,
+              bankAccountId: currentTx.bankAccountId,
               date: currentTx.date,
               docNo: currentTx.docNo,
               description: currentTx.description,
-              amount: currentTx.amount,
+              amountCents: currentTx.amountCents,
             };
-            return !accountScrapedTxs.some((bankTx) => isMatching(objToMatch, bankTx));
+            return !accountScrapedTxs.some((scrapedTx) => isMatching(objToMatch, scrapedTx));
           })
           .map((tx) => tx.id),
       );
@@ -249,5 +295,5 @@ export async function bacScrape({
     }
   }
   await page.locator('a.icon-exit').click();
-  return { createTxs, deleteTxIds };
+  return { createTxs, deleteTxIds, runningBalances };
 }
