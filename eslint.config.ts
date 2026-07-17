@@ -62,6 +62,14 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': 'off',
     },
   },
+  {
+    // NestJS relies on runtime dependency injection: a class referenced only as a constructor
+    // parameter type (an injected service) must stay a VALUE import so `emitDecoratorMetadata` can
+    // emit it — `import type` would elide it and break DI. `consistent-type-imports` can't tell those
+    // apart from real type-only imports, so it's off for the Nest app.
+    files: ['projects/ai-agent/**/*.ts'],
+    rules: { '@typescript-eslint/consistent-type-imports': 'off' },
+  },
   // Prettier LAST: eslint-plugin-prettier/recommended runs Prettier as the `prettier/prettier` rule
   // and disables ESLint's conflicting formatting rules, so the two never fight.
   prettierRecommended,

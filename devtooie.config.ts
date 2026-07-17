@@ -8,10 +8,14 @@ export default defineConfig({
     {
       name: 'scrape-txs',
       relativeDir: 'projects/scrape-txs',
-      // One-shot scraper run straight with node (no file watching); after editing its
-      // code, restart it. `builds` defaults to true, but there's no build/clean script,
-      // so a rebuild is a no-op — restart re-runs node (swc-node re-transpiles).
+      selectable: false,
+    },
+    {
+      name: 'ai-agent',
+      relativeDir: 'projects/ai-agent',
       command: ['start', { watches: false }],
+      port: 3001,
+      healthcheck: 'http://localhost:$port/status/health',
     },
   ],
 });
