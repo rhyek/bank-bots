@@ -66,6 +66,51 @@ truth, so every mutation lands there and flows back to the replica via the exist
 The agent never receives a general database handle. Each write is a single named operation with its
 own Zod schema, validated in our code, with ids minted by us.
 
+### Sequential matching is a feedback loop, not just serialization
+
+`concurrency: 1` exists so that **each resolved transaction becomes history the next one can use**.
+The backlog compounds as it drains: resolving `PLAYSTATION 650-2` once should make the other six
+occurrences free.
+
+That property does not survive the Postgres-write / SQLite-read split on its own. The tiers read the
+replica, but matches are written to Postgres and only reach the replica via `trg_replica_notify` →
+`replica-sync`. The race is lost by default:
+
+```
+job N   : await pgDb.update(bank_tx)   -- returns in ~1 ms
+          process() returns
+job N+1 : exact-tier SELECT on SQLite  -- runs immediately, before the notification lands
+```
+
+For tiers 1 and 2 this was harmless, which is why it went unnoticed: an exact match copies from some
+source row S that is already in the replica, so the next transaction finds S directly whether or not
+its predecessor replicated. A tier-1/2 match adds no information that did not already exist.
+
+**The AI tier breaks that.** It creates new payees, categories, and rules — genuinely new
+information. Without write-through the failure is not merely a wasted agent call:
+
+> tx N `PLAYSTATION 650-2` → agent finds no payee, creates "PlayStation".
+> tx N+1 `PLAYSTATION 650-2` → exact misses (stale replica), regex misses, agent reruns,
+> `search_payees` still reads the stale replica → **creates a second "PlayStation" payee.**
+
+**Resolution: write-through.** Every successful Postgres write is applied to the local replica
+immediately, in the same code path, before the job completes:
+
+| Write | Written through to |
+| --- | --- |
+| `bank_tx.payee_id` / `category_id` | `bank_tx` in the replica |
+| `create_payee` | `payee` |
+| `create_category` | `category` |
+| `create_matching_rule` / `update_matching_rule` | `matching_rule` |
+
+This does not weaken the boundary: the **agent** still has no SQLite write path — our service
+performs the write-through after its own validated Postgres write. It is self-healing, because delta
+sync later overwrites those rows with identical values from the source of truth; a failed
+write-through costs one redundant agent call, never a corrupted replica.
+
+The rejected alternative is awaiting replication before completing each job. It preserves a single
+writer, but adds latency to every job and stalls if a notification is ever dropped.
+
 ### New files
 
 | Path | Responsibility |
@@ -180,6 +225,10 @@ merchant prefix" from "this suffix is a random identifier" using evidence rather
 
 Each write tool records its side effect into a per-run context object. That record — not the
 model's self-report — is what lands in `matcher_result.data.created` / `.updated`.
+
+Each write tool also **writes through to the replica** after its Postgres write succeeds, so the
+next transaction in the queue sees the new payee, category, or rule. See "Sequential matching is a
+feedback loop" above for why this is required rather than an optimization.
 
 `create_category` requires an existing `category_group.id`; the agent can add a category, not
 restructure the budget into new groups.
@@ -360,6 +409,11 @@ The existing invariant holds: a single transaction can never stall the backlog.
 - **Write-tool validation tests** — uuidv7 minting, unknown `groupId` rejected, rule safety checks.
 - **Skip-logic test** — a tx with a `none` row is excluded from the backlog query; deleting the row
   re-includes it.
+- **Write-through / feedback test** — the one that guards the property `concurrency: 1` exists for.
+  Queue two transactions with identical descriptions; stub the AI tier so the first call resolves by
+  creating a payee and the second call fails the test if invoked. Assert the second transaction is
+  resolved by the **exact** tier, and that exactly one payee was created. Without write-through this
+  test fails, which is the point.
 - **Structured-output parsing tests** — success, `error_max_structured_output_retries`,
   success-with-no-output, and self-contradictory `matched: true` with null ids.
 - **One live end-to-end run**, manually, against a single real unmapped transaction, with the result
