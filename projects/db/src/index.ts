@@ -9,7 +9,15 @@ export const pool = new pg.Pool({
 // Pass `schema` so the RQB (`db.query.bankTxs` / `db.query.config`) is available.
 export const db = drizzle(pool, { schema });
 
-export { bankAccount, bankTx, payee, categoryGroup, category, config } from './schema';
+export {
+  bankAccount,
+  bankTx,
+  payee,
+  categoryGroup,
+  category,
+  config,
+  matchingRule,
+} from './schema';
 
 // Re-export the drizzle-orm query helpers consumers need, so @bank-bots/db is the single owner of
 // the drizzle-orm dependency. Importing drizzle-orm directly from a consumer creates a second

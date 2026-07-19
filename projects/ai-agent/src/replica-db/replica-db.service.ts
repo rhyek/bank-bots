@@ -5,6 +5,10 @@ import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '~/replica-db/replica-schema';
 
+// Bump whenever replica-schema.ts changes shape. Files written before this stamp existed read 0,
+// so they rebuild on first boot.
+const EXPECTED_SCHEMA_VERSION = 1;
+
 // Owns the better-sqlite3 connection + its (typed) Drizzle instance for the local replica cache.
 // Opens the file and creates the schema (if absent) on init; the file persists across restarts, so
 // a hot-reload boot reuses the existing cache rather than rebuilding it.
@@ -20,7 +24,24 @@ export class ReplicaDb implements OnModuleInit, OnModuleDestroy {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     this.sqlite = new Database(dbPath);
     this.sqlite.pragma('journal_mode = WAL'); // concurrent reads while the sync writes
+
+    const version = this.sqlite.pragma('user_version', { simple: true }) as number;
+    if (version !== EXPECTED_SCHEMA_VERSION) {
+      this.logger.log(`replica schema v${version} != v${EXPECTED_SCHEMA_VERSION}; rebuilding`);
+      this.sqlite.exec(schema.DROP_SCHEMA_SQL);
+    }
     this.sqlite.exec(schema.CREATE_SCHEMA_SQL);
+    this.sqlite.pragma(`user_version = ${EXPECTED_SCHEMA_VERSION}`);
+
+    // SQLite ships no REGEXP implementation: the grammar accepts `X REGEXP Y`, which compiles to
+    // regexp(Y, X), but with no such function defined the statement fails at prepare() time.
+    // Supplying it here gives the matching rules real JS regex semantics — they use \b and negative
+    // lookahead, neither of which Postgres's POSIX `~*` can express. Note the argument order: the
+    // operator passes the PATTERN first.
+    this.sqlite.function('regexp', (pattern: string, value: string) =>
+      value != null && new RegExp(pattern, 'i').test(value) ? 1 : 0,
+    );
+
     this.db = drizzle(this.sqlite, { schema });
     this.logger.log(`SQLite replica ready at ${dbPath}`);
   }

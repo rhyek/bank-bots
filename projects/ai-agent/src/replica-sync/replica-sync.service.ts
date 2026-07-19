@@ -8,6 +8,7 @@ import { Client, type Notification } from 'pg';
 import {
   bankTx as pgBankTx,
   category as pgCategory,
+  matchingRule as pgMatchingRule,
   payee as pgPayee,
   count as pgCount,
   db as pgDb,
@@ -18,6 +19,7 @@ import { eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import {
   bankTx as liteBankTx,
   category as liteCategory,
+  matchingRule as liteMatchingRule,
   payee as litePayee,
 } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
@@ -52,6 +54,7 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
     { name: 'payee', pg: pgPayee, lite: litePayee },
     { name: 'category', pg: pgCategory, lite: liteCategory },
     { name: 'bank_tx', pg: pgBankTx, lite: liteBankTx },
+    { name: 'matching_rule', pg: pgMatchingRule, lite: liteMatchingRule },
   ];
   private readonly byName = new Map(this.tables.map((t) => [t.name, t]));
 

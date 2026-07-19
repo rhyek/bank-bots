@@ -33,6 +33,20 @@ export const bankTx = sqliteTable('bank_tx', {
   payeeId: text('payee_id'),
   categoryId: text('category_id'),
   transferBankAccountId: text('transfer_bank_account_id'),
+  reconcile: integer('reconcile', { mode: 'boolean' }).notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// Merchant patterns for tx-payees. Selectors only — the payee/category come from matching history,
+// never from the rule. Patterns are JS regex sources, evaluated by the regexp() function ReplicaDb
+// registers on the connection.
+export const matchingRule = sqliteTable('matching_rule', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull(),
+  pattern: text('pattern').notNull(),
+  priority: integer('priority').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull(),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
@@ -65,10 +79,36 @@ CREATE TABLE IF NOT EXISTS bank_tx (
   payee_id TEXT,
   category_id TEXT,
   transfer_bank_account_id TEXT,
+  reconcile INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS matching_rule (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  pattern TEXT NOT NULL,
+  priority INTEGER NOT NULL,
+  enabled INTEGER NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS payee_updated_at ON payee (updated_at);
 CREATE INDEX IF NOT EXISTS category_updated_at ON category (updated_at);
 CREATE INDEX IF NOT EXISTS bank_tx_updated_at ON bank_tx (updated_at);
+CREATE INDEX IF NOT EXISTS matching_rule_updated_at ON matching_rule (updated_at);
+-- tx-payees' hot paths: the backlog sweep filters on payee_id, and the exact tier looks up by
+-- description.
+CREATE INDEX IF NOT EXISTS bank_tx_payee_id ON bank_tx (payee_id);
+CREATE INDEX IF NOT EXISTS bank_tx_description ON bank_tx (description);
+`;
+
+// Applied when the stored user_version doesn't match EXPECTED_SCHEMA_VERSION. `CREATE TABLE IF NOT
+// EXISTS` can't evolve an existing file, so a shape change means rebuilding: dropping empties the
+// delta-sync watermark, and the next sync does a full re-pull. That's the intended recovery for a
+// cache that is disposable by design.
+export const DROP_SCHEMA_SQL = `
+DROP TABLE IF EXISTS matching_rule;
+DROP TABLE IF EXISTS bank_tx;
+DROP TABLE IF EXISTS category;
+DROP TABLE IF EXISTS payee;
 `;
