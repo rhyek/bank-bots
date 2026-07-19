@@ -19,8 +19,8 @@ import {
   bankTx as liteBankTx,
   category as liteCategory,
   payee as litePayee,
-} from '~/db-replica/replica-schema';
-import { ReplicaDb } from '~/db-replica/replica-db.service';
+} from '~/replica-db/replica-schema';
+import { ReplicaDb } from '~/replica-db/replica-db.service';
 
 const CHANNEL = 'replica_events';
 const MAX_RECONNECT_MS = 30_000;

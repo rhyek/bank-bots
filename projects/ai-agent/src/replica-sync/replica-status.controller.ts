@@ -1,12 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { SQLiteTable } from 'drizzle-orm/sqlite-core';
-import { bankTx, category, payee } from '~/db-replica/replica-schema';
-import { ReplicaDb } from '~/db-replica/replica-db.service';
+import { bankTx, category, payee } from '~/replica-db/replica-schema';
+import { ReplicaDb } from '~/replica-db/replica-db.service';
 
 // Observability: row counts + most-recent updated_at per table in the local replica.
 @Controller('replica')
-export class ReplicaController {
+export class ReplicaStatusController {
   constructor(private readonly replica: ReplicaDb) {}
 
   @Get('status')

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import * as schema from '~/db-replica/replica-schema';
+import * as schema from '~/replica-db/replica-schema';
 
 // Owns the better-sqlite3 connection + its (typed) Drizzle instance for the local replica cache.
 // Opens the file and creates the schema (if absent) on init; the file persists across restarts, so

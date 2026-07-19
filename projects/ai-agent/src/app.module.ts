@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { DbReplicaModule } from '~/db-replica/db-replica.module';
+import { ReplicaSyncModule } from '~/replica-sync/replica-sync.module';
 import { StatusModule } from '~/status/status.module';
 
-@Module({ imports: [StatusModule, DbReplicaModule] })
+// ReplicaDbModule isn't listed here — ReplicaSyncModule imports it, and so does TxPayeesModule.
+@Module({ imports: [StatusModule, ReplicaSyncModule] })
 export class AppModule {}
