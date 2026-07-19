@@ -93,23 +93,76 @@ information. Without write-through the failure is not merely a wasted agent call
 > tx N+1 `PLAYSTATION 650-2` → exact misses (stale replica), regex misses, agent reruns,
 > `search_payees` still reads the stale replica → **creates a second "PlayStation" payee.**
 
-**Resolution: write-through.** Every successful Postgres write is applied to the local replica
-immediately, in the same code path, before the job completes:
+**Resolution: await replication.** After writing to Postgres, the writer waits until `replica-sync`
+confirms the row has landed in SQLite, then continues. `replica-sync` remains the **only** writer to
+the replica.
 
-| Write | Written through to |
+`replica-sync` emits one event in `onNotification`, after the upsert or delete has been applied —
+the point at which the replica provably reflects the row:
+
+```ts
+'replica-sync.row-persisted': { table: string; op: 'insert' | 'update' | 'delete'; id: string };
+```
+
+**This replaces `replica-sync.new-tx`, which is removed.** `new-tx` was a strict subset of
+`row-persisted` (`bank_tx` + `insert`), and it encoded a *consumer's* interpretation — "there is
+fresh work" — inside a module that is supposed to know nothing about payee-resolver. `row-persisted`
+is a pure replication fact; each consumer decides what it means. That is the layering the
+event-decoupling was for.
+
+The insert-only filter moves to the consumer and must stay explicit:
+
+```ts
+this.events.on('replica-sync.row-persisted', ({ data }) => {
+  // insert-only: an update to a still-unmapped row (a re-scrape changing amount_cents)
+  // shouldn't re-queue it — the next startup sweep picks it up.
+  if (data.table !== 'bank_tx' || data.op !== 'insert') return;
+  this.onNewTx(data.id);
+});
+```
+
+> **Correction to the earlier rationale.** `projects/tx-payees/CLAUDE.md` currently claims
+> inserts-only makes the payee-write feedback loop "structurally impossible". That overstates the
+> emitter's role. The loop protection is the `payeeId != null` check in `onNewTx` — our own writes set
+> a payee, so they are skipped whichever event carries them. Inserts-only prevents something
+> narrower: re-queueing a still-unmatched row when an unrelated field changes. Real, but churn, not a
+> loop. The doc is corrected as part of this work.
+
+A small `ReplicaSettled` helper wraps the pattern, and its shape enforces the ordering:
+
+```ts
+// Registers the one-off listener BEFORE running the write, then awaits confirmation.
+await settle.around('payee', id, () => pgDb.insert(pgPayee).values(row));
+```
+
+Registering after the write is the one way to get this wrong: the notification can land in the gap,
+the listener never fires, and every write pays the full timeout. Passing the write as a callback makes
+that ordering impossible to invert at a call site. Ids are minted app-side, so the id is always known
+before the write.
+
+Applied at each write site, not batched at the end of the job:
+
+| Write | Awaits |
 | --- | --- |
-| `bank_tx.payee_id` / `category_id` | `bank_tx` in the replica |
-| `create_payee` | `payee` |
-| `create_category` | `category` |
-| `create_matching_rule` / `update_matching_rule` | `matching_rule` |
+| `bank_tx.payee_id` / `category_id` | `('bank_tx', txId)` |
+| `create_payee` | `('payee', id)` |
+| `create_category` | `('category', id)` |
+| `create_matching_rule` / `update_matching_rule` | `('matching_rule', id)` |
 
-This does not weaken the boundary: the **agent** still has no SQLite write path — our service
-performs the write-through after its own validated Postgres write. It is self-healing, because delta
-sync later overwrites those rows with identical values from the source of truth; a failed
-write-through costs one redundant agent call, never a corrupted replica.
+Per-site rather than per-job because it also fixes intra-run staleness: if `create_payee` does not
+return until the payee is locally visible, the agent's own later `search_payees` call in the same run
+sees it too.
 
-The rejected alternative is awaiting replication before completing each job. It preserves a single
-writer, but adds latency to every job and stalls if a notification is ever dropped.
+**On timeout** (`TX_AI_SETTLE_TIMEOUT_MS`, default 2000): log a warning and proceed. The Postgres
+write has already succeeded — that is the source of truth — so a missed confirmation degrades to
+exactly the pre-existing behavior and the next sweep self-corrects. A settle timeout must never fail
+the job.
+
+**Rejected alternative: write-through** (applying each change to SQLite ourselves in the same code
+path). It avoids the wait, but it duplicates `replica-sync`'s row mapping — the `Descriptor` tables
+and `excludedSet()` upsert — in a second module, for four tables, where it would silently drift the
+first time the replica schema changes. It also asserts the replica's contents rather than confirming
+them. The added latency it saves is a few milliseconds against a 20–60 s agent run.
 
 ### New files
 
@@ -122,10 +175,19 @@ writer, but adds latency to every job and stalls if a notification is ever dropp
 | `payee-resolver/ai/output-schema.ts` | Zod schema → JSON Schema for `outputFormat` |
 | `payee-resolver/matcher-result.service.ts` | persists `matcher_result` rows |
 
+Also new: `events/replica-settled.service.ts` — the `settle.around(table, id, write)` helper.
+
 Modified: `tx-matcher.service.ts` (async + third tier + richer return type),
-`payee-resolver.service.ts` (persist result, skip `none`), `payee-resolver.module.ts` (new providers),
-`replica-db/replica-schema.ts` + `replica-sync.service.ts` (replicate `matcher_result`),
+`payee-resolver.service.ts` (persist result, skip `none`, subscribe to `row-persisted` with an
+explicit insert-only filter), `payee-resolver.module.ts` (new providers),
+`events/app-events.ts` (**replace `new-tx` with `row-persisted`**),
+`replica-sync.service.ts` (emit `row-persisted`; replicate `matcher_result`),
+`replica-db/replica-schema.ts` (`matcher_result` + `EXPECTED_SCHEMA_VERSION` bump),
 `projects/db/src/schema.ts` + a migration (the new table).
+
+Replacing `new-tx` is a breaking change to code that already exists and works. It is a small,
+self-contained refactor and should be its own task in the plan, verified green before the AI tier is
+built on top of it.
 
 ## The Agent SDK integration
 
@@ -226,9 +288,10 @@ merchant prefix" from "this suffix is a random identifier" using evidence rather
 Each write tool records its side effect into a per-run context object. That record — not the
 model's self-report — is what lands in `matcher_result.data.created` / `.updated`.
 
-Each write tool also **writes through to the replica** after its Postgres write succeeds, so the
-next transaction in the queue sees the new payee, category, or rule. See "Sequential matching is a
-feedback loop" above for why this is required rather than an optimization.
+Each write tool also **awaits replication** before returning, via `ReplicaSettled`, so both the rest
+of the agent's own run and the next transaction in the queue can see the new payee, category, or
+rule. See "Sequential matching is a feedback loop" above for why this is required rather than an
+optimization.
 
 `create_category` requires an existing `category_group.id`; the agent can add a category, not
 restructure the budget into new groups.
@@ -381,6 +444,7 @@ Controls:
 | `TX_AI_EFFORT` | `medium` | effort override |
 | `TX_AI_MAX_PER_SWEEP` | `25` | cap on agent calls per backlog sweep; beyond it, remaining rows are left unmapped **without** a `none` verdict so the next boot resumes |
 | `TX_AI_TIMEOUT_MS` | `180000` | per-run wall clock; on expiry `query.close()` and treat as failure |
+| `TX_AI_SETTLE_TIMEOUT_MS` | `2000` | how long a write waits for `row-persisted` before proceeding with a warning |
 
 `CLAUDE_CODE_OAUTH_TOKEN` is required when `TX_AI_ENABLED` is true; its absence is a startup error,
 not a per-transaction failure.
@@ -409,11 +473,15 @@ The existing invariant holds: a single transaction can never stall the backlog.
 - **Write-tool validation tests** — uuidv7 minting, unknown `groupId` rejected, rule safety checks.
 - **Skip-logic test** — a tx with a `none` row is excluded from the backlog query; deleting the row
   re-includes it.
-- **Write-through / feedback test** — the one that guards the property `concurrency: 1` exists for.
-  Queue two transactions with identical descriptions; stub the AI tier so the first call resolves by
-  creating a payee and the second call fails the test if invoked. Assert the second transaction is
-  resolved by the **exact** tier, and that exactly one payee was created. Without write-through this
-  test fails, which is the point.
+- **Feedback-loop test** — the one that guards the property `concurrency: 1` exists for. Queue two
+  transactions with identical descriptions; stub the AI tier so the first call resolves by creating a
+  payee and the second call fails the test if invoked. Assert the second transaction is resolved by
+  the **exact** tier, and that exactly one payee was created. Without the settle-await this test
+  fails, which is the point.
+- **`ReplicaSettled` tests** — resolves when the matching `(table, id)` event fires; ignores events
+  for other tables/ids; resolves (with a warning) on timeout rather than throwing; and registers its
+  listener before the write runs, proven by emitting the event synchronously from inside the write
+  callback and asserting it is still observed.
 - **Structured-output parsing tests** — success, `error_max_structured_output_retries`,
   success-with-no-output, and self-contradictory `matched: true` with null ids.
 - **One live end-to-end run**, manually, against a single real unmapped transaction, with the result
@@ -424,7 +492,9 @@ No test calls the real Agent SDK; `TxAiMatcher` is injected and stubbed everywhe
 ## Documentation to update
 
 - `projects/tx-payees/CLAUDE.md` — the third tier, the tool surface, the SQLite-read/Postgres-write
-  split, `matcher_result`, the manual-retry one-liner, the new env vars.
+  split, `matcher_result`, the manual-retry one-liner, the new env vars. **Also:** replace `new-tx`
+  with `row-persisted` in the event-contract table, and correct the "Why `new-tx` is inserts-only"
+  section — the feedback loop is prevented by the `payeeId` check, not by the emitter's filter.
 - Root `CLAUDE.md` — the `matcher_result` table in the schema section. **Also fix a pre-existing
   error found while writing this spec:** the schema table documents `bank_tx.amount` as `numeric` and
   the unique index as `(bank_account_id, date, doc_no, description, amount)`, but the column has been
