@@ -1,8 +1,8 @@
 // Backfill payee_id + category_id onto unmapped bank_tx rows by matching their DESCRIPTION against
 // already-mapped history. This is a Postgres re-implementation of update-ynab's `UpdateEmptyPayees`
 // (ynab/ynab.go): for each transaction with no payee/category, find the MOST RECENT already-mapped
-// transaction whose description matches — either exactly, or via one of a fixed list of merchant
-// regexes — and copy its payee_id + category_id.
+// transaction whose description matches — first by exact description, falling back to a fixed list
+// of merchant regexes — and copy its payee_id + category_id.
 //
 // Differences from the Go original: the source of truth is bank_tx (not YNAB), we match on
 // bank_tx.description directly (the Go matched the `desc:` it had written into the YNAB memo, which
@@ -23,12 +23,7 @@ import { db, pool, sql } from '@bank-bots/db';
 // Merchant regexes ported verbatim from update-ynab ynab/ynab.go `matchers`. Go's `(?i)` inline
 // flag becomes the JS `i` flag; `\b`, `\s`, `\d` behave the same. Order matters (first match wins),
 // matching the Go's list order. In practice these are disjoint (each targets one merchant).
-// `forcePayee` pins a matcher to a specific payee (by name): its source becomes the most-recent
-// mapped tx with THAT payee — regardless of what the most-recent same-description tx was categorized
-// as — and such matchers override even the exact-description path. Used for sub-brands whose recent
-// categorization drifted (e.g. propinas were recently tagged plain "PedidosYa" instead of the
-// dedicated "PedidosYa Propinas" payee).
-const MATCHERS: { label: string; re: RegExp; forcePayee?: string }[] = [
+const MATCHERS: { label: string; re: RegExp }[] = [
   { label: 'san martin', re: /\bsan martin\b/i },
   { label: 'cpx', re: /\bcpx\b/i },
   { label: 'spotify', re: /\bspotify\b/i },
@@ -48,9 +43,8 @@ const MATCHERS: { label: string; re: RegExp; forcePayee?: string }[] = [
   // propinas→PedidosYa Propinas/Misc, supermercado→PedidosYa Súper/Groceries, Plus→a subscription).
   // So they get separate matchers, specific-first; the generic food one carries a negative lookahead
   // so it can never swallow a propina/súper/plus row. `PEDIDOS YA` (with a space) and `PEDIDOSYA` both
-  // occur, hence `pedidos\s*ya`. NOTE: "PedidosYa Plus" has NO mapped source in history yet, so those
-  // rows stay unmatched (nothing to copy) — the matcher is here so they route correctly once one is.
-  { label: 'pedidosya propina', re: /\bpedidos\s*ya\s+propina/i, forcePayee: 'PedidosYa Propinas' },
+  // occur, hence `pedidos\s*ya`.
+  { label: 'pedidosya propina', re: /\bpedidos\s*ya\s+propina/i },
   { label: 'pedidosya super', re: /\bpedidos\s*ya\s+(?:super|s[úu]per)/i },
   { label: 'pedidosya plus', re: /\bpedidos\s*ya\s+plus/i },
   { label: 'pedidosya', re: /\bpedidos\s*ya\b(?!\s+(?:propina|super|s[úu]per|plus))/i },
@@ -100,20 +94,11 @@ async function main() {
   const exactByDesc = new Map<string, Row>();
   for (const s of sources) if (!exactByDesc.has(s.description)) exactByDesc.set(s.description, s);
 
-  // source to copy per matcher. forcePayee matchers bind to the most-recent mapped tx with that
-  // payee; the rest bind to the most-recent mapped tx whose description matches the regex.
+  // source to copy per matcher: the most-recent mapped tx whose description matches the regex.
   const matcherSource: (Row | undefined)[] = new Array(MATCHERS.length).fill(undefined);
-  for (let i = 0; i < MATCHERS.length; i++) {
-    const fp = MATCHERS[i].forcePayee;
-    if (fp) matcherSource[i] = sources.find((s) => payeeName.get(s.payeeId!) === fp);
-  }
   for (const s of sources) {
     for (let i = 0; i < MATCHERS.length; i++) {
-      if (
-        !MATCHERS[i].forcePayee &&
-        matcherSource[i] === undefined &&
-        MATCHERS[i].re.test(s.description)
-      )
+      if (matcherSource[i] === undefined && MATCHERS[i].re.test(s.description))
         matcherSource[i] = s;
     }
   }
@@ -142,26 +127,16 @@ async function main() {
   for (const t of targets) {
     let src: Row | undefined;
     let via = '';
-    // 1. forced matchers win over everything, including exact (they pin a sub-brand to a payee)
-    for (let i = 0; i < MATCHERS.length; i++) {
-      if (MATCHERS[i].forcePayee && MATCHERS[i].re.test(t.description) && matcherSource[i]) {
-        src = matcherSource[i];
-        via = `force:${MATCHERS[i].label}`;
-        break;
-      }
+    // 1. exact description match
+    const exact = exactByDesc.get(t.description);
+    if (exact) {
+      src = exact;
+      via = 'exact';
     }
-    // 2. exact description match
-    if (!src) {
-      const exact = exactByDesc.get(t.description);
-      if (exact) {
-        src = exact;
-        via = 'exact';
-      }
-    }
-    // 3. regular (non-forced) regex matchers
+    // 2. regex matchers
     if (!src) {
       for (let i = 0; i < MATCHERS.length; i++) {
-        if (!MATCHERS[i].forcePayee && MATCHERS[i].re.test(t.description) && matcherSource[i]) {
+        if (MATCHERS[i].re.test(t.description) && matcherSource[i]) {
           src = matcherSource[i];
           via = `regex:${MATCHERS[i].label}`;
           break;
