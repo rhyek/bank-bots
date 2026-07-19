@@ -57,6 +57,13 @@
       "when": 1784251650294,
       "tag": "0007_add_replica_timestamps_and_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784251750294,
+      "tag": "0008_bank_tx_uuidv7_pk",
+      "breakpoints": true
     }
   ]
 }

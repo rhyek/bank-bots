@@ -74,7 +74,7 @@ export const category = pgTable('category', {
 export const bankTx = pgTable(
   'bank_tx',
   {
-    id: bigint({ mode: 'number' }).primaryKey().generatedByDefaultAsIdentity(),
+    id: uuid().primaryKey().$defaultFn(uuidv7),
     bankAccountId: uuid('bank_account_id')
       .notNull()
       .references(() => bankAccount.id),
