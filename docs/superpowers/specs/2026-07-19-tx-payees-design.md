@@ -18,7 +18,7 @@ This is the first step. A later phase adds rule-based matching beyond the two ti
 
 `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts` is a manual, dry-run-by-default
 script that matches unmapped transactions in two tiers: exact description, then a hard-coded list of
-22 merchant regexes. Both tiers answer from history — they locate the most recent already-mapped
+21 merchant regexes. Both tiers answer from history — they locate the most recent already-mapped
 transaction that matches, and copy its `payee_id` + `category_id`. The regexes only decide *where to
 look*; history decides the answer.
 
@@ -102,10 +102,10 @@ CREATE OR REPLACE TRIGGER trg_replica_notify AFTER INSERT OR UPDATE OR DELETE ON
 Both changes are additive, so `db:generate` should not prompt for rename resolution. The trigger
 statements are hand-appended, following the pattern already used in `0007`.
 
-**Seed:** the 22 patterns from `backfill-mappings-by-description.ts` `MATCHERS`, in their current
+**Seed:** the 21 patterns from `backfill-mappings-by-description.ts` `MATCHERS`, in their current
 array order, with `priority` 10, 20, 30… preserving first-match-wins. Ported as regex *source
 strings* (`\bspotify\b`). The `i` flag is applied by the registered `regexp()` function rather than
-stored per row — all 22 are case-insensitive today. Per-rule flags are a future column if needed.
+stored per row — all 21 are case-insensitive today. Per-rule flags are a future column if needed.
 
 ### SQLite replica — `replica-schema.ts`
 
