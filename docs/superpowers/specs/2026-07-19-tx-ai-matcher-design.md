@@ -253,7 +253,7 @@ Names are `mcp__txp__<tool>` once registered under the server key `txp`.
 | Tool | Input | Returns |
 | --- | --- | --- |
 | `find_similar_transactions` | `{ query, limit? }` | mapped history matching a token/substring: description, payee name, category name, most recent date, occurrence count |
-| `search_payees` | `{ query, limit? }` | payee id + name (667 payees — too many to inline) |
+| `search_payees` | `{ query, limit? }` | payee id + name, transaction count, and **the distinct trailing country tokens seen in its transactions** (667 payees — too many to inline) |
 | `list_matching_rules` | `{}` | id, label, pattern, priority, enabled for all rules |
 | `test_regex` | `{ pattern }` | see below |
 
@@ -402,13 +402,49 @@ bill.
 
   CLARO MCE MPC CR         SAN J
 
-Here "CR" is inside the merchant name and the city is San Jose. Every mapped Claro transaction is
-Guatemalan ("MIPAGO CLARO RECURRENC GT"), so this is Claro COSTA RICA — a separate payee, not the
-existing "Claro". Create it.
+Here "CR" is inside the merchant name and the city is San Jose.
 
-The test to apply: does this look like the same service billed through a different country, or a
-different account in a different country? Uber is the first. Claro CR is the second. If you cannot
-tell, prefer a separate payee — merging two payees later is easier than untangling one.
+### The test: position first, then corroborate
+
+The primary signal is WHERE the country sits.
+
+  Trailing field  -> which entity processed the charge. Ignore it.
+  In the name     -> part of the merchant's identity. Likely a separate national entity.
+
+Then corroborate with search_payees, which returns the country breakdown of each candidate payee's
+own transactions:
+
+  The candidate payee already spans several TRAILING-field countries on the same card
+    -> confirms the country is a payment rail, not a place. Reuse that payee.
+
+  The candidate payee is single-country, and this country appears INSIDE the merchant name
+    -> confirms a separate national entity. Create a new payee.
+
+Worked example both ways.
+
+  UBER *TRIP  NL / UBER*RIDES  GT / UBER *TRIP  CR
+    All on the same Guatemalan card, in overlapping date ranges (NL runs 2022-02 to 2023-10, GT runs
+    2023-03 to 2024-02). Nobody commutes between Guatemala and the Netherlands for seven months.
+    "NL" is Uber B.V. Amsterdam, Uber's international billing entity — those rides happened in
+    Guatemala. ONE payee: "Uber". Splitting would file 92 Guatemalan rides under "Uber NL".
+
+  CLARO MCE MPC CR         SAN J
+    "CR" is inside the merchant name, the city is San Jose, and every one of the 43 mapped Claro
+    transactions is Guatemalan. A Costa Rican phone line is its own contract and its own bill.
+    SEPARATE payee: "Claro CR".
+
+The question to ask is not "which country is this?" but "is this the same account and the same
+relationship, billed through a different rail — or a different account in a different country?"
+Uber is the first. Claro CR is the second.
+
+When it is genuinely a different national entity, split. Splitting is the norm: 278 of 290 payees
+are single-country. Name the new payee "<Name> <CC>", matching the existing convention —
+"Boni Gourmet CR", "La Estancia GT", "Gelatiamo CR", "Floristería Marvin CR".
+
+Two cautions. A trailing two-letter token is not always a country: "apple.com" shows a spurious
+"TV" that is really the tail of "Apple TV". Sanity-check before treating one as a country. And a
+country appearing only in the CITY field ("SAN J" for San Jose) is corroboration, not the signal
+itself.
 
 ### 4. Unknown merchants: search the web
 
@@ -488,8 +524,10 @@ than hard-coded.
 | Finding | Evidence |
 | --- | --- |
 | Fixed-width fields: 22+country at len 25, 25+city at len 30 | 1290 rows at len 25 (` GT` ×979, ` US` ×155, ` NL` ×58, ` CR` ×10); 1736 at len 30 (`GUATE` ×579, `SAN J` ×39) |
-| Trailing country is noise | Payee "Uber" spans NL, GT, CR, GUATE, US across 18 description variants |
+| Trailing country is a payment rail, not a place | Uber's NL (n=92, 2022-02→2023-10), GT (n=64, 2023-03→2024-02) and CR (n=7) rows are **all on the same `bancoIndustrialGt` card with overlapping date ranges** — NL is Uber B.V. Amsterdam, so those rides happened in Guatemala |
 | Embedded country is identity | All 43 mapped Claro rows are GT; `CLARO MCE MPC CR` has CR inside the merchant field, city San José, and no mapped precedent |
+| Country-splitting is the norm | 278 of 290 payees are single-country; existing names already use the `<Name> <CC>` convention (`Boni Gourmet CR`, `La Estancia GT`) |
+| "Payee spans countries" alone is not a safe test | It classifies Uber wrongly. Used only to corroborate the positional signal |
 | Random identifiers dominate drift | Amazon 162 variants, Spotify 47, Parqueo 40, El Roble 39, Namecheap 17 |
 | Rules go stale as counters roll | `\bI\/T-\d+ I000\d+\b` misses `I/T-042926 I001012017` and `I/T-060524 I59665` — 3 unmapped rows |
 | Payee does not determine category | 75 multi-category payees over 3,763 txs vs 424 single-category over 2,165 |
