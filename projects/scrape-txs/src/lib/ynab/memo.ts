@@ -12,24 +12,34 @@ export interface ParsedMemo {
 
 export function parseYnabMemo(memo: string | null | undefined): ParsedMemo {
   const result: ParsedMemo = { ref: '', desc: '' };
-  if (!memo) return result;
+  if (!memo) {
+    return result;
+  }
 
   // JSON shape: {"ref":"...","desc":"..."}
   try {
     const parsed: unknown = JSON.parse(memo);
     if (parsed && typeof parsed === 'object') {
       const obj = parsed as Record<string, unknown>;
-      if (typeof obj.ref === 'string') result.ref = obj.ref;
-      if (typeof obj.desc === 'string') result.desc = obj.desc;
+      if (typeof obj.ref === 'string') {
+        result.ref = obj.ref;
+      }
+      if (typeof obj.desc === 'string') {
+        result.desc = obj.desc;
+      }
     }
   } catch {
     // not JSON; fall through to the text-shape regexes
   }
 
   const refMatch = memo.match(/ref: ([\d_()]+);/);
-  if (refMatch) result.ref = refMatch[1];
+  if (refMatch) {
+    result.ref = refMatch[1];
+  }
   const descMatch = memo.match(/desc: (.+?);/);
-  if (descMatch) result.desc = descMatch[1];
+  if (descMatch) {
+    result.desc = descMatch[1];
+  }
 
   return result;
 }
@@ -38,7 +48,9 @@ export function parseYnabMemo(memo: string | null | undefined): ParsedMemo {
 // part after `YYYYMMDD_` (or the whole thing if the ref is a bare doc number). Returns null when the
 // ref is empty. Used to match a YNAB tx back to a bank_tx (together with account, date and amount).
 export function docNoFromRef(ref: string): string | null {
-  if (!ref) return null;
+  if (!ref) {
+    return null;
+  }
   const core = ref.replace(/\(\d+\)$/, '');
   const dated = core.match(/^\d{8}_(.+)$/);
   return dated ? dated[1] : core;

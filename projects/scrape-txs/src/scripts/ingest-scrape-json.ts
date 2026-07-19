@@ -21,7 +21,9 @@ interface ScrapeAccount {
 
 async function main() {
   const path = process.argv[2];
-  if (!path) throw new Error('usage: ingest-scrape-json.ts <path-to-json>');
+  if (!path) {
+    throw new Error('usage: ingest-scrape-json.ts <path-to-json>');
+  }
   const data = JSON.parse(await fs.readFile(path, 'utf8')) as ScrapeAccount[];
   const rows = data.flatMap((a) =>
     Object.entries(a.months).flatMap(([month, txs]) =>

@@ -94,14 +94,19 @@ async function main() {
 
   // exact-description index: description -> most recent source (first wins, list is sorted desc)
   const exactByDesc = new Map<string, Row>();
-  for (const s of sources) if (!exactByDesc.has(s.description)) exactByDesc.set(s.description, s);
+  for (const s of sources) {
+    if (!exactByDesc.has(s.description)) {
+      exactByDesc.set(s.description, s);
+    }
+  }
 
   // source to copy per matcher: the most-recent mapped tx whose description matches the regex.
   const matcherSource: (Row | undefined)[] = new Array(MATCHERS.length).fill(undefined);
   for (const s of sources) {
     for (let i = 0; i < MATCHERS.length; i++) {
-      if (matcherSource[i] === undefined && MATCHERS[i].re.test(s.description))
+      if (matcherSource[i] === undefined && MATCHERS[i].re.test(s.description)) {
         matcherSource[i] = s;
+      }
     }
   }
 

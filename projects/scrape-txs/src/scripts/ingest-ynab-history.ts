@@ -21,14 +21,18 @@ interface AccountMapEntry {
 }
 
 function parseDocNo(memo: string | null): string | null {
-  if (!memo) return null;
+  if (!memo) {
+    return null;
+  }
   const strip = (ref: string) => {
     const core = ref.replace(/\(\d+\)$/, '');
     const dated = core.match(/^\d{8}_(.+)$/);
     return dated ? dated[1] : core;
   };
   const m = memo.match(/ref: ([\d_()]+);/);
-  if (m) return strip(m[1]);
+  if (m) {
+    return strip(m[1]);
+  }
   try {
     const j: unknown = JSON.parse(memo);
     if (j && typeof j === 'object' && typeof (j as Record<string, unknown>).ref === 'string') {
@@ -42,22 +46,27 @@ function parseDocNo(memo: string | null): string | null {
 }
 
 function parseDesc(memo: string | null): string | null {
-  if (!memo) return null;
+  if (!memo) {
+    return null;
+  }
   const m = memo.match(/desc: (.+?);/);
   return m ? m[1] : null;
 }
 
 function chunk<T>(a: T[], n: number): T[][] {
   const o: T[][] = [];
-  for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n));
+  for (let i = 0; i < a.length; i += n) {
+    o.push(a.slice(i, i + n));
+  }
   return o;
 }
 
 async function main() {
   const accessToken = process.env.YNAB_ACCESS_TOKEN;
   const budgetId = process.env.YNAB_BUDGET_ID;
-  if (!accessToken || !budgetId)
+  if (!accessToken || !budgetId) {
     throw new Error('YNAB_ACCESS_TOKEN and YNAB_BUDGET_ID must be set');
+  }
 
   const watermark = new Date().toISOString();
   console.log(`ingestion watermark (revert with created_at >= this): ${watermark}\n`);

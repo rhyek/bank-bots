@@ -48,7 +48,9 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy() {
-    for (const off of this.unsubscribes) off();
+    for (const off of this.unsubscribes) {
+      off();
+    }
     this.unsubscribes.length = 0;
   }
 
@@ -60,7 +62,9 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
       .from(bankTx)
       .where(eq(bankTx.id, txId))
       .get();
-    if (!row || row.payeeId != null) return;
+    if (!row || row.payeeId != null) {
+      return;
+    }
     this.enqueue(txId);
   }
 
@@ -70,7 +74,9 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
    * Idempotent: a second call is a no-op.
    */
   start() {
-    if (this.started) return;
+    if (this.started) {
+      return;
+    }
     this.started = true;
     const rows = this.replica.db
       .select({ id: bankTx.id })
@@ -87,12 +93,16 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
       .orderBy(asc(bankTx.createdAt), asc(bankTx.id))
       .all();
     this.logger.log(`backlog: ${rows.length} unmapped transactions since ${FROM_DATE}`);
-    for (const r of rows) this.enqueue(r.id);
+    for (const r of rows) {
+      this.enqueue(r.id);
+    }
   }
 
   /** Queue a transaction for matching. Safe to call repeatedly — duplicates are ignored. */
   enqueue(txId: string) {
-    if (this.pending.has(txId)) return;
+    if (this.pending.has(txId)) {
+      return;
+    }
     this.pending.add(txId);
     void this.queue.add(() => this.process(txId));
   }
@@ -113,9 +123,15 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
         .get();
       // Re-read rather than trusting the enqueue-time state: the row may have been mapped, changed,
       // or deleted between being queued and being run.
-      if (!tx) return;
-      if (tx.payeeId != null || tx.transferBankAccountId != null || tx.reconcile) return;
-      if (tx.date < FROM_DATE) return;
+      if (!tx) {
+        return;
+      }
+      if (tx.payeeId != null || tx.transferBankAccountId != null || tx.reconcile) {
+        return;
+      }
+      if (tx.date < FROM_DATE) {
+        return;
+      }
 
       const result = this.matcher.match({ id: tx.id, description: tx.description });
       if (!result) {

@@ -27,7 +27,6 @@ export default defineConfig([
     languageOptions: { globals: { ...globals.node } },
     plugins: { 'unused-imports': unusedImports },
     rules: {
-      curly: ['error', 'all'],
       'unused-imports/no-unused-imports': 'error',
       '@typescript-eslint/consistent-type-imports': [
         'error',
@@ -73,4 +72,12 @@ export default defineConfig([
   // Prettier LAST: eslint-plugin-prettier/recommended runs Prettier as the `prettier/prettier` rule
   // and disables ESLint's conflicting formatting rules, so the two never fight.
   prettierRecommended,
+  {
+    // AFTER prettier, on purpose. eslint-config-prettier (bundled into prettierRecommended) treats
+    // `curly` as a "special rule" and force-disables it, because `curly: multi-line`/`multi-or-nest`
+    // can fight Prettier's line breaking. `curly: all` does NOT conflict — Prettier never strips
+    // braces — so we re-enable it here. Put this block before prettierRecommended and the rule
+    // silently resolves to severity 0: configured, but never firing.
+    rules: { curly: ['error', 'all'] },
+  },
 ]);

@@ -29,7 +29,9 @@ interface MatchRow {
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
   return out;
 }
 
@@ -45,10 +47,14 @@ async function main() {
     where: (c, { eq }) => eq(c.id, 'general'),
     columns: { data: true },
   });
-  if (!configRow) throw new Error("config row 'general' not found");
+  if (!configRow) {
+    throw new Error("config row 'general' not found");
+  }
   const accountsMap = ((configRow.data as { ynab?: { accountsMap?: AccountMapEntry[] } }).ynab
     ?.accountsMap ?? []) as AccountMapEntry[];
-  if (accountsMap.length === 0) throw new Error('config.ynab.accountsMap is empty');
+  if (accountsMap.length === 0) {
+    throw new Error('config.ynab.accountsMap is empty');
+  }
 
   // --- ynabAccountId -> bank_account.id ---
   const bankAccounts = await db.query.bankAccount.findMany({
@@ -135,8 +141,11 @@ async function main() {
   const byNoDoc = new Map<string, MatchRow[]>();
   const push = (m: Map<string, MatchRow[]>, k: string, r: MatchRow) => {
     const l = m.get(k);
-    if (l) l.push(r);
-    else m.set(k, [r]);
+    if (l) {
+      l.push(r);
+    } else {
+      m.set(k, [r]);
+    }
   };
   for (const r of allBankTx) {
     const amountMilli = r.amountCents * 10; // cents*10 == YNAB milliunits
@@ -185,8 +194,12 @@ async function main() {
 
     const docNo = docNoFromRef(parseYnabMemo(tx.memo).ref);
     let row: MatchRow | undefined;
-    if (docNo != null) row = take(byFull, `${bankAccountId}|${tx.date}|${docNo}|${tx.amount}`);
-    if (!row) row = take(byNoDoc, `${bankAccountId}|${tx.date}|${tx.amount}`);
+    if (docNo != null) {
+      row = take(byFull, `${bankAccountId}|${tx.date}|${docNo}|${tx.amount}`);
+    }
+    if (!row) {
+      row = take(byNoDoc, `${bankAccountId}|${tx.date}|${tx.amount}`);
+    }
     if (!row) {
       skip.unmatched++;
       continue;

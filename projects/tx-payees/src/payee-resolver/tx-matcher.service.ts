@@ -34,15 +34,21 @@ export class TxMatcher {
       ne(bankTx.id, tx.id),
       eq(bankTx.description, tx.description),
     );
-    if (exact) return { ...exact, via: 'exact' };
+    if (exact) {
+      return { ...exact, via: 'exact' };
+    }
 
     for (const rule of this.rules()) {
-      if (!this.patternMatches(rule.pattern, rule.label, tx.description)) continue;
+      if (!this.patternMatches(rule.pattern, rule.label, tx.description)) {
+        continue;
+      }
       const src = this.mostRecentMapped(
         ne(bankTx.id, tx.id),
         sql`${bankTx.description} REGEXP ${rule.pattern}`,
       );
-      if (src) return { ...src, via: `regex:${rule.label}` };
+      if (src) {
+        return { ...src, via: `regex:${rule.label}` };
+      }
     }
     return null;
   }

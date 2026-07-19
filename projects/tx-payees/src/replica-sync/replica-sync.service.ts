@@ -37,7 +37,9 @@ type Descriptor = { name: string; pg: any; lite: any };
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
   return out;
 }
 
@@ -78,7 +80,9 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private async start() {
-    if (this.shuttingDown) return;
+    if (this.shuttingDown) {
+      return;
+    }
     try {
       await this.connectListener(); // LISTEN before syncing so events during the snapshot aren't lost
       await this.deltaSync();
@@ -90,7 +94,10 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   // ---------- delta sync (boot + reconnect catch-up) ----------
 
   private async deltaSync() {
-    if (this.syncing) return; // never overlap an initial sync with a reconnect-triggered one
+    // never overlap an initial sync with a reconnect-triggered one
+    if (this.syncing) {
+      return;
+    }
     this.syncing = true;
     try {
       for (const t of this.tables) {
@@ -123,7 +130,9 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
     const rows = watermark
       ? await pgDb.select().from(t.pg).where(pgGt(t.pg.updatedAt, watermark))
       : await pgDb.select().from(t.pg);
-    if (rows.length === 0) return 0;
+    if (rows.length === 0) {
+      return 0;
+    }
     const set = this.excludedSet(t.lite);
     this.replica.raw.transaction(() => {
       for (const c of chunk(rows, UPSERT_CHUNK)) {
@@ -149,7 +158,9 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
         .select({ c: sql<number>`count(*)` })
         .from(t.lite)
         .get()?.c ?? 0;
-    if (pgCountVal === liteCountVal) return 0;
+    if (pgCountVal === liteCountVal) {
+      return 0;
+    }
 
     const pgIds = new Set((await pgDb.select({ id: t.pg.id }).from(t.pg)).map((r) => r.id));
     const liteIds = this.replica.db
@@ -158,7 +169,9 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
       .all()
       .map((r) => r.id as string | number);
     const toDelete = liteIds.filter((id) => !pgIds.has(id));
-    if (toDelete.length === 0) return 0;
+    if (toDelete.length === 0) {
+      return 0;
+    }
     this.replica.raw.transaction(() => {
       for (const c of chunk(toDelete, UPSERT_CHUNK)) {
         this.replica.db.delete(t.lite).where(inArray(t.lite.id, c)).run();
@@ -171,7 +184,9 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   private excludedSet(liteTable: Descriptor['lite']): Record<string, unknown> {
     const set: Record<string, unknown> = {};
     for (const [key, col] of Object.entries(getTableColumns(liteTable))) {
-      if (key === 'id') continue;
+      if (key === 'id') {
+        continue;
+      }
       set[key] = sql`excluded.${sql.identifier((col as { name: string }).name)}`;
     }
     return set;
@@ -191,7 +206,10 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private scheduleReconnect(err: Error) {
-    if (this.shuttingDown || this.reconnectScheduled) return; // one pending timer at a time
+    // one pending timer at a time
+    if (this.shuttingDown || this.reconnectScheduled) {
+      return;
+    }
     this.reconnectScheduled = true;
     this.logger.warn(
       `replica listener down (${err.message}); reconnecting in ${this.reconnectMs}ms`,
@@ -205,7 +223,9 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
 
   private async reconnect() {
     this.reconnectScheduled = false;
-    if (this.shuttingDown) return;
+    if (this.shuttingDown) {
+      return;
+    }
     try {
       await this.connectListener();
       await this.deltaSync(); // close any gap from the disconnect window
@@ -215,7 +235,9 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private async onNotification(msg: Notification) {
-    if (msg.channel !== CHANNEL || !msg.payload) return;
+    if (msg.channel !== CHANNEL || !msg.payload) {
+      return;
+    }
     let evt: { table: string; op: string; id: string };
     try {
       evt = JSON.parse(msg.payload);
@@ -224,14 +246,19 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
       return;
     }
     const t = this.byName.get(evt.table);
-    if (!t) return;
+    if (!t) {
+      return;
+    }
     const id = evt.id;
     try {
       if (evt.op === 'delete') {
         this.replica.db.delete(t.lite).where(eq(t.lite.id, id)).run();
       } else {
         const [row] = await pgDb.select().from(t.pg).where(pgEq(t.pg.id, id));
-        if (!row) return; // already gone; a delete event will follow
+        // already gone; a delete event will follow
+        if (!row) {
+          return;
+        }
         this.replica.db
           .insert(t.lite)
           .values(row)
