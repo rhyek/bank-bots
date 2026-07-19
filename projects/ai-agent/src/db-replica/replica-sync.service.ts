@@ -26,10 +26,11 @@ const CHANNEL = 'replica_events';
 const MAX_RECONNECT_MS = 30_000;
 const UPSERT_CHUNK = 200;
 
-// A replicated table: its Postgres source (@bank-bots/db) + SQLite mirror, and how to read an id from
-// the notify payload (bank_tx.id is a bigint → number; payee/category ids are text).
+// A replicated table: its Postgres source (@bank-bots/db) + SQLite mirror. Every replicated id is
+// text (bank_tx is a uuidv7; payee/category are the YNAB uuids), so the notify payload's id needs no
+// casting before it's used as a key.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Descriptor = { name: string; pg: any; lite: any; castId: (id: string) => string | number };
+type Descriptor = { name: string; pg: any; lite: any };
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -48,9 +49,9 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
 
   // Dependency order: payee + category before bank_tx (which references them).
   private readonly tables: Descriptor[] = [
-    { name: 'payee', pg: pgPayee, lite: litePayee, castId: (id) => id },
-    { name: 'category', pg: pgCategory, lite: liteCategory, castId: (id) => id },
-    { name: 'bank_tx', pg: pgBankTx, lite: liteBankTx, castId: (id) => Number(id) },
+    { name: 'payee', pg: pgPayee, lite: litePayee },
+    { name: 'category', pg: pgCategory, lite: liteCategory },
+    { name: 'bank_tx', pg: pgBankTx, lite: liteBankTx },
   ];
   private readonly byName = new Map(this.tables.map((t) => [t.name, t]));
 
@@ -208,7 +209,7 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
     }
     const t = this.byName.get(evt.table);
     if (!t) return;
-    const id = t.castId(evt.id);
+    const id = evt.id;
     try {
       if (evt.op === 'delete') {
         this.replica.db.delete(t.lite).where(eq(t.lite.id, id)).run();

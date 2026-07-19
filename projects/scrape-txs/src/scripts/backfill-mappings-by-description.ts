@@ -53,7 +53,7 @@ const MATCHERS: { label: string; re: RegExp }[] = [
 ];
 
 interface Row {
-  id: number;
+  id: string;
   date: string;
   description: string;
   payeeId: string | null;
@@ -88,7 +88,9 @@ async function main() {
   // --- source pool: rows that already have BOTH payee + category, most-recent-first ---
   const sources = (allTx as Row[])
     .filter((r) => r.payeeId != null && r.categoryId != null)
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id));
+    // uuidv7 ids are lexicographically time-ordered, so comparing them as text still means
+    // "most recently created first" — the same tiebreaker the bigint ids gave.
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id.localeCompare(a.id)));
 
   // exact-description index: description -> most recent source (first wins, list is sorted desc)
   const exactByDesc = new Map<string, Row>();
@@ -113,7 +115,7 @@ async function main() {
   );
 
   interface Plan {
-    id: number;
+    id: string;
     date: string;
     description: string;
     via: string;
@@ -196,7 +198,7 @@ async function main() {
   for (let i = 0; i < plan.length; i += chunk) {
     const batch = plan.slice(i, i + chunk);
     const values = sql.join(
-      batch.map((u) => sql`(${u.id}::bigint, ${u.payeeId}::text, ${u.categoryId}::text)`),
+      batch.map((u) => sql`(${u.id}::uuid, ${u.payeeId}::text, ${u.categoryId}::text)`),
       sql`, `,
     );
     await db.execute(sql`

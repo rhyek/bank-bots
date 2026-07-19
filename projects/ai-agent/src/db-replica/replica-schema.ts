@@ -23,7 +23,7 @@ export const category = sqliteTable('category', {
 });
 
 export const bankTx = sqliteTable('bank_tx', {
-  id: integer('id').primaryKey(),
+  id: text('id').primaryKey(),
   bankAccountId: text('bank_account_id').notNull(),
   month: text('month').notNull(),
   date: text('date').notNull(),
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS category (
   updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS bank_tx (
-  id INTEGER PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   bank_account_id TEXT NOT NULL,
   month TEXT NOT NULL,
   date TEXT NOT NULL,

@@ -27,7 +27,7 @@ export async function bacScrape({
       .join(', ')}`,
   );
   const createTxs: (typeof bankTx.$inferInsert)[] = [];
-  const deleteTxIds: number[] = [];
+  const deleteTxIds: string[] = [];
   // running_balance_cents = the last row's "Balance" (in cents) on the current month, per account.
   const runningBalances: Record<string, number> = {};
   const currentMonth = dayjs().format('YYYY-MM');

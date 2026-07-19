@@ -45,7 +45,7 @@ export async function bancoIndustrialScrape({
 
   await page.waitForURL('https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard');
   const createTxs: (typeof bankTx.$inferInsert)[] = [];
-  const deleteTxIds: number[] = [];
+  const deleteTxIds: string[] = [];
   for (const account of accounts) {
     if (account.type === 'checking') {
       const bankAccountId = await ensureBankAccount({

@@ -29,7 +29,7 @@ export async function run(
     headless: false,
   });
   let createTxs: (typeof bankTx.$inferInsert)[];
-  let deleteTxIds: number[];
+  let deleteTxIds: string[];
   let runningBalances: Record<string, number>;
   const maxAttempts = 2;
   let attempt = 0;

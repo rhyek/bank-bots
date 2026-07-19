@@ -123,8 +123,10 @@ more moving parts; same result.
 | `projects/ai-agent/src/tx-payees/*` | `Set<number>` → `Set<string>`; `enqueue(txId: string)` |
 | `CLAUDE.md` | Record the uuidv7 PK convention; update the `bank_tx.id` row in the schema table |
 
-The scrapers need no change: `deleteTxIds` is opaque — ids are collected from query results and fed
-straight to `inArray`, never parsed or compared numerically.
+The scrapers need three one-line changes: `deleteTxIds` is explicitly annotated `number[]` in
+`lib/run.ts:32`, `lib/bac/scrape.ts:30`, and `lib/banco-industrial/scrape.ts:48`. The ids are
+otherwise opaque — collected from query results and fed straight to `inArray`, never parsed or
+compared numerically — so widening the annotation to `string[]` is the whole fix.
 
 ## Ordering assumptions to re-check
 

@@ -22,7 +22,7 @@ interface AccountMapEntry {
 }
 
 interface MatchRow {
-  id: number;
+  id: string;
   amountMilli: number;
   assigned: boolean;
 }
@@ -148,8 +148,8 @@ async function main() {
     m.get(k)?.find((r) => !r.assigned);
 
   // --- compute updates from YNAB transactions ---
-  const mappingUpdates: { id: number; payeeId: string; categoryId: string }[] = [];
-  const transferUpdates: { id: number; transferBankAccountId: string }[] = [];
+  const mappingUpdates: { id: string; payeeId: string; categoryId: string }[] = [];
+  const transferUpdates: { id: string; transferBankAccountId: string }[] = [];
   const skip = { noAccount: 0, transferUnresolved: 0, noMappingData: 0, unmatched: 0 };
 
   const candidates = transactions
@@ -210,7 +210,7 @@ async function main() {
   // --- apply updates (batched VALUES upserts) ---
   for (const c of chunk(mappingUpdates, 500)) {
     const values = sql.join(
-      c.map((u) => sql`(${u.id}::bigint, ${u.payeeId}::text, ${u.categoryId}::text)`),
+      c.map((u) => sql`(${u.id}::uuid, ${u.payeeId}::text, ${u.categoryId}::text)`),
       sql`, `,
     );
     await db.execute(sql`
@@ -220,7 +220,7 @@ async function main() {
   }
   for (const c of chunk(transferUpdates, 500)) {
     const values = sql.join(
-      c.map((u) => sql`(${u.id}::bigint, ${u.transferBankAccountId}::uuid)`),
+      c.map((u) => sql`(${u.id}::uuid, ${u.transferBankAccountId}::uuid)`),
       sql`, `,
     );
     await db.execute(sql`
