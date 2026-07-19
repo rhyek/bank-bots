@@ -1,37 +1,72 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import PQueue from 'p-queue';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { bankTx as pgBankTx, db as pgDb, eq as pgEq } from '@bank-bots/db';
 import { bankTx } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
 import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
+import { AppEvents } from '~/events/app-events';
 
 // Only transactions on or after this date are matched. Deliberately the TRANSACTION date, not
 // created_at: 3145 rows share a single created_at from the YNAB history ingest while spanning
 // transaction dates back to 2022, so a created_at cutoff would sweep in four years of history.
 const FROM_DATE = '2026-01-01';
 
-// Matches unmapped bank_tx rows to a payee + category and writes the result to Postgres. Work
-// arrives from two places, both through enqueue(): a backlog sweep when the replica first finishes
-// syncing, and the replica's LISTEN/NOTIFY path as new transactions land.
+// Matches unmapped bank_tx rows to a payee + category and writes the result to Postgres.
 //
-// Concurrency is 1, so jobs run strictly in order. The queue is public because ReplicaSync pushes
-// into it — see replica-sync.service.ts.
+// Work arrives entirely through AppEvents, so this module has no reference to replica-sync:
+//   - 'replica-sync.startup-sync-finished' triggers the backlog sweep
+//   - 'replica-sync.new-tx'                 queues a freshly scraped transaction
+// Both funnel into enqueue(). Concurrency is 1, so jobs run strictly in order.
 @Injectable()
-export class PayeeResolver {
+export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PayeeResolver.name);
   readonly queue = new PQueue({ concurrency: 1 });
   private readonly pending = new Set<string>();
+  private readonly unsubscribes: (() => void)[] = [];
   private started = false;
 
   constructor(
     private readonly replica: ReplicaDb,
     private readonly matcher: TxMatcher,
+    private readonly events: AppEvents,
   ) {}
 
+  // onModuleInit, not onApplicationBootstrap: Nest runs every onModuleInit hook before any
+  // onApplicationBootstrap hook, and ReplicaSync kicks off its sync from the latter. Subscribing
+  // here therefore guarantees the listener exists before the first event can be emitted, instead of
+  // relying on ReplicaSync's initial `await` happening to yield first.
+  onModuleInit() {
+    this.unsubscribes.push(
+      this.events.on('replica-sync.startup-sync-finished', () => {
+        this.start();
+      }),
+      this.events.on('replica-sync.new-tx', ({ data }) => {
+        this.onNewTx(data.id);
+      }),
+    );
+  }
+
+  onModuleDestroy() {
+    for (const off of this.unsubscribes) off();
+    this.unsubscribes.length = 0;
+  }
+
+  // A scraped transaction should always arrive unmapped, but the emitter can't guarantee that for
+  // rows inserted by other paths (the ingest scripts, a manual INSERT), so confirm before queueing.
+  private onNewTx(txId: string) {
+    const row = this.replica.db
+      .select({ payeeId: bankTx.payeeId })
+      .from(bankTx)
+      .where(eq(bankTx.id, txId))
+      .get();
+    if (!row || row.payeeId != null) return;
+    this.enqueue(txId);
+  }
+
   /**
-   * Sweep the backlog of unmapped transactions. Called by ReplicaSync once the first delta sync has
-   * completed — matching against a half-populated replica would copy from incomplete history.
+   * Sweep the backlog of unmapped transactions. Runs on 'replica-sync.startup-sync-finished' —
+   * matching against a half-populated replica would copy from incomplete history.
    * Idempotent: a second call is a no-op.
    */
   start() {

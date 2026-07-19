@@ -3,11 +3,11 @@ import { ReplicaDbModule } from '~/replica-db/replica-db.module';
 import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
 import { PayeeResolver } from '~/payee-resolver/payee-resolver.service';
 
-// Depends on the replica CLIENT only, never on replica-sync — replica-sync drives this module, so
-// importing it here would close a dependency cycle.
+// Reads the replica and subscribes to AppEvents. It neither imports replica-sync nor is imported by
+// it — the two communicate only through the event bus, so either can change without touching the
+// other. Nothing outside consumes PayeeResolver directly, so it isn't exported.
 @Module({
   imports: [ReplicaDbModule],
   providers: [TxMatcher, PayeeResolver],
-  exports: [PayeeResolver],
 })
 export class PayeeResolverModule {}

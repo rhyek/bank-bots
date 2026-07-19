@@ -64,30 +64,54 @@ skill for how those libraries are shaped.
 
 ```
 src/
-  replica-db/     the SQLite client only — connection, schema, regexp(), version stamp
-  replica-sync/   Postgres -> SQLite replication (delta sync + LISTEN/NOTIFY) + /replica/status
-  tx-payees/      matches unmapped bank_tx rows to a payee + category
-  status/         /status/health
+  events/          the typed event bus (@Global) — AppEvents + the event contract
+  replica-db/      the SQLite client only — connection, schema, regexp(), version stamp
+  replica-sync/    Postgres -> SQLite replication (delta sync + LISTEN/NOTIFY) + /replica/status
+  payee-resolver/  matches unmapped bank_tx rows to a payee + category
+  status/          /status/health
 ```
 
-**Why `replica-db` and `replica-sync` are separate modules.** `tx-payees` needs the replica *client*
-to read from, and `replica-sync` needs `tx-payees` to hand work to. If one module owned both the
-client and the sync, that would be a dependency cycle needing `forwardRef`. Splitting them makes the
-graph `ReplicaDb ← TxPayees ← ReplicaSync` — acyclic, and `replica-db` stays feature-agnostic so the
-next consumer just imports it too.
+**Modules communicate over events, not references.** `replica-sync` and `payee-resolver` have **no
+import relationship in either direction** — one emits, the other listens, and either can be changed
+or removed without touching the other. The contract is `AppEventData` in `events/app-events.ts`:
 
-**Startup ordering.** `ReplicaSync.onApplicationBootstrap` connects the listener, runs the delta
-sync, and only then calls `txPayees.start()` — guarded by a flag so reconnect-triggered syncs don't
-re-trigger it. Matching against a half-populated replica would copy from incomplete history. If the
-first sync fails, `start()` simply isn't called; the existing backoff retries and the backlog sweep
-runs on the first sync that succeeds.
+| Event | Payload | Meaning |
+| --- | --- | --- |
+| `replica-sync.startup-sync-finished` | *(none)* | first full delta sync completed; history is safe to read |
+| `replica-sync.new-tx` | `{ id: string }` | a transaction was **inserted** in Postgres (scraped) |
 
-**`tx-payees`.** A `p-queue` with `concurrency: 1`. `start()` sweeps unmapped transactions since
-2026-01-01; `enqueue(txId)` is the single entry point, also used by `ReplicaSync`'s notify handler
-when a new or changed `bank_tx` arrives with a null payee. Matching is two tiers — exact description,
-then `matching_rule` patterns by priority — and both copy the payee/category from the most recent
-already-mapped transaction. Hits are written to **Postgres**, whose trigger notifies the replica; the
-row comes back with `payee_id` set, so it isn't re-enqueued and the loop terminates.
+`AppEvents` extends **emittery** (`Emittery<AppEventData>`), so `emit` and `on` are both checked
+against that map — an unknown event name, a missing payload, or a wrong payload shape is a compile
+error. Dataless events are emitted as `emit('name')` with no second argument, and their listener's
+`data` is typed `undefined`.
+
+> **Why emittery and not `@nestjs/event-emitter`.** The Nest-native package peer-depends on
+> `@nestjs/common@^10 || ^11`, and this app pins **v12**. Revisit if it gains v12 support.
+
+**`replica-db` vs `replica-sync`.** `payee-resolver` needs the replica *client* to read from, but has
+no interest in replication. Keeping the client in its own module lets consumers depend on exactly
+that, and keeps `replica-db` feature-agnostic. (This split originally existed to break a dependency
+cycle; the event bus removed the cycle, but the separation is still the right boundary.)
+
+**Startup ordering.** `ReplicaSync.onApplicationBootstrap` connects the listener and runs the delta
+sync, then emits `startup-sync-finished` — guarded by a flag so reconnect-triggered syncs don't
+re-announce. `PayeeResolver` subscribes in **`onModuleInit`**, deliberately: Nest runs every
+`onModuleInit` before any `onApplicationBootstrap`, so the listener is guaranteed to exist before the
+event can fire, rather than depending on `ReplicaSync`'s first `await` happening to yield. If the
+initial sync fails nothing is emitted; the existing backoff retries and the sweep runs on the first
+sync that succeeds.
+
+**`payee-resolver`.** A `p-queue` with `concurrency: 1`. `start()` sweeps unmapped transactions since
+2026-01-01 on `startup-sync-finished`; `new-tx` queues a single freshly scraped row. Both funnel
+through `enqueue(txId)`. Matching is two tiers — exact description, then `matching_rule` patterns by
+priority — and both copy the payee/category from the most recent already-mapped transaction. Hits are
+written to **Postgres**, whose trigger notifies the replica.
+
+**Why `new-tx` is inserts-only.** A scraped transaction always arrives unmapped, so an insert always
+means real work. It also makes the feedback loop structurally impossible: this module's own payee
+writes come back as *updates*, which are never emitted. The trade-off is that a transaction that
+fails to match and is later updated (a re-scrape changing `amount_cents`, say) is not re-queued
+immediately — it is picked up by the next startup sweep.
 
 **`regexp()` is registered by `ReplicaDb`.** SQLite defines no `REGEXP` function — the grammar
 accepts `X REGEXP Y` (which compiles to `regexp(Y, X)`, **pattern first**) but the statement fails at

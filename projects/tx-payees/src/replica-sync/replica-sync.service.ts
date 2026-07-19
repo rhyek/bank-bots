@@ -23,7 +23,7 @@ import {
   payee as litePayee,
 } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
-import { PayeeResolver } from '~/payee-resolver/payee-resolver.service';
+import { AppEvents } from '~/events/app-events';
 
 const CHANNEL = 'replica_events';
 const MAX_RECONNECT_MS = 30_000;
@@ -49,7 +49,7 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   private syncing = false;
   private reconnectScheduled = false;
   private reconnectMs = 1_000;
-  private payeeResolverStarted = false;
+  private startupSyncEmitted = false;
 
   // Dependency order: payee + category before bank_tx (which references them).
   private readonly tables: Descriptor[] = [
@@ -62,7 +62,7 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
 
   constructor(
     private readonly replica: ReplicaDb,
-    private readonly payeeResolver: PayeeResolver,
+    private readonly events: AppEvents,
   ) {}
 
   // Kicked off in the background so a slow first-ever sync (the initial full pull can be large over a
@@ -98,12 +98,13 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
         const deletes = await this.syncDeletes(t);
         this.logger.log(`sync ${t.name}: +${upserts} upserted, -${deletes} deleted`);
       }
-      // Only once the replica is fully populated — matching against partial history would copy from
-      // an incomplete source. A failed sync throws before reaching here, so the backlog sweep waits
-      // for the first sync that actually succeeds.
-      if (!this.payeeResolverStarted) {
-        this.payeeResolverStarted = true;
-        this.payeeResolver.start();
+      // Announced only once the replica is fully populated — a subscriber reading partial history
+      // would copy from an incomplete source. A failed sync throws before reaching here, so this
+      // fires on the first sync that actually succeeds, and the flag keeps reconnect-triggered
+      // syncs from re-announcing startup.
+      if (!this.startupSyncEmitted) {
+        this.startupSyncEmitted = true;
+        void this.events.emit('replica-sync.startup-sync-finished');
       }
     } finally {
       this.syncing = false;
@@ -236,11 +237,11 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
           .values(row)
           .onConflictDoUpdate({ target: t.lite.id, set: this.excludedSet(t.lite) })
           .run();
-        // A new or changed transaction with no payee is work for payee-resolver. The row is already in
-        // hand from the fetch above, so this costs nothing extra. Matched rows come back through
-        // here with payee_id set, which is what stops this from looping.
-        if (evt.table === 'bank_tx' && (row as { payeeId: string | null }).payeeId == null) {
-          this.payeeResolver.enqueue(id);
+        // Inserts only. A scraped transaction always arrives with no payee, so 'new-tx' means
+        // exactly "there is fresh work". Restricting to inserts also means our own payee writes —
+        // which arrive as updates — can never feed back into the queue.
+        if (evt.table === 'bank_tx' && evt.op === 'insert') {
+          void this.events.emit('replica-sync.new-tx', { id });
         }
       }
     } catch (err) {
