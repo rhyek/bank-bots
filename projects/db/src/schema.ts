@@ -88,6 +88,10 @@ export const bankTx = pgTable(
     payeeId: text('payee_id').references(() => payee.id),
     categoryId: text('category_id').references(() => category.id),
     transferBankAccountId: uuid('transfer_bank_account_id').references(() => bankAccount.id),
+    // Manual reconciliation rows: not present on any bank statement, so a scrape must never delete
+    // them and payee/category matching must never target them. Replaces the old convention of
+    // marking such rows with `doc_no = 'RECONCILE'`.
+    reconcile: boolean().notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull(),
@@ -104,6 +108,31 @@ export const bankTx = pgTable(
       table.amountCents,
     ),
   ],
+);
+
+// Merchant patterns used by ai-agent's tx-payees module to match an unmapped transaction to a payee
+// + category. A rule only decides WHERE to look: the answer always comes from the most recent
+// already-mapped transaction whose description matches the pattern, never from the rule itself
+// (a rule carrying a fixed payee would be the `forcePayee` behavior that was deliberately removed).
+// Patterns are JS regex sources evaluated in SQLite against the replica — Postgres `~*` is POSIX and
+// cannot express the negative lookahead some patterns rely on. Matching is case-insensitive.
+export const matchingRule = pgTable(
+  'matching_rule',
+  {
+    id: uuid().primaryKey().$defaultFn(uuidv7),
+    label: text().notNull(),
+    pattern: text().notNull(),
+    priority: bigint({ mode: 'number' }).notNull(),
+    enabled: boolean().notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  // Unique so the seed script can upsert on label (onConflictDoUpdate needs a unique target).
+  (table) => [uniqueIndex('matching_rule_label_unique').on(table.label)],
 );
 
 export const config = pgTable('config', {

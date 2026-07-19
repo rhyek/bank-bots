@@ -59,7 +59,7 @@ interface Row {
   payeeId: string | null;
   categoryId: string | null;
   transferBankAccountId: string | null;
-  docNo: string;
+  reconcile: boolean;
 }
 
 async function main() {
@@ -78,7 +78,7 @@ async function main() {
         payeeId: true,
         categoryId: true,
         transferBankAccountId: true,
-        docNo: true,
+        reconcile: true,
       },
     }),
   ]);
@@ -105,13 +105,10 @@ async function main() {
     }
   }
 
-  // --- targets: fully-unmapped rows (both null), skipping transfers + manual RECONCILE rows ---
+  // --- targets: fully-unmapped rows (both null), skipping transfers + manual reconciliation rows ---
   const targets = (allTx as Row[]).filter(
     (r) =>
-      r.payeeId == null &&
-      r.categoryId == null &&
-      r.transferBankAccountId == null &&
-      r.docNo !== 'RECONCILE',
+      r.payeeId == null && r.categoryId == null && r.transferBankAccountId == null && !r.reconcile,
   );
 
   interface Plan {

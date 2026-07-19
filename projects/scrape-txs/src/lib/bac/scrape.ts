@@ -279,7 +279,7 @@ export async function bacScrape({
           .filter((currentTx) => {
             // Never delete manual reconciliation rows — they aren't on the bank statement, so the
             // scrape would otherwise wipe them (and un-reconcile the account) on every run.
-            if (currentTx.docNo === 'RECONCILE') return false;
+            if (currentTx.reconcile) return false;
             const objToMatch = {
               bankAccountId: currentTx.bankAccountId,
               date: currentTx.date,
