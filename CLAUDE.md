@@ -46,6 +46,7 @@ handler. Treat the scheduling/deploy story as in flux; the data pipeline below i
 | --- | --- |
 | `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs (and the planned web app). |
 | `projects/scrape-txs/` | TypeScript Playwright scraper (run via Node + `@swc-node/register`). Imports `@bank-bots/db`. |
+| `projects/ai-agent/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs **`tx-payees`**, which matches unmapped transactions to a payee + category. See its own `CLAUDE.md`. |
 | `projects/update-ynab/` | Go program that syncs `bank_txs` → YNAB. |
 | `infra/` | Terraform for AWS (ECR/IAM/S3/Lambda). Currently being removed/reworked. |
 | `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
@@ -101,10 +102,18 @@ the bank site) and removes them — so a scrape reconciles a month, it doesn't j
 
 ## Database schema (Supabase Postgres)
 
-Five tables, all **singular**. **RLS is disabled** (the DB is reached only via a direct Postgres
-connection, which bypasses RLS). Ids: `bank_tx.id` is a `bigint` identity; `bank_account.id` is a
-**uuidv7** (generated app-side via the schema's `$defaultFn` — PG 15 has no `uuidv7()`);
-`payee`/`category`/`category_group` ids are the **YNAB uuids** they were imported from.
+Six tables, all **singular**. **RLS is disabled** (the DB is reached only via a direct Postgres
+connection, which bypasses RLS).
+
+> **Id convention — every new table gets a uuidv7 primary key**, generated app-side via
+> `uuid().primaryKey().$defaultFn(uuidv7)` (PG 15 has no `uuidv7()`, so generation is always in
+> application code). `bank_account`, `bank_tx`, and `matching_rule` all follow this.
+> **Exception:** `payee`/`category`/`category_group` keep the **YNAB uuids** they were imported
+> with — those are foreign identifiers, not ids we mint.
+
+Note that uuidv7 sorts lexicographically by creation time, so `ORDER BY id` is insertion order. It is
+**not** transaction chronology — for that, order by `bank_tx.date`. (The 6786 rows that predate the
+uuidv7 migration all carry that migration's timestamp; only their relative order is meaningful.)
 
 **`bank_account`** — canonical account registry. `config.banks.<key>.accounts` still drives which
 accounts get scraped + their credentials; this table gives each `(bank_key, account_number)` a stable
@@ -125,7 +134,7 @@ replaced by the `bank_account_id` FK). Amounts are the bank's raw number (curren
 
 | column | type | notes |
 | --- | --- | --- |
-| `id` | bigint | primary key, auto-generated |
+| `id` | uuid | primary key (uuidv7, app-generated) |
 | `bank_account_id` | uuid | **NOT NULL** FK → `bank_account.id` |
 | `month` | text | `YYYY-MM` (the statement month scraped) |
 | `date` | date | transaction date |
@@ -135,7 +144,9 @@ replaced by the `bank_account_id` FK). Amounts are the bank's raw number (curren
 | `payee_id` | text | nullable FK → `payee.id`; backfilled from YNAB |
 | `category_id` | text | nullable FK → `category.id`; backfilled from YNAB |
 | `transfer_bank_account_id` | uuid | nullable FK → `bank_account.id`; the *other* account for a transfer (payee/category stay null) |
+| `reconcile` | boolean | manual reconciliation row — not on any bank statement. Scrapes never delete these, and `tx-payees` never matches them. **Replaced the old `doc_no = 'RECONCILE'` sentinel**, so new rows can carry a real doc number |
 | `created_at` | timestamptz | `now()` on insert (not touched on conflict-update) |
+| `updated_at` | timestamptz | maintained by the `trg_set_updated_at` trigger; the replica's delta-sync watermark |
 
 Unique index `bank_tx_unique_cols` on `(bank_account_id, date, doc_no, description, amount)` — the
 upsert conflict target and effective natural key.
@@ -149,6 +160,16 @@ date/amount + the `doc_no` parsed from its memo `ref: <YYYYMMDD_docno>`. (Only Y
 synced survive to match, so older `bank_tx` rows with no YNAB counterpart stay unmapped. This budget
 had **no** native YNAB transfers, so `transfer_bank_account_id` is unset everywhere today — the
 column + logic exist for the new backend.)
+
+**`matching_rule`** — merchant patterns used by ai-agent's `tx-payees` module (`id` uuidv7, `label`,
+`pattern`, `priority`, `enabled`, `created_at`, `updated_at`; unique index on `label`). A rule holds
+**no payee/category**: it only decides *where to look*. The answer always comes from the most recent
+already-mapped transaction whose description matches — a rule that pinned an answer would reintroduce
+the `forcePayee` behavior that was deliberately removed. `pattern` is a **JS regex source** (no
+delimiters, no flags) evaluated in SQLite against the replica, because Postgres `~*` is POSIX and
+cannot express the negative lookahead some patterns need. Seed with
+`pnpm -C projects/ai-agent run seed-matching-rules` (idempotent, upserts on `label`). Rules are
+live-replicated, so editing one in `psql` takes effect without restarting the agent.
 
 **`config`** — single row, `id = 'general'`, `data json`. The whole app config lives in this JSON
 blob (bank credentials + YNAB settings). Shape:
@@ -212,6 +233,8 @@ pnpm devtooie cmd scrape-txs -c start --log-dir "$RUN_DIR" -- --bank-key <bankKe
 # Typecheck
 pnpm -C projects/db run typecheck          # @bank-bots/db (source-only lib)
 pnpm -C projects/scrape-txs run typecheck
+pnpm -C projects/ai-agent run typecheck
+pnpm -C projects/ai-agent test             # node --test (TxMatcher unit tests)
 ( cd projects/update-ynab && go build ./... && go vet ./... )
 
 # DB migrations (Drizzle) — live in @bank-bots/db. Edit projects/db/src/schema.ts, then with
@@ -230,6 +253,10 @@ pnpm -C projects/db db:migrate    # apply pending migrations (tracked in drizzle
 # Import YNAB payees/categories + per-tx mappings into Postgres (one-shot, idempotent).
 # Needs DATABASE_URL + YNAB_ACCESS_TOKEN + YNAB_BUDGET_ID in env (source .env.local).
 pnpm -C projects/scrape-txs run backfill-ynab-mappings
+
+# ai-agent: replica + tx-payees. Matches unmapped transactions on boot and then continuously.
+pnpm -C projects/ai-agent start
+pnpm -C projects/ai-agent run seed-matching-rules   # one-shot, idempotent; seeds matching_rule
 
 # update-ynab (Go) is legacy/retired (see Component 2) — targets the old `bank_txs` schema, not run.
 ```

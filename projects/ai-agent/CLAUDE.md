@@ -60,6 +60,45 @@ at `src` (no build, no `dist`, no TypeScript project references). Depend on one 
 That's why this app's `tsconfig.json` has **no `references`** array. See the `prepare-monorepo`
 skill for how those libraries are shaped.
 
+## Feature modules
+
+```
+src/
+  replica-db/     the SQLite client only — connection, schema, regexp(), version stamp
+  replica-sync/   Postgres -> SQLite replication (delta sync + LISTEN/NOTIFY) + /replica/status
+  tx-payees/      matches unmapped bank_tx rows to a payee + category
+  status/         /status/health
+```
+
+**Why `replica-db` and `replica-sync` are separate modules.** `tx-payees` needs the replica *client*
+to read from, and `replica-sync` needs `tx-payees` to hand work to. If one module owned both the
+client and the sync, that would be a dependency cycle needing `forwardRef`. Splitting them makes the
+graph `ReplicaDb ← TxPayees ← ReplicaSync` — acyclic, and `replica-db` stays feature-agnostic so the
+next consumer just imports it too.
+
+**Startup ordering.** `ReplicaSync.onApplicationBootstrap` connects the listener, runs the delta
+sync, and only then calls `txPayees.start()` — guarded by a flag so reconnect-triggered syncs don't
+re-trigger it. Matching against a half-populated replica would copy from incomplete history. If the
+first sync fails, `start()` simply isn't called; the existing backoff retries and the backlog sweep
+runs on the first sync that succeeds.
+
+**`tx-payees`.** A `p-queue` with `concurrency: 1`. `start()` sweeps unmapped transactions since
+2026-01-01; `enqueue(txId)` is the single entry point, also used by `ReplicaSync`'s notify handler
+when a new or changed `bank_tx` arrives with a null payee. Matching is two tiers — exact description,
+then `matching_rule` patterns by priority — and both copy the payee/category from the most recent
+already-mapped transaction. Hits are written to **Postgres**, whose trigger notifies the replica; the
+row comes back with `payee_id` set, so it isn't re-enqueued and the loop terminates.
+
+**`regexp()` is registered by `ReplicaDb`.** SQLite defines no `REGEXP` function — the grammar
+accepts `X REGEXP Y` (which compiles to `regexp(Y, X)`, **pattern first**) but the statement fails at
+`prepare()` with "no such function". Registering it gives real JS regex semantics, which the rule
+patterns need for `\b` and negative lookahead.
+
+**Replica schema changes require bumping `EXPECTED_SCHEMA_VERSION`** in `replica-db.service.ts`.
+`CREATE TABLE IF NOT EXISTS` cannot evolve an existing file, so a mismatch drops and rebuilds the
+replica; the empty watermark then makes the next delta sync a full re-pull. That is the intended
+recovery — the replica is a disposable cache.
+
 ## Build / deploy
 
 Dev is `pnpm dev`. There's no compile artifact — production runs the same way the app runs locally
