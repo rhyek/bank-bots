@@ -2,6 +2,8 @@
 
 **Date:** 2026-07-19
 **Status:** approved, ready for implementation plan
+**Depends on:** [bank_tx uuidv7 PK](./2026-07-19-bank-tx-uuidv7-design.md) — lands first; transaction
+ids are uuid strings throughout this spec, not numbers.
 
 ## Goal
 
@@ -70,7 +72,7 @@ Dependency graph: `ReplicaDb ← TxPayees ← ReplicaSync`, and `ReplicaDb ← R
 
 ## Schema changes
 
-### Postgres — migration `0008`
+### Postgres — migration `0009`
 
 ```sql
 -- 1. reconcile flag (replaces the doc_no sentinel)
@@ -162,7 +164,7 @@ SQLite has no built-in `REGEXP`. The grammar accepts the operator, but `X REGEXP
 ```ts
 readonly queue = new PQueue({ concurrency: 1 });   // public, per request
 start(): void                                       // called by ReplicaSync after first sync
-enqueue(txId: number): void                         // called by start() and the notify path
+enqueue(txId: string): void                         // called by start() and the notify path
 ```
 
 ### `start()` — backlog sweep
@@ -181,7 +183,7 @@ carry deliberately-null payee/category.
 
 ### `enqueue(id)`
 
-Dedups against an in-flight `Set<number>`, then `queue.add(() => this.process(id))`. One entry point
+Dedups against an in-flight `Set<string>`, then `queue.add(() => this.process(id))`. One entry point
 for both the backlog and the notify path.
 
 ### `process(id)`
