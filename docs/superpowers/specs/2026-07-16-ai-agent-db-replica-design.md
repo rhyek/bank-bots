@@ -1,8 +1,13 @@
 # ai-agent `db-replica` — design
 
+> **Superseded in part.** The app `ai-agent` is now **`tx-payees`** (`projects/tx-payees/`), and
+> `DbReplicaModule` has been split into **`ReplicaDbModule`** (`replica-db/`, the SQLite client) and
+> **`ReplicaSyncModule`** (`replica-sync/`, the replication). The replication design below still
+> holds; only the module boundaries and names changed.
+
 ## Goal
 
-A NestJS module in `projects/ai-agent` that maintains a **persistent local SQLite cache**
+A NestJS module in `projects/tx-payees` that maintains a **persistent local SQLite cache**
 replicating three Postgres tables — `payee`, `category`, `bank_tx` — kept current in **real time**
 via Postgres `LISTEN`/`NOTIFY`, and reconciled on boot with a cheap **delta sync**. The cache
 persists across process restarts, so dev hot-reload (the `dev` script runs `node --watch`) does
@@ -51,7 +56,7 @@ near-zero work per restart instead of a full resync.
 entirely in ai-agent; `@bank-bots/db` stays Postgres-only. The two Drizzle instances never exchange
 objects — rows cross as plain JS.
 
-- **SQLite file**: `projects/ai-agent/storage/replica.sqlite` — **gitignored, persistent**. This is
+- **SQLite file**: `projects/tx-payees/storage/replica.sqlite` — **gitignored, persistent**. This is
   the cache that survives restarts. Path overridable via env (default under the package's `storage/`).
 - **SQLite schema (`drizzle-orm/sqlite-core`)**: `payee`, `category`, `bank_tx` mirroring the PG
   columns (+ `created_at`/`updated_at` stored as ISO text), plus a `sync_state(table_name PRIMARY

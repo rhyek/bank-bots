@@ -2,7 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Convert `bank_tx.id` to uuidv7, then add a `tx-payees` module to `ai-agent` that
+> **Renamed after execution.** The app `ai-agent` is now **`tx-payees`** (`projects/tx-payees/`), and
+> the module `tx-payees` is now **`payee-resolver`** (`TxPayees` → `PayeeResolver`). Paths below were
+> updated, but the `feat(ai-agent): …` commit messages are left verbatim because those commits exist
+> in git history under those names.
+
+**Goal:** Convert `bank_tx.id` to uuidv7, then add a payee-matching module to the service that
 continuously matches unmapped transactions to a payee + category and writes the result to Postgres.
 
 **Architecture:** Phase 1 swaps the `bank_tx` primary key and propagates the string id type through
@@ -208,8 +213,8 @@ git commit -m "feat(db): bank_tx uuidv7 primary key"
 ### Task 2: Propagate string ids through replica and scripts
 
 **Files:**
-- Modify: `projects/ai-agent/src/db-replica/replica-schema.ts:26` (bankTx.id), `:58` (DDL)
-- Modify: `projects/ai-agent/src/db-replica/replica-sync.service.ts:29-32,53`
+- Modify: `projects/tx-payees/src/db-replica/replica-schema.ts:26` (bankTx.id), `:58` (DDL)
+- Modify: `projects/tx-payees/src/db-replica/replica-sync.service.ts:29-32,53`
 - Modify: `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts`
 - Modify: `projects/scrape-txs/src/scripts/backfill-ynab-mappings.ts:25` and its `VALUES` casts
 
@@ -283,7 +288,7 @@ In `backfill-ynab-mappings.ts:25`, change `id: number;` to `id: string;`. Change
 
 ```bash
 pnpm -C projects/scrape-txs run typecheck
-pnpm -C projects/ai-agent run typecheck
+pnpm -C projects/tx-payees run typecheck
 ```
 
 Expected: both clean.
@@ -301,7 +306,7 @@ same baseline as before the id change.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add projects/ai-agent/src projects/scrape-txs/src
+git add projects/tx-payees/src projects/scrape-txs/src
 git commit -m "refactor: string bank_tx ids across replica and backfill scripts"
 ```
 
@@ -312,10 +317,10 @@ git commit -m "refactor: string bank_tx ids across replica and backfill scripts"
 ### Task 3: Split `db-replica/` into `replica-db/` + `replica-sync/`
 
 **Files:**
-- Create: `projects/ai-agent/src/replica-db/{replica-db.module.ts,replica-db.service.ts,replica-schema.ts}`
-- Create: `projects/ai-agent/src/replica-sync/{replica-sync.module.ts,replica-sync.service.ts,replica-status.controller.ts}`
-- Delete: `projects/ai-agent/src/db-replica/`
-- Modify: `projects/ai-agent/src/app.module.ts`
+- Create: `projects/tx-payees/src/replica-db/{replica-db.module.ts,replica-db.service.ts,replica-schema.ts}`
+- Create: `projects/tx-payees/src/replica-sync/{replica-sync.module.ts,replica-sync.service.ts,replica-status.controller.ts}`
+- Delete: `projects/tx-payees/src/db-replica/`
+- Modify: `projects/tx-payees/src/app.module.ts`
 
 **Interfaces:**
 - Produces: `ReplicaDbModule` exporting `ReplicaDb`; `ReplicaSyncModule` importing it.
@@ -323,7 +328,7 @@ git commit -m "refactor: string bank_tx ids across replica and backfill scripts"
 - [ ] **Step 1: Move the files with git**
 
 ```bash
-cd /Users/carlos/Dev/personal/bank-bots/projects/ai-agent/src
+cd /Users/carlos/Dev/personal/bank-bots/projects/tx-payees/src
 mkdir -p replica-db replica-sync
 git mv db-replica/replica-db.service.ts replica-db/replica-db.service.ts
 git mv db-replica/replica-schema.ts     replica-db/replica-schema.ts
@@ -340,7 +345,7 @@ Every `~/db-replica/replica-schema` becomes `~/replica-db/replica-schema`; every
 `replica-sync/replica-status.controller.ts`.
 
 ```bash
-cd /Users/carlos/Dev/personal/bank-bots/projects/ai-agent/src
+cd /Users/carlos/Dev/personal/bank-bots/projects/tx-payees/src
 grep -rl "~/db-replica/" . | xargs sed -i '' 's|~/db-replica/|~/replica-db/|g'
 grep -rn "~/db-replica/" . || echo "no stale imports"
 ```
@@ -392,8 +397,8 @@ it is pulled in transitively.
 - [ ] **Step 7: Typecheck and boot**
 
 ```bash
-pnpm -C projects/ai-agent run typecheck
-set -a && . ./.env.local && set +a && timeout 25 pnpm -C projects/ai-agent start 2>&1 | head -25
+pnpm -C projects/tx-payees run typecheck
+set -a && . ./.env.local && set +a && timeout 25 pnpm -C projects/tx-payees start 2>&1 | head -25
 ```
 
 Expected: typecheck clean; startup logs `SQLite replica ready at …`, `listening on 'replica_events'`,
@@ -402,7 +407,7 @@ and three `sync …` lines.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add -A projects/ai-agent/src
+git add -A projects/tx-payees/src
 git commit -m "refactor(ai-agent): split db-replica into replica-db + replica-sync"
 ```
 
@@ -538,9 +543,9 @@ git commit -m "feat(db): bank_tx.reconcile flag + matching_rule table"
 ### Task 5: Replica schema — `reconcile`, `matching_rule`, versioning, `regexp()`
 
 **Files:**
-- Modify: `projects/ai-agent/src/replica-db/replica-schema.ts`
-- Modify: `projects/ai-agent/src/replica-db/replica-db.service.ts`
-- Modify: `projects/ai-agent/src/replica-sync/replica-sync.service.ts` (tables list)
+- Modify: `projects/tx-payees/src/replica-db/replica-schema.ts`
+- Modify: `projects/tx-payees/src/replica-db/replica-db.service.ts`
+- Modify: `projects/tx-payees/src/replica-sync/replica-sync.service.ts` (tables list)
 
 **Interfaces:**
 - Produces: `matchingRule` SQLite table; `ReplicaDb` with a working `regexp()` SQL function and
@@ -640,8 +645,8 @@ In `replica-sync.service.ts`, import `matchingRule as pgMatchingRule` from `@ban
 - [ ] **Step 4: Boot and verify the rebuild**
 
 ```bash
-pnpm -C projects/ai-agent run typecheck
-set -a && . ./.env.local && set +a && timeout 40 pnpm -C projects/ai-agent start 2>&1 | head -30
+pnpm -C projects/tx-payees run typecheck
+set -a && . ./.env.local && set +a && timeout 40 pnpm -C projects/tx-payees start 2>&1 | head -30
 ```
 
 Expected: a `replica schema v0 != v1; rebuilding` line, then four `sync …` lines with full row
@@ -650,7 +655,7 @@ counts (a complete re-pull), including `sync matching_rule`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add projects/ai-agent/src
+git add projects/tx-payees/src
 git commit -m "feat(ai-agent): replicate matching_rule; replica schema versioning + regexp()"
 ```
 
@@ -659,9 +664,9 @@ git commit -m "feat(ai-agent): replicate matching_rule; replica schema versionin
 ### Task 6: `TxMatcher` — the two-tier resolution
 
 **Files:**
-- Create: `projects/ai-agent/src/tx-payees/tx-matcher.service.ts`
-- Create: `projects/ai-agent/src/tx-payees/tx-matcher.service.test.ts`
-- Modify: `projects/ai-agent/package.json` (add `test` script)
+- Create: `projects/tx-payees/src/tx-payees/tx-matcher.service.ts`
+- Create: `projects/tx-payees/src/tx-payees/tx-matcher.service.test.ts`
+- Modify: `projects/tx-payees/package.json` (add `test` script)
 
 **Interfaces:**
 - Consumes: `ReplicaDb` from Task 3; `matchingRule` + `bankTx` replica tables from Task 5.
@@ -671,7 +676,7 @@ git commit -m "feat(ai-agent): replicate matching_rule; replica schema versionin
 
 - [ ] **Step 1: Add the test script to `package.json`**
 
-In `projects/ai-agent/package.json` `scripts`, add:
+In `projects/tx-payees/package.json` `scripts`, add:
 
 ```json
     "test": "node --import @swc-node/register/esm-register --test --test-isolation=none 'src/**/*.test.ts'",
@@ -679,7 +684,7 @@ In `projects/ai-agent/package.json` `scripts`, add:
 
 - [ ] **Step 2: Write the failing test**
 
-Create `projects/ai-agent/src/tx-payees/tx-matcher.service.test.ts`:
+Create `projects/tx-payees/src/tx-payees/tx-matcher.service.test.ts`:
 
 ```ts
 import assert from 'node:assert/strict';
@@ -808,14 +813,14 @@ describe('TxMatcher', () => {
 - [ ] **Step 3: Run the test to verify it fails**
 
 ```bash
-pnpm -C projects/ai-agent test 2>&1 | tail -20
+pnpm -C projects/tx-payees test 2>&1 | tail -20
 ```
 
 Expected: FAIL — cannot resolve `~/tx-payees/tx-matcher.service`.
 
 - [ ] **Step 4: Implement `TxMatcher`**
 
-Create `projects/ai-agent/src/tx-payees/tx-matcher.service.ts`:
+Create `projects/tx-payees/src/tx-payees/tx-matcher.service.ts`:
 
 ```ts
 import { Injectable, Logger } from '@nestjs/common';
@@ -898,7 +903,7 @@ export class TxMatcher {
 - [ ] **Step 5: Run the tests to verify they pass**
 
 ```bash
-pnpm -C projects/ai-agent test 2>&1 | tail -20
+pnpm -C projects/tx-payees test 2>&1 | tail -20
 ```
 
 Expected: `# pass 6`, `# fail 0`.
@@ -906,7 +911,7 @@ Expected: `# pass 6`, `# fail 0`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add projects/ai-agent/src/tx-payees projects/ai-agent/package.json
+git add projects/tx-payees/src/tx-payees projects/tx-payees/package.json
 git commit -m "feat(ai-agent): TxMatcher two-tier payee/category resolution"
 ```
 
@@ -915,9 +920,9 @@ git commit -m "feat(ai-agent): TxMatcher two-tier payee/category resolution"
 ### Task 7: `TxPayees` — queue, backlog sweep, worker
 
 **Files:**
-- Create: `projects/ai-agent/src/tx-payees/tx-payees.service.ts`
-- Create: `projects/ai-agent/src/tx-payees/tx-payees.module.ts`
-- Modify: `projects/ai-agent/package.json` (add `p-queue`)
+- Create: `projects/tx-payees/src/tx-payees/tx-payees.service.ts`
+- Create: `projects/tx-payees/src/tx-payees/tx-payees.module.ts`
+- Modify: `projects/tx-payees/package.json` (add `p-queue`)
 
 **Interfaces:**
 - Consumes: `TxMatcher.match()` from Task 6; `ReplicaDb` from Task 3.
@@ -926,12 +931,12 @@ git commit -m "feat(ai-agent): TxMatcher two-tier payee/category resolution"
 - [ ] **Step 1: Add `p-queue`**
 
 ```bash
-pnpm -C projects/ai-agent add p-queue
+pnpm -C projects/tx-payees add p-queue
 ```
 
 - [ ] **Step 2: Implement the service**
 
-Create `projects/ai-agent/src/tx-payees/tx-payees.service.ts`:
+Create `projects/tx-payees/src/tx-payees/tx-payees.service.ts`:
 
 ```ts
 import { Injectable, Logger } from '@nestjs/common';
@@ -1029,7 +1034,7 @@ export class TxPayees {
 
 - [ ] **Step 3: Create the module**
 
-Create `projects/ai-agent/src/tx-payees/tx-payees.module.ts`:
+Create `projects/tx-payees/src/tx-payees/tx-payees.module.ts`:
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -1050,7 +1055,7 @@ export class TxPayeesModule {}
 - [ ] **Step 4: Typecheck**
 
 ```bash
-pnpm -C projects/ai-agent run typecheck
+pnpm -C projects/tx-payees run typecheck
 ```
 
 Expected: clean.
@@ -1058,7 +1063,7 @@ Expected: clean.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add projects/ai-agent
+git add projects/tx-payees
 git commit -m "feat(ai-agent): TxPayees queue + backlog sweep + worker"
 ```
 
@@ -1067,8 +1072,8 @@ git commit -m "feat(ai-agent): TxPayees queue + backlog sweep + worker"
 ### Task 8: Wire `ReplicaSync` → `TxPayees`
 
 **Files:**
-- Modify: `projects/ai-agent/src/replica-sync/replica-sync.service.ts`
-- Modify: `projects/ai-agent/src/replica-sync/replica-sync.module.ts`
+- Modify: `projects/tx-payees/src/replica-sync/replica-sync.service.ts`
+- Modify: `projects/tx-payees/src/replica-sync/replica-sync.module.ts`
 
 **Interfaces:**
 - Consumes: `TxPayees.start()` and `TxPayees.enqueue()` from Task 7.
@@ -1128,8 +1133,8 @@ In `onNotification`, inside the non-delete branch after the SQLite upsert:
 - [ ] **Step 4: Typecheck and run**
 
 ```bash
-pnpm -C projects/ai-agent run typecheck
-set -a && . ./.env.local && set +a && timeout 60 pnpm -C projects/ai-agent start 2>&1 | head -40
+pnpm -C projects/tx-payees run typecheck
+set -a && . ./.env.local && set +a && timeout 60 pnpm -C projects/tx-payees start 2>&1 | head -40
 ```
 
 Expected: after the four `sync …` lines, a `backlog: 154 unmapped transactions since 2026-01-01`
@@ -1150,7 +1155,7 @@ Expected: `still_unmapped` lower than the 154 baseline.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add projects/ai-agent/src
+git add projects/tx-payees/src
 git commit -m "feat(ai-agent): start tx-payees after first sync; enqueue on notify"
 ```
 
@@ -1159,12 +1164,12 @@ git commit -m "feat(ai-agent): start tx-payees after first sync; enqueue on noti
 ### Task 9: Seed the 21 matching rules
 
 **Files:**
-- Create: `projects/ai-agent/src/tx-payees/seed-matching-rules.ts`
-- Modify: `projects/ai-agent/package.json` (add the script)
+- Create: `projects/tx-payees/src/tx-payees/seed-matching-rules.ts`
+- Modify: `projects/tx-payees/package.json` (add the script)
 
 - [ ] **Step 1: Write the seed script**
 
-Create `projects/ai-agent/src/tx-payees/seed-matching-rules.ts`:
+Create `projects/tx-payees/src/tx-payees/seed-matching-rules.ts`:
 
 ```ts
 // Seeds matching_rule with the merchant patterns ported from scrape-txs'
@@ -1173,7 +1178,7 @@ Create `projects/ai-agent/src/tx-payees/seed-matching-rules.ts`:
 // the regexp() function registered in ReplicaDb. Idempotent: upserts on `label`.
 //
 // Run (from repo root, with .env.local sourced):
-//   pnpm -C projects/ai-agent run seed-matching-rules
+//   pnpm -C projects/tx-payees run seed-matching-rules
 import { db, matchingRule, pool, sql } from '@bank-bots/db';
 
 const PATTERNS: [label: string, pattern: string][] = [
@@ -1240,7 +1245,7 @@ single-argument `pgTable` form — add the index there and re-run `db:generate` 
 
 - [ ] **Step 3: Add the package script**
 
-In `projects/ai-agent/package.json` `scripts`:
+In `projects/tx-payees/package.json` `scripts`:
 
 ```json
     "seed-matching-rules": "node --import @swc-node/register/esm-register src/tx-payees/seed-matching-rules.ts",
@@ -1250,9 +1255,9 @@ In `projects/ai-agent/package.json` `scripts`:
 
 ```bash
 set -a && . ./.env.local && set +a
-pnpm -C projects/ai-agent run seed-matching-rules
+pnpm -C projects/tx-payees run seed-matching-rules
 psql "$DATABASE_URL" -c "SELECT count(*) FROM matching_rule;"
-pnpm -C projects/ai-agent run seed-matching-rules   # idempotency check
+pnpm -C projects/tx-payees run seed-matching-rules   # idempotency check
 psql "$DATABASE_URL" -c "SELECT count(*) FROM matching_rule;"
 ```
 
@@ -1261,7 +1266,7 @@ Expected: 21 both times.
 - [ ] **Step 5: Run the agent and confirm regex matches fire**
 
 ```bash
-set -a && . ./.env.local && set +a && timeout 60 pnpm -C projects/ai-agent start 2>&1 | grep -E "backlog|regex:|exact:" | head -20
+set -a && . ./.env.local && set +a && timeout 60 pnpm -C projects/tx-payees start 2>&1 | grep -E "backlog|regex:|exact:" | head -20
 ```
 
 Expected: `regex:<label>` lines alongside exact matches.
@@ -1269,7 +1274,7 @@ Expected: `regex:<label>` lines alongside exact matches.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add projects/ai-agent projects/db
+git add projects/tx-payees projects/db
 git commit -m "feat(ai-agent): seed matching rules from the legacy matcher list"
 ```
 
@@ -1279,7 +1284,7 @@ git commit -m "feat(ai-agent): seed matching rules from the legacy matcher list"
 
 **Files:**
 - Modify: `CLAUDE.md`
-- Modify: `projects/ai-agent/CLAUDE.md`
+- Modify: `projects/tx-payees/CLAUDE.md`
 
 - [ ] **Step 1: Update the root `CLAUDE.md`**
 
@@ -1290,10 +1295,10 @@ add the `reconcile` row; add a `matching_rule` table subsection; record the conv
 > `uuid().primaryKey().$defaultFn(uuidv7)` (PG 15 has no `uuidv7()`). Exception: `payee`,
 > `category`, `category_group` keep the YNAB uuids they were imported with.
 
-Add `pnpm -C projects/ai-agent run seed-matching-rules` to the "Running things" section, and note
+Add `pnpm -C projects/tx-payees run seed-matching-rules` to the "Running things" section, and note
 that reconciliation rows are identified by `bank_tx.reconcile`, not `doc_no`.
 
-- [ ] **Step 2: Update `projects/ai-agent/CLAUDE.md`**
+- [ ] **Step 2: Update `projects/tx-payees/CLAUDE.md`**
 
 Add a section describing `replica-db/` vs `replica-sync/` vs `tx-payees/`, the startup ordering
 (sync completes → `txPayees.start()`), and the registered `regexp()` function.
@@ -1303,8 +1308,8 @@ Add a section describing `replica-db/` vs `replica-sync/` vs `tx-payees/`, the s
 ```bash
 pnpm -C projects/db run typecheck
 pnpm -C projects/scrape-txs run typecheck
-pnpm -C projects/ai-agent run typecheck
-pnpm -C projects/ai-agent test
+pnpm -C projects/tx-payees run typecheck
+pnpm -C projects/tx-payees test
 ( cd projects/update-ynab && go build ./... )
 ```
 
@@ -1313,6 +1318,6 @@ Expected: all clean (the Go build is unaffected legacy code).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add CLAUDE.md projects/ai-agent/CLAUDE.md
+git add CLAUDE.md projects/tx-payees/CLAUDE.md
 git commit -m "docs: uuidv7 convention, reconcile flag, tx-payees module"
 ```

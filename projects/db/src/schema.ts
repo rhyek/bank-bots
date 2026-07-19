@@ -110,8 +110,8 @@ export const bankTx = pgTable(
   ],
 );
 
-// Merchant patterns used by ai-agent's tx-payees module to match an unmapped transaction to a payee
-// + category. A rule only decides WHERE to look: the answer always comes from the most recent
+// Merchant patterns used by the tx-payees app's payee-resolver module to match an unmapped
+// transaction to a payee + category. A rule only decides WHERE to look: the answer comes from the most recent
 // already-mapped transaction whose description matches the pattern, never from the rule itself
 // (a rule carrying a fixed payee would be the `forcePayee` behavior that was deliberately removed).
 // Patterns are JS regex sources evaluated in SQLite against the replica — Postgres `~*` is POSIX and

@@ -1,7 +1,7 @@
 packages:
   - 'projects/db'
   - 'projects/scrape-txs'
-  - 'projects/ai-agent'
+  - 'projects/tx-payees'
 allowBuilds:
   '@nestjs/core': false
   '@swc/core': true

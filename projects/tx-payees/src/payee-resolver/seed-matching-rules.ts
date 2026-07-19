@@ -9,7 +9,7 @@
 // Idempotent — upserts on `label`, so re-running updates patterns/priorities in place.
 //
 // Run (from repo root, with .env.local sourced for DATABASE_URL):
-//   pnpm -C projects/ai-agent run seed-matching-rules
+//   pnpm -C projects/tx-payees run seed-matching-rules
 import { db, matchingRule, pool, sql } from '@bank-bots/db';
 
 const PATTERNS: [label: string, pattern: string][] = [

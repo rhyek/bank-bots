@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from '~/replica-db/replica-schema';
-import { TxMatcher } from '~/tx-payees/tx-matcher.service';
+import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
 
 // An in-memory stand-in for ReplicaDb, set up the same way ReplicaDb.onModuleInit does: create the
 // schema and register regexp(). Without that function every REGEXP query fails at prepare().

@@ -38,7 +38,7 @@ export const bankTx = sqliteTable('bank_tx', {
   updatedAt: text('updated_at').notNull(),
 });
 
-// Merchant patterns for tx-payees. Selectors only — the payee/category come from matching history,
+// Merchant patterns for payee-resolver. Selectors only — the payee/category come from matching history,
 // never from the rule. Patterns are JS regex sources, evaluated by the regexp() function ReplicaDb
 // registers on the connection.
 export const matchingRule = sqliteTable('matching_rule', {
@@ -96,7 +96,7 @@ CREATE INDEX IF NOT EXISTS payee_updated_at ON payee (updated_at);
 CREATE INDEX IF NOT EXISTS category_updated_at ON category (updated_at);
 CREATE INDEX IF NOT EXISTS bank_tx_updated_at ON bank_tx (updated_at);
 CREATE INDEX IF NOT EXISTS matching_rule_updated_at ON matching_rule (updated_at);
--- tx-payees' hot paths: the backlog sweep filters on payee_id, and the exact tier looks up by
+-- payee-resolver's hot paths: the backlog sweep filters on payee_id, and the exact tier looks up by
 -- description.
 CREATE INDEX IF NOT EXISTS bank_tx_payee_id ON bank_tx (payee_id);
 CREATE INDEX IF NOT EXISTS bank_tx_description ON bank_tx (description);

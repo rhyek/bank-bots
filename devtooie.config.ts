@@ -11,8 +11,8 @@ export default defineConfig({
       selectable: false,
     },
     {
-      name: 'ai-agent',
-      relativeDir: 'projects/ai-agent',
+      name: 'tx-payees',
+      relativeDir: 'projects/tx-payees',
       command: ['start', { watches: false }],
       port: 3001,
       healthcheck: 'http://localhost:$port/status/health',

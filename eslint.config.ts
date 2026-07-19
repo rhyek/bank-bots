@@ -67,7 +67,7 @@ export default defineConfig([
     // parameter type (an injected service) must stay a VALUE import so `emitDecoratorMetadata` can
     // emit it — `import type` would elide it and break DI. `consistent-type-imports` can't tell those
     // apart from real type-only imports, so it's off for the Nest app.
-    files: ['projects/ai-agent/**/*.ts'],
+    files: ['projects/tx-payees/**/*.ts'],
     rules: { '@typescript-eslint/consistent-type-imports': 'off' },
   },
   // Prettier LAST: eslint-plugin-prettier/recommended runs Prettier as the `prettier/prettier` rule

@@ -46,7 +46,7 @@ handler. Treat the scheduling/deploy story as in flux; the data pipeline below i
 | --- | --- |
 | `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs (and the planned web app). |
 | `projects/scrape-txs/` | TypeScript Playwright scraper (run via Node + `@swc-node/register`). Imports `@bank-bots/db`. |
-| `projects/ai-agent/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs **`tx-payees`**, which matches unmapped transactions to a payee + category. See its own `CLAUDE.md`. |
+| `projects/tx-payees/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs its **`payee-resolver`** module, which matches unmapped transactions to a payee + category. See its own `CLAUDE.md`. |
 | `projects/update-ynab/` | Go program that syncs `bank_txs` → YNAB. |
 | `infra/` | Terraform for AWS (ECR/IAM/S3/Lambda). Currently being removed/reworked. |
 | `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
@@ -161,14 +161,14 @@ synced survive to match, so older `bank_tx` rows with no YNAB counterpart stay u
 had **no** native YNAB transfers, so `transfer_bank_account_id` is unset everywhere today — the
 column + logic exist for the new backend.)
 
-**`matching_rule`** — merchant patterns used by ai-agent's `tx-payees` module (`id` uuidv7, `label`,
+**`matching_rule`** — merchant patterns used by the tx-payees app's `payee-resolver` module (`id` uuidv7, `label`,
 `pattern`, `priority`, `enabled`, `created_at`, `updated_at`; unique index on `label`). A rule holds
 **no payee/category**: it only decides *where to look*. The answer always comes from the most recent
 already-mapped transaction whose description matches — a rule that pinned an answer would reintroduce
 the `forcePayee` behavior that was deliberately removed. `pattern` is a **JS regex source** (no
 delimiters, no flags) evaluated in SQLite against the replica, because Postgres `~*` is POSIX and
 cannot express the negative lookahead some patterns need. Seed with
-`pnpm -C projects/ai-agent run seed-matching-rules` (idempotent, upserts on `label`). Rules are
+`pnpm -C projects/tx-payees run seed-matching-rules` (idempotent, upserts on `label`). Rules are
 live-replicated, so editing one in `psql` takes effect without restarting the agent.
 
 **`config`** — single row, `id = 'general'`, `data json`. The whole app config lives in this JSON
@@ -233,8 +233,8 @@ pnpm devtooie cmd scrape-txs -c start --log-dir "$RUN_DIR" -- --bank-key <bankKe
 # Typecheck
 pnpm -C projects/db run typecheck          # @bank-bots/db (source-only lib)
 pnpm -C projects/scrape-txs run typecheck
-pnpm -C projects/ai-agent run typecheck
-pnpm -C projects/ai-agent test             # node --test (TxMatcher unit tests)
+pnpm -C projects/tx-payees run typecheck
+pnpm -C projects/tx-payees test             # node --test (TxMatcher unit tests)
 ( cd projects/update-ynab && go build ./... && go vet ./... )
 
 # DB migrations (Drizzle) — live in @bank-bots/db. Edit projects/db/src/schema.ts, then with
@@ -254,9 +254,9 @@ pnpm -C projects/db db:migrate    # apply pending migrations (tracked in drizzle
 # Needs DATABASE_URL + YNAB_ACCESS_TOKEN + YNAB_BUDGET_ID in env (source .env.local).
 pnpm -C projects/scrape-txs run backfill-ynab-mappings
 
-# ai-agent: replica + tx-payees. Matches unmapped transactions on boot and then continuously.
-pnpm -C projects/ai-agent start
-pnpm -C projects/ai-agent run seed-matching-rules   # one-shot, idempotent; seeds matching_rule
+# tx-payees app: replica + payee-resolver. Matches unmapped transactions on boot, then continuously.
+pnpm -C projects/tx-payees start
+pnpm -C projects/tx-payees run seed-matching-rules   # one-shot, idempotent; seeds matching_rule
 
 # update-ynab (Go) is legacy/retired (see Component 2) — targets the old `bank_txs` schema, not run.
 ```

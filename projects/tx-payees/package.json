@@ -1,10 +1,10 @@
 {
-  "name": "ai-agent",
+  "name": "tx-payees",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node --import @swc-node/register/esm-register src/main.ts",
-    "seed-matching-rules": "node --import @swc-node/register/esm-register src/tx-payees/seed-matching-rules.ts",
+    "seed-matching-rules": "node --import @swc-node/register/esm-register src/payee-resolver/seed-matching-rules.ts",
     "test": "node --import @swc-node/register/esm-register --test --test-isolation=none 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },

@@ -1,4 +1,8 @@
-# tx-payees — automatic payee/category matching in ai-agent
+# tx-payees — automatic payee/category matching
+
+> **Renamed after implementation.** The app formerly called `ai-agent` is now **`tx-payees`**
+> (`projects/tx-payees/`), and the module this spec calls `tx-payees` is now **`payee-resolver`**
+> (`TxPayees` → `PayeeResolver`). References to "ai-agent" below mean the app now named tx-payees.
 
 **Date:** 2026-07-19
 **Status:** approved, ready for implementation plan

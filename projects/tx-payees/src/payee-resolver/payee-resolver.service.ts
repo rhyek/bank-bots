@@ -4,7 +4,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { bankTx as pgBankTx, db as pgDb, eq as pgEq } from '@bank-bots/db';
 import { bankTx } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
-import { TxMatcher } from '~/tx-payees/tx-matcher.service';
+import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
 
 // Only transactions on or after this date are matched. Deliberately the TRANSACTION date, not
 // created_at: 3145 rows share a single created_at from the YNAB history ingest while spanning
@@ -18,8 +18,8 @@ const FROM_DATE = '2026-01-01';
 // Concurrency is 1, so jobs run strictly in order. The queue is public because ReplicaSync pushes
 // into it — see replica-sync.service.ts.
 @Injectable()
-export class TxPayees {
-  private readonly logger = new Logger(TxPayees.name);
+export class PayeeResolver {
+  private readonly logger = new Logger(PayeeResolver.name);
   readonly queue = new PQueue({ concurrency: 1 });
   private readonly pending = new Set<string>();
   private started = false;

@@ -1,4 +1,4 @@
-# ai-agent — app conventions
+# tx-payees — app conventions
 
 A **NestJS** service (scaffolded/updated by the `prepare-nestjs-app` skill). This file holds the
 **stack + structure conventions**; the skill's SKILL.md is the setup workflow.

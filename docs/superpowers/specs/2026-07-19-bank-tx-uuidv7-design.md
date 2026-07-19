@@ -116,11 +116,11 @@ more moving parts; same result.
 | File | Change |
 | --- | --- |
 | `projects/db/src/schema.ts:77` | `bigint({mode:'number'}).primaryKey().generatedByDefaultAsIdentity()` → `uuid().primaryKey().$defaultFn(uuidv7)` |
-| `projects/ai-agent/src/replica-db/replica-schema.ts` | `bankTx.id`: `integer('id')` → `text('id')`; same in `CREATE_SCHEMA_SQL`; bump `EXPECTED_SCHEMA_VERSION` |
-| `projects/ai-agent/src/replica-sync/replica-sync.service.ts:53` | `castId: (id) => Number(id)` → `(id) => id`; update the comment at line 30 |
+| `projects/tx-payees/src/replica-db/replica-schema.ts` | `bankTx.id`: `integer('id')` → `text('id')`; same in `CREATE_SCHEMA_SQL`; bump `EXPECTED_SCHEMA_VERSION` |
+| `projects/tx-payees/src/replica-sync/replica-sync.service.ts:53` | `castId: (id) => Number(id)` → `(id) => id`; update the comment at line 30 |
 | `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts` | `Row.id: number` → `string`; `${u.id}::bigint` → `::uuid` in the `VALUES` upsert |
 | `projects/scrape-txs/src/scripts/backfill-ynab-mappings.ts:25` | `id: number` → `string`; the two `VALUES` casts likewise |
-| `projects/ai-agent/src/tx-payees/*` | `Set<number>` → `Set<string>`; `enqueue(txId: string)` |
+| `projects/tx-payees/src/payee-resolver/*` | `Set<number>` → `Set<string>`; `enqueue(txId: string)` |
 | `CLAUDE.md` | Record the uuidv7 PK convention; update the `bank_tx.id` row in the schema table |
 
 The scrapers need three one-line changes: `deleteTxIds` is explicitly annotated `number[]` in
@@ -147,11 +147,11 @@ to `TEXT`.
 ## Verification
 
 - `pnpm -C projects/db run typecheck`, `pnpm -C projects/scrape-txs run typecheck`,
-  `pnpm -C projects/ai-agent run typecheck`
+  `pnpm -C projects/tx-payees run typecheck`
 - Re-run `db:generate`; expect "No schema changes" against the hand-authored snapshot
 - Row count unchanged at 6786; `count(DISTINCT id) = count(*)`
 - New ids strictly increasing when ordered by the pre-migration id sequence
-- Boot `ai-agent`; confirm the replica rebuilds and `bank_tx` row counts match Postgres
+- Boot the service; confirm the replica rebuilds and `bank_tx` row counts match Postgres
 - Re-run the description backfill dry run; expect the same `760 targets / 0 matched` baseline
 
 ## Out of scope
