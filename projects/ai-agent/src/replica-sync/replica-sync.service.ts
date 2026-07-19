@@ -23,6 +23,7 @@ import {
   payee as litePayee,
 } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
+import { TxPayees } from '~/tx-payees/tx-payees.service';
 
 const CHANNEL = 'replica_events';
 const MAX_RECONNECT_MS = 30_000;
@@ -48,6 +49,7 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   private syncing = false;
   private reconnectScheduled = false;
   private reconnectMs = 1_000;
+  private txPayeesStarted = false;
 
   // Dependency order: payee + category before bank_tx (which references them).
   private readonly tables: Descriptor[] = [
@@ -58,7 +60,10 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   ];
   private readonly byName = new Map(this.tables.map((t) => [t.name, t]));
 
-  constructor(private readonly replica: ReplicaDb) {}
+  constructor(
+    private readonly replica: ReplicaDb,
+    private readonly txPayees: TxPayees,
+  ) {}
 
   // Kicked off in the background so a slow first-ever sync (the initial full pull can be large over a
   // slow link) never blocks the app from listening. The listener is connected first, then the delta
@@ -92,6 +97,13 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
         const upserts = await this.syncUpserts(t);
         const deletes = await this.syncDeletes(t);
         this.logger.log(`sync ${t.name}: +${upserts} upserted, -${deletes} deleted`);
+      }
+      // Only once the replica is fully populated — matching against partial history would copy from
+      // an incomplete source. A failed sync throws before reaching here, so the backlog sweep waits
+      // for the first sync that actually succeeds.
+      if (!this.txPayeesStarted) {
+        this.txPayeesStarted = true;
+        this.txPayees.start();
       }
     } finally {
       this.syncing = false;
@@ -224,6 +236,12 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
           .values(row)
           .onConflictDoUpdate({ target: t.lite.id, set: this.excludedSet(t.lite) })
           .run();
+        // A new or changed transaction with no payee is work for tx-payees. The row is already in
+        // hand from the fetch above, so this costs nothing extra. Matched rows come back through
+        // here with payee_id set, which is what stops this from looping.
+        if (evt.table === 'bank_tx' && (row as { payeeId: string | null }).payeeId == null) {
+          this.txPayees.enqueue(id);
+        }
       }
     } catch (err) {
       this.logger.error(`apply ${evt.op} ${evt.table}#${evt.id}: ${(err as Error).message}`);
