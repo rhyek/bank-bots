@@ -69,6 +69,15 @@ Follows the `prepare-tanstack-start-app` conventions: srvx production server (no
 alias, Tailwind v4, custom client entry with StrictMode off, the same-origin CSRF middleware on
 server functions, and the global sonner toast for mutation failures.
 
+**One deliberate deviation from that skill: no instrumentation.** It offers OpenTelemetry or
+Datadog, both of which assume a collector to export to. This app is single-user and runs on the
+owner's machine alongside `tx-payees`; there is no collector and no operator to page. The
+`Dockerfile` is kept (it costs nothing and matches the other packages), but its `CMD` is a plain
+`node server.ts` with no `--import` tracer. Add one if this is ever deployed somewhere real.
+
+Dev runs through devtooie (`pnpm devtooie`), which injects the workspace `.env.local` — including
+`DATABASE_URL` — into the package's process. The `dev` script is `vite dev`, so it hot-reloads.
+
 It consumes `@bank-bots/db` as TypeScript source over the workspace link (Vite transpiles it). That
 package remains the sole owner of `drizzle-orm` — importing `drizzle-orm` directly from the app
 would create a second physical instance under pnpm whose `SQL` types are mutually unassignable.
@@ -131,10 +140,17 @@ Source: [`satnaing/shadcn-admin`](https://github.com/satnaing/shadcn-admin) (12.
 Vite **SPA** on TanStack Router — React 19, Tailwind v4, shadcn `new-york`/slate, `@tanstack/react-table`.
 There is no upstream TanStack Start version, so this is a subset vendor, not a fork.
 
-**Taken:** `components/ui/*` (39 stock shadcn files, incl. `sidebar.tsx`), `components/data-table/*`
-(toolbar, pagination, column-header, faceted-filter, view-options), `components/layout/`
-(`app-sidebar`, `nav-group`, `header`, `main`), `context/` (`theme-provider`, `layout-provider`,
-`search-provider`), `hooks/use-table-url-state.ts`, `lib/{utils,cookies}.ts`.
+**Taken:** `components/ui/*` (39 stock shadcn files, incl. `sidebar.tsx`), `components/layout/`
+(`app-sidebar`, `nav-group`, `header`, `main`), `context/` (`theme-provider`, `layout-provider`),
+`hooks/use-mobile.tsx`, `lib/{utils,cookies}.ts`.
+
+**Not taken, though initially planned:** `components/data-table/*` and `hooks/use-table-url-state.ts`.
+Both exist to map TanStack Table's client-side pagination/filter state to URL params. This register
+paginates and filters *server-side* and renders through a virtualizer, so a `<tr>`-based table row
+model buys nothing — the register is built directly on shadcn `Table` primitives with a CSS-grid row
+layout (virtualized rows can't participate in native table layout). Filter state is held in
+TanStack Router `validateSearch` schemas read via `useSearch`/`useNavigate`. `@tanstack/react-table`
+is therefore not a dependency.
 
 **Dropped:** Clerk and all of `routes/clerk/**`, `features/auth/**`, `routes/(auth)/**`,
 `stores/auth-store.ts`, `sign-out-dialog.tsx`, `profile-dropdown.tsx` (and its 7 call sites),
@@ -233,9 +249,9 @@ All Dates**, plus an explicit From/To month+year range. Default is This Month.
 
 Plus a free-text search over description and payee name.
 
-All filter state lives in URL search params (validated by TanStack Router, driven by the template's
-`use-table-url-state.ts`), so any view is linkable and survives reload. Changing a filter resets the
-infinite query to its first page.
+All filter state lives in URL search params, validated by each route's `validateSearch` schema, so
+any view is linkable and survives reload. The filter values are part of the React Query key, so
+changing one resets the infinite query to its first page automatically.
 
 ## Error handling
 
