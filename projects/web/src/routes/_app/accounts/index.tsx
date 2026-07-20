@@ -1,16 +1,25 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Header } from '~/components/layout/header';
 import { Main } from '~/components/layout/main';
 import { ThemeSwitch } from '~/components/theme-switch';
 import { Register } from '~/components/register/register';
-import type { TxFilters } from '~/lib/filters';
+import { RegisterToolbar, type FilterPatch } from '~/components/register/register-toolbar';
+import { registerSearchSchema } from '~/lib/filters';
 
-export const Route = createFileRoute('/_app/accounts/')({ component: AllAccounts });
-
-// Hardcoded until Task 8 reads the filters off the URL search params.
-const filters: TxFilters = { window: 'all' };
+export const Route = createFileRoute('/_app/accounts/')({
+  component: AllAccounts,
+  validateSearch: registerSearchSchema,
+});
 
 function AllAccounts() {
+  const filters = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+
+  // `replace` keeps filter fiddling out of the back-button history — otherwise clicking through
+  // four presets means four presses of Back to leave the page.
+  const onChange = (patch: FilterPatch) =>
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+
   return (
     <>
       <Header>
@@ -23,6 +32,7 @@ function AllAccounts() {
           Main to the rest of the viewport keeps the body from scrolling behind a list that already
           scrolls itself. */}
       <Main fixed fluid className="h-[calc(100svh-4rem)]">
+        <RegisterToolbar filters={filters} onChange={onChange} />
         <Register filters={filters} showAccountColumn />
       </Main>
     </>

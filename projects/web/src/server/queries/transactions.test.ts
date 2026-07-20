@@ -115,4 +115,19 @@ describe('listTransactionsQuery', () => {
       expect(haystack).toContain(term);
     }
   });
+
+  it('restricts rows to the requested date range', async () => {
+    const page = await listTransactionsQuery({
+      filters: { window: 'custom', from: '2026-01-01', to: '2026-01-31' },
+      cursor: null,
+      pageSize: 200,
+    });
+
+    expect(page.rows.length).toBeGreaterThan(0);
+    for (const row of page.rows) {
+      // `date` is a 'YYYY-MM-DD' string, so lexical comparison is chronological.
+      expect(row.date >= '2026-01-01').toBe(true);
+      expect(row.date <= '2026-01-31').toBe(true);
+    }
+  });
 });

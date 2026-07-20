@@ -48,3 +48,60 @@ export function resolveWindow(
       return { from: filters.from ?? iso(year, 1, 1), to: filters.to ?? iso(year, 12, 31) };
   }
 }
+
+export const TIME_WINDOWS: TimeWindow[] = [
+  'this-month',
+  'last-3-months',
+  'this-year',
+  'last-year',
+  'all',
+  'custom',
+];
+
+/** Labels for the preset buttons, mirroring YNAB's View Options. `custom` has no button. */
+export const WINDOW_LABELS: Record<Exclude<TimeWindow, 'custom'>, string> = {
+  'this-month': 'This Month',
+  'last-3-months': 'Latest 3 Months',
+  'this-year': 'This Year',
+  'last-year': 'Last Year',
+  all: 'All Dates',
+};
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parses the register's URL search params.
+ *
+ * Hand-written rather than zod: it is five fields, and `validateSearch` must never throw on a
+ * hand-edited or stale URL — every field falls back to a default instead. `accountId` is
+ * deliberately absent; it comes from the route path (`/accounts/$accountId`), so an account's URL
+ * stays clean.
+ */
+export function registerSearchSchema(search: Record<string, unknown>): TxFilters {
+  const window = TIME_WINDOWS.includes(search.window as TimeWindow)
+    ? (search.window as TimeWindow)
+    : 'this-month';
+
+  // Only trust well-formed dates — a garbage `from` would otherwise reach Postgres as a date literal.
+  const date = (value: unknown) =>
+    typeof value === 'string' && ISO_DATE.test(value) ? value : undefined;
+
+  const searchTerm = typeof search.search === 'string' ? search.search.trim() : '';
+
+  return {
+    window,
+    from: date(search.from),
+    to: date(search.to),
+    search: searchTerm || undefined,
+    unmatchedOnly: search.unmatchedOnly === true || search.unmatchedOnly === 'true',
+  };
+}
+
+/** First day of a month, and the last — the two ends the From/To month+year selects produce. */
+export function monthStart(year: number, month: number) {
+  return iso(year, month, 1);
+}
+
+export function monthEnd(year: number, month: number) {
+  return iso(year, month, new Date(year, month, 0).getDate());
+}
