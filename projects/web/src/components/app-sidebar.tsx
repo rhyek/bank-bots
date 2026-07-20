@@ -46,6 +46,7 @@ function buildGeneralNavGroup(unmatched: number | undefined): NavGroupData {
     title: 'General',
     items: [
       { title: 'Overview', url: '/' },
+      { title: 'Spending', url: '/spending' },
       { title: 'Unmatched', url: '/unmatched', badge: unmatched ? String(unmatched) : undefined },
       { title: 'Payees', url: '/payees' },
     ],

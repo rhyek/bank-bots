@@ -126,8 +126,14 @@ agree on the same filters to stay consistent, and would drift the first time one
 
 Against the real database, on months whose answers are known:
 
-- January 2026 totals are exactly `1118314 / 655696 / 462618` cents, and its five visible group
-  totals sum to the outflow — the arithmetic verified by hand against the raw table.
+- January 2026 totals are exactly `1118314 / 655696 / 462618` cents, and its six visible groups
+  carry the expected totals — verified by hand against the raw table.
+- Group totals do **not** sum to outflow, and the tests assert that they don't. January's
+  `Quality of Life` nets **+$100.00** from the Vegas 2025 refund: that $100 is in the header's gross
+  inflow *and* nets against its own category, so the two sides differ by exactly the refunds. This
+  is the "net, not gross" rule, and it is asserted rather than worked around.
+- Every group's aggregate total equals the sum of the rows its drill-down returns. The summary and
+  the drill-down are separate queries over the same filters; this is the check that they can't drift.
 - The internal group never appears among the table's groups, and its income is in the header.
 - A month with uncategorized transactions (May 2026) produces an `Uncategorized` bucket whose
   amount is included in the totals.

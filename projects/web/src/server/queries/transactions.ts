@@ -1,10 +1,6 @@
 import {
-  alias,
   and,
-  bankAccount,
   bankTx,
-  category,
-  categoryGroup,
   db,
   desc,
   eq,
@@ -18,22 +14,9 @@ import {
   type TxCursor,
 } from '@bank-bots/db';
 import { resolveWindow, type TxFilters } from '~/lib/filters';
+import { mapTxRow, txRowQuery, type TxRow } from './tx-row';
 
-export type TxRow = {
-  id: string;
-  date: string;
-  description: string;
-  amountCents: number;
-  reconcile: boolean;
-  accountId: string;
-  accountLabel: string;
-  payeeId: string | null;
-  payeeName: string | null;
-  categoryId: string | null;
-  categoryName: string | null;
-  categoryGroupName: string | null;
-  transferAccountLabel: string | null;
-};
+export type { TxRow };
 
 export type TxPage = { rows: TxRow[]; nextCursor: string | null };
 
@@ -56,7 +39,6 @@ export async function listTransactionsQuery(input: {
   onlyId?: string;
 }): Promise<TxPage> {
   const { filters, pageSize } = input;
-  const transferAccount = alias(bankAccount, 'transfer_account');
   const range = resolveWindow(filters);
   const search = filters.search?.trim();
 
@@ -72,30 +54,7 @@ export async function listTransactionsQuery(input: {
 
   // Fetch one extra row: its presence is the has-more signal, which avoids a final empty
   // round-trip at the end of an infinite scroll.
-  const rows = await db
-    .select({
-      id: bankTx.id,
-      date: bankTx.date,
-      description: bankTx.description,
-      amountCents: bankTx.amountCents,
-      reconcile: bankTx.reconcile,
-      accountId: bankAccount.id,
-      accountName: bankAccount.name,
-      accountNumber: bankAccount.accountNumber,
-      payeeId: bankTx.payeeId,
-      payeeName: payee.name,
-      categoryId: bankTx.categoryId,
-      categoryName: category.name,
-      categoryGroupName: categoryGroup.name,
-      transferName: transferAccount.name,
-      transferNumber: transferAccount.accountNumber,
-    })
-    .from(bankTx)
-    .innerJoin(bankAccount, eq(bankTx.bankAccountId, bankAccount.id))
-    .leftJoin(payee, eq(bankTx.payeeId, payee.id))
-    .leftJoin(category, eq(bankTx.categoryId, category.id))
-    .leftJoin(categoryGroup, eq(category.groupId, categoryGroup.id))
-    .leftJoin(transferAccount, eq(bankTx.transferBankAccountId, transferAccount.id))
+  const rows = await txRowQuery()
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(bankTx.date), desc(bankTx.id))
     .limit(pageSize + 1);
@@ -105,21 +64,7 @@ export async function listTransactionsQuery(input: {
   const last = page.at(-1);
 
   return {
-    rows: page.map((row) => ({
-      id: row.id,
-      date: row.date,
-      description: row.description,
-      amountCents: Number(row.amountCents),
-      reconcile: row.reconcile,
-      accountId: row.accountId,
-      accountLabel: row.accountName ?? row.accountNumber,
-      payeeId: row.payeeId,
-      payeeName: row.payeeName,
-      categoryId: row.categoryId,
-      categoryName: row.categoryName,
-      categoryGroupName: row.categoryGroupName,
-      transferAccountLabel: row.transferName ?? row.transferNumber,
-    })),
+    rows: page.map(mapTxRow),
     nextCursor: hasMore && last ? encodeCursor({ date: last.date, id: last.id }) : null,
   };
 }

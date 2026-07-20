@@ -21,7 +21,7 @@ export const Route = createFileRoute('/_app/accounts/$accountId')({
 
 function AccountRegister() {
   const { accountId } = Route.useParams();
-  const filters = Route.useSearch();
+  const { highlight, ...filters } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [renaming, setRenaming] = useState(false);
 
@@ -62,7 +62,7 @@ function AccountRegister() {
         <RegisterToolbar filters={filters} onChange={onChange} />
         {/* The account is fixed by the route, so its column would repeat the page title on every
             row — hence showAccountColumn is left off here. */}
-        <Register filters={{ ...filters, accountId }} />
+        <Register filters={{ ...filters, accountId }} highlight={highlight} />
       </Main>
 
       <RenameAccountDialog account={account ?? null} open={renaming} onOpenChange={setRenaming} />

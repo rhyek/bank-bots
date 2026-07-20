@@ -78,6 +78,56 @@ export const WINDOW_LABELS: Record<Exclude<TimeWindow, 'custom'>, string> = {
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_MONTH = /^\d{4}-\d{2}$/;
+
+/**
+ * What the register routes read out of the URL: the filters, plus `highlight`.
+ *
+ * `highlight` is NOT a filter, and keeping it out of `TxFilters` is load-bearing: `TxFilters` is the
+ * React Query key, so folding a view concern into it would throw away every loaded page and refetch
+ * the list each time the highlighted row changed.
+ */
+export type RegisterSearch = TxFilters & { highlight?: string };
+
+/** 'YYYY-MM' for a date. The spending page's month lives in the URL in this form. */
+export function currentMonth(today = new Date()): string {
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** 'YYYY-MM' → the inclusive date range covering it. */
+export function monthRange(month: string): { from: string; to: string } {
+  const [year, index] = month.split('-').map(Number);
+  return { from: monthStart(year, index), to: monthEnd(year, index) };
+}
+
+/**
+ * Step a 'YYYY-MM' by whole months. Built through `new Date` rather than arithmetic on the month
+ * number so December → January rolls the year over instead of producing month 13.
+ */
+export function shiftMonth(month: string, delta: number): string {
+  const [year, index] = month.split('-').map(Number);
+  return currentMonth(new Date(year, index - 1 + delta, 1));
+}
+
+/** 'YYYY-MM' → 'July 2026'. Day 1 is safe here — the range never crosses a DST boundary. */
+export function formatMonth(month: string): string {
+  const [year, index] = month.split('-').map(Number);
+  return new Date(year, index - 1, 1).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+  });
+}
+
+/**
+ * Parses the spending page's URL search params. Like `registerSearchSchema`, it never throws on a
+ * hand-edited URL — a malformed month falls back to the current one.
+ */
+export function spendingSearchSchema(search: Record<string, unknown>): { month: string } {
+  const month = search.month;
+  return {
+    month: typeof month === 'string' && ISO_MONTH.test(month) ? month : currentMonth(),
+  };
+}
 
 /**
  * Parses the register's URL search params.
@@ -92,7 +142,7 @@ export function registerSearchSchema(
   /** What an absent/invalid `window` falls back to. `/unmatched` overrides it to 'all', because
    *  that backlog spans every year and a current-month default would read as "nothing to do". */
   defaultWindow: TimeWindow = 'this-month',
-): TxFilters {
+): RegisterSearch {
   const window = TIME_WINDOWS.includes(search.window as TimeWindow)
     ? (search.window as TimeWindow)
     : defaultWindow;
@@ -109,6 +159,7 @@ export function registerSearchSchema(
     to: date(search.to),
     search: searchTerm || undefined,
     unmatchedOnly: search.unmatchedOnly === true || search.unmatchedOnly === 'true',
+    highlight: typeof search.highlight === 'string' ? search.highlight : undefined,
   };
 }
 

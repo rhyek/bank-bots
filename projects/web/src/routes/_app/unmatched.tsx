@@ -12,7 +12,7 @@ export const Route = createFileRoute('/_app/unmatched')({
 });
 
 function Unmatched() {
-  const search = Route.useSearch();
+  const { highlight, ...search } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
   const onChange = (patch: FilterPatch) =>
@@ -28,7 +28,11 @@ function Unmatched() {
       </Header>
       <Main fixed fluid className="h-[calc(100svh-4rem)]">
         <RegisterToolbar filters={search} onChange={onChange} />
-        <Register filters={{ ...search, unmatchedOnly: true }} showAccountColumn />
+        <Register
+          filters={{ ...search, unmatchedOnly: true }}
+          showAccountColumn
+          highlight={highlight}
+        />
       </Main>
     </>
   );

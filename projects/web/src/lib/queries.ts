@@ -2,6 +2,8 @@ import { queryOptions } from '@tanstack/react-query';
 import { listAccounts } from '~/server/accounts';
 import { listCategories, listPayees } from '~/server/lookups';
 import { listPayeeSummaries, unmatchedCount } from '~/server/payees';
+import { listBucketTransactions, monthSummary } from '~/server/spending';
+import type { SpendingBucket } from '~/server/queries/spending';
 
 export function accountsQueryOptions() {
   return queryOptions({
@@ -42,5 +44,26 @@ export function unmatchedCountQueryOptions() {
   return queryOptions({
     queryKey: ['unmatched-count'],
     queryFn: () => unmatchedCount(),
+  });
+}
+
+export function monthSummaryQueryOptions(month: string) {
+  return queryOptions({
+    queryKey: ['month-summary', month],
+    queryFn: () => monthSummary({ data: { month } }),
+  });
+}
+
+/**
+ * The transactions behind one figure on the spending page.
+ *
+ * `enabled` is the caller's business: the dialog mounts with no bucket selected, and this must not
+ * fire until one is.
+ */
+export function bucketTransactionsQueryOptions(month: string, bucket: SpendingBucket | null) {
+  return queryOptions({
+    queryKey: ['bucket-transactions', month, bucket],
+    queryFn: () => listBucketTransactions({ data: { month, bucket: bucket! } }),
+    enabled: bucket !== null,
   });
 }

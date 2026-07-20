@@ -12,12 +12,29 @@ import { HEADER_HEIGHT, REGISTER_GRID, REGISTER_MIN_WIDTH, ROW_HEIGHT } from './
 type RegisterProps = {
   filters: TxFilters;
   showAccountColumn?: boolean;
+  /**
+   * A transaction to scroll to and ring — how the spending page hands off to the register.
+   *
+   * Deliberately separate from `filters`: `filters` is the React Query key, so carrying this inside
+   * it would discard every loaded page and refetch the list each time the highlight changed.
+   */
+  highlight?: string;
 };
 
 /** Start fetching the next page once the last rendered row is within this many rows of the end. */
 const PREFETCH_THRESHOLD = 10;
 
-export function Register({ filters, showAccountColumn = false }: RegisterProps) {
+/**
+ * How far the seek below will page looking for `highlight` before giving up.
+ *
+ * `hasNextPage` already stops it at the end of the filtered set, which for the intended arrival
+ * (a month-scoped window) is one or two pages. This is the second bound, for a `highlight` that
+ * isn't in the current result set at all — a hand-edited URL, or a filter changed after arriving —
+ * where the first bound alone would walk the entire table.
+ */
+const MAX_SEEK_ROWS = 2000;
+
+export function Register({ filters, showAccountColumn = false, highlight }: RegisterProps) {
   // Only one row edits at a time, YNAB-style. Held here rather than in the row so that
   // opening a second editor implicitly closes the first.
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -60,6 +77,30 @@ export function Register({ filters, showAccountColumn = false }: RegisterProps) 
       void fetchNextPage();
     }
   }, [virtualItems, rows.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const highlightIndex = highlight ? rows.findIndex((row) => row.id === highlight) : -1;
+
+  // Page forward until the highlighted row is loaded. Bounded by `hasNextPage` and MAX_SEEK_ROWS.
+  useEffect(() => {
+    if (!highlight || highlightIndex !== -1 || rows.length >= MAX_SEEK_ROWS) {
+      return;
+    }
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [highlight, highlightIndex, rows.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Scroll to it once it exists. Keyed on the id rather than a boolean so that arriving at a
+  // different transaction scrolls again, while paging or editing around the current one does not
+  // yank the viewport back.
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlight || highlightIndex === -1 || scrolledTo.current === highlight) {
+      return;
+    }
+    scrolledTo.current = highlight;
+    virtualizer.scrollToIndex(highlightIndex, { align: 'center' });
+  }, [highlight, highlightIndex, virtualizer]);
 
   // Measured so the first paint fills the viewport with skeletons rather than a fixed guess. The
   // whole app is client-fetched, so this loading state is the first thing anyone sees.
@@ -132,6 +173,7 @@ export function Register({ filters, showAccountColumn = false }: RegisterProps) 
                   row={row}
                   showAccountColumn={showAccountColumn}
                   style={style}
+                  highlighted={row.id === highlight}
                   onEdit={() => setEditingId(row.id)}
                 />
               );

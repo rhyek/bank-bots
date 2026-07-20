@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppPayeesRouteImport } from './routes/_app/payees'
+import { Route as AppSpendingRouteImport } from './routes/_app/spending'
 import { Route as AppUnmatchedRouteImport } from './routes/_app/unmatched'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
@@ -29,6 +30,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppPayeesRoute = AppPayeesRouteImport.update({
   id: '/payees',
   path: '/payees',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSpendingRoute = AppSpendingRouteImport.update({
+  id: '/spending',
+  path: '/spending',
   getParentRoute: () => AppRoute,
 } as any)
 const AppUnmatchedRoute = AppUnmatchedRouteImport.update({
@@ -55,6 +61,7 @@ const AppAccountsAccountIdRoute = AppAccountsAccountIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/payees': typeof AppPayeesRoute
+  '/spending': typeof AppSpendingRoute
   '/unmatched': typeof AppUnmatchedRoute
   '/api/health': typeof ApiHealthRoute
   '/accounts/$accountId': typeof AppAccountsAccountIdRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/payees': typeof AppPayeesRoute
+  '/spending': typeof AppSpendingRoute
   '/unmatched': typeof AppUnmatchedRoute
   '/api/health': typeof ApiHealthRoute
   '/': typeof AppIndexRoute
@@ -72,6 +80,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_app/payees': typeof AppPayeesRoute
+  '/_app/spending': typeof AppSpendingRoute
   '/_app/unmatched': typeof AppUnmatchedRoute
   '/api/health': typeof ApiHealthRoute
   '/_app/': typeof AppIndexRoute
@@ -83,6 +92,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/payees'
+    | '/spending'
     | '/unmatched'
     | '/api/health'
     | '/accounts/$accountId'
@@ -90,6 +100,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/payees'
+    | '/spending'
     | '/unmatched'
     | '/api/health'
     | '/'
@@ -99,6 +110,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/_app/payees'
+    | '/_app/spending'
     | '/_app/unmatched'
     | '/api/health'
     | '/_app/'
@@ -134,6 +146,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPayeesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/spending': {
+      id: '/_app/spending'
+      path: '/spending'
+      fullPath: '/spending'
+      preLoaderRoute: typeof AppSpendingRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/unmatched': {
       id: '/_app/unmatched'
       path: '/unmatched'
@@ -167,6 +186,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppPayeesRoute: typeof AppPayeesRoute
+  AppSpendingRoute: typeof AppSpendingRoute
   AppUnmatchedRoute: typeof AppUnmatchedRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAccountsAccountIdRoute: typeof AppAccountsAccountIdRoute
@@ -175,6 +195,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppPayeesRoute: AppPayeesRoute,
+  AppSpendingRoute: AppSpendingRoute,
   AppUnmatchedRoute: AppUnmatchedRoute,
   AppIndexRoute: AppIndexRoute,
   AppAccountsAccountIdRoute: AppAccountsAccountIdRoute,

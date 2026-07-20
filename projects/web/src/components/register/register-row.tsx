@@ -9,11 +9,19 @@ type RegisterRowProps = {
   showAccountColumn: boolean;
   /** Absolute positioning + translateY, computed by the virtualizer in <Register/>. */
   style: React.CSSProperties;
+  /** Arrived here from the spending page's drill-down — ring it so it's findable on a dense page. */
+  highlighted?: boolean;
   /** Double-click opens the row editor, YNAB-style. */
   onEdit: () => void;
 };
 
-export function RegisterRow({ row, showAccountColumn, style, onEdit }: RegisterRowProps) {
+export function RegisterRow({
+  row,
+  showAccountColumn,
+  style,
+  highlighted,
+  onEdit,
+}: RegisterRowProps) {
   return (
     <div
       style={style}
@@ -21,6 +29,7 @@ export function RegisterRow({ row, showAccountColumn, style, onEdit }: RegisterR
       className={cn(
         'grid cursor-default items-center gap-3 border-b px-3 text-sm hover:bg-muted/50',
         showAccountColumn ? REGISTER_GRID.withAccount : REGISTER_GRID.withoutAccount,
+        highlighted && 'bg-primary/10 ring-1 ring-primary/50 ring-inset hover:bg-primary/15',
       )}
     >
       {showAccountColumn && (
