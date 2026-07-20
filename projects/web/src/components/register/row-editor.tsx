@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, Lock, X } from 'lucide-react';
 import { Button } from '~/components/ui/button';
-import { Input } from '~/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip';
 import { cn } from '~/lib/utils';
 import { formatCents, formatDate } from '~/lib/format';
@@ -46,13 +45,12 @@ export function RowEditor({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [payeeId, setPayeeId] = useState(row.payeeId);
   const [categoryId, setCategoryId] = useState(row.categoryId);
-  const [memo, setMemo] = useState(row.memo ?? '');
 
   const mutation = useMutation({
-    mutationFn: () =>
-      updateTransaction({ data: { id: row.id, payeeId, categoryId, memo: memo || null } }),
+    mutationFn: () => updateTransaction({ data: { id: row.id, payeeId, categoryId } }),
 
     onMutate: async () => {
       // Stop in-flight refetches from overwriting the optimistic patch when they land.
@@ -69,9 +67,7 @@ export function RowEditor({
             pages: old.pages.map((page) => ({
               ...page,
               rows: page.rows.map((candidate) =>
-                candidate.id === row.id
-                  ? { ...candidate, payeeId, categoryId, memo: memo || null }
-                  : candidate,
+                candidate.id === row.id ? { ...candidate, payeeId, categoryId } : candidate,
               ),
             })),
           },
@@ -106,8 +102,38 @@ export function RowEditor({
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  /**
+   * Clicking anywhere outside the row abandons the edit.
+   *
+   * "Outside" is not simply "not inside this element": both comboboxes render their popover through
+   * a portal on <body>, so picking a payee is a click outside the row in the DOM while being very
+   * much inside the edit. Radix marks those portals with `data-radix-popper-content-wrapper`, which
+   * is what distinguishes them from a genuine click away.
+   *
+   * pointerdown rather than click, so the edit closes on the same gesture that starts a double-click
+   * on another row instead of waiting for the button release.
+   */
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (containerRef.current?.contains(target)) {
+        return;
+      }
+      if (target.closest('[data-radix-popper-content-wrapper]')) {
+        return;
+      }
+      onClose();
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [onClose]);
+
   return (
     <div
+      ref={containerRef}
       style={style}
       className={cn(
         'bg-muted/60 ring-primary/40 grid items-center gap-3 border-b px-3 text-sm ring-1 ring-inset',
@@ -121,12 +147,7 @@ export function RowEditor({
       <CategoryCombobox value={categoryId} onSelect={setCategoryId} />
 
       <div className="flex min-w-0 items-center gap-1">
-        <Input
-          value={memo}
-          onChange={(event) => setMemo(event.target.value)}
-          placeholder={row.description}
-          className="h-7 px-2"
-        />
+        <LockedCell className="flex-1">{row.description}</LockedCell>
         <Button
           size="icon"
           variant="ghost"

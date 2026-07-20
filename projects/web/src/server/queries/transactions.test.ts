@@ -116,7 +116,7 @@ describe('listTransactionsQuery', () => {
     expect(page.rows.every((r) => r.payeeId === null)).toBe(true);
   });
 
-  it('searches description, payee name and memo case-insensitively', async () => {
+  it('searches description and payee name case-insensitively', async () => {
     // Take a real description from the newest page so the search is guaranteed to have a hit,
     // and lowercase it to prove the match is case-insensitive.
     const [seed] = (await listTransactionsQuery({ filters: ALL, cursor: null, pageSize: 1 })).rows;
@@ -130,7 +130,7 @@ describe('listTransactionsQuery', () => {
 
     expect(page.rows.length).toBeGreaterThan(0);
     for (const row of page.rows) {
-      const haystack = [row.description, row.payeeName, row.memo]
+      const haystack = [row.description, row.payeeName]
         .filter((value) => value !== null)
         .join('\n')
         .toLowerCase();

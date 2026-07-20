@@ -92,6 +92,13 @@
       "when": 1784510504719,
       "tag": "0012_web_register_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784564167029,
+      "tag": "0013_drop_bank_tx_memo",
+      "breakpoints": true
     }
   ]
 }

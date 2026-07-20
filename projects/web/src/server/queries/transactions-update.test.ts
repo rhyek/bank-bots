@@ -1,4 +1,4 @@
-import { bankTx, db, eq } from '@bank-bots/db';
+import { bankTx, db, eq, isNotNull } from '@bank-bots/db';
 import { afterAll, describe, expect, it } from 'vitest';
 import { listTransactionsQuery, updateTransactionQuery } from './transactions';
 
@@ -27,18 +27,29 @@ describe('updateTransactionQuery', () => {
     restores.push(() =>
       db
         .update(bankTx)
-        .set({ payeeId: row.payeeId, categoryId: row.categoryId, memo: row.memo })
+        .set({ payeeId: row.payeeId, categoryId: row.categoryId })
         .where(eq(bankTx.id, row.id)),
     );
 
     return row;
   }
 
-  it('writes the memo and leaves the scraper natural key untouched', async () => {
-    const before = await claimRow();
+  /** Any real payee id, so the FK on bank_tx.payee_id is satisfied. */
+  async function somePayeeId() {
+    const [row] = await db
+      .select({ payeeId: bankTx.payeeId })
+      .from(bankTx)
+      .where(isNotNull(bankTx.payeeId))
+      .limit(1);
+    return row.payeeId!;
+  }
 
-    const updated = await updateTransactionQuery({ id: before.id, memo: 'test memo' });
-    expect(updated.memo).toBe('test memo');
+  it('writes the payee and leaves the scraper natural key untouched', async () => {
+    const before = await claimRow();
+    const payeeId = await somePayeeId();
+
+    const updated = await updateTransactionQuery({ id: before.id, payeeId });
+    expect(updated.payeeId).toBe(payeeId);
 
     const [after] = await db.select().from(bankTx).where(eq(bankTx.id, before.id));
 
@@ -53,20 +64,14 @@ describe('updateTransactionQuery', () => {
 
   it('clears a field when passed null, and leaves omitted fields alone', async () => {
     const before = await claimRow();
+    const payeeId = await somePayeeId();
 
-    await updateTransactionQuery({ id: before.id, memo: 'seeded' });
-    const cleared = await updateTransactionQuery({ id: before.id, payeeId: null });
+    await updateTransactionQuery({ id: before.id, payeeId });
+    const cleared = await updateTransactionQuery({ id: before.id, categoryId: null });
 
-    expect(cleared.payeeId).toBeNull();
-    // memo was not in the second call's input, so it must survive it.
-    expect(cleared.memo).toBe('seeded');
-  });
-
-  it('treats a whitespace-only memo as clearing it', async () => {
-    const before = await claimRow();
-
-    const updated = await updateTransactionQuery({ id: before.id, memo: '   ' });
-    expect(updated.memo).toBeNull();
+    expect(cleared.categoryId).toBeNull();
+    // payeeId was not in the second call's input, so it must survive it.
+    expect(cleared.payeeId).toBe(payeeId);
   });
 
   it('rejects a call with nothing to update', async () => {
@@ -76,7 +81,7 @@ describe('updateTransactionQuery', () => {
 
   it('rejects an unknown transaction id', async () => {
     await expect(
-      updateTransactionQuery({ id: '00000000-0000-7000-8000-000000000000', memo: 'nope' }),
+      updateTransactionQuery({ id: '00000000-0000-7000-8000-000000000000', payeeId: null }),
     ).rejects.toThrow(/No transaction with id/);
   });
 });

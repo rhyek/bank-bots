@@ -32,8 +32,8 @@ export function RegisterRow({ row, showAccountColumn, style, onEdit }: RegisterR
       <PayeeCell row={row} />
       <CategoryCell row={row} />
       <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate" title={row.memo ?? row.description}>
-          {row.memo ?? row.description}
+        <span className="truncate" title={row.description}>
+          {row.description}
         </span>
         {/* Hand-entered reconciliation rows aren't on any bank statement and the scraper never
             touches them — worth flagging inline so they don't read as a scraping artifact. */}

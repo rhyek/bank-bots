@@ -23,7 +23,6 @@ export type TxRow = {
   id: string;
   date: string;
   description: string;
-  memo: string | null;
   amountCents: number;
   reconcile: boolean;
   accountId: string;
@@ -68,12 +67,7 @@ export async function listTransactionsQuery(input: {
     range && lte(bankTx.date, range.to),
     filters.accountId && eq(bankTx.bankAccountId, filters.accountId),
     filters.unmatchedOnly && isNull(bankTx.payeeId),
-    search &&
-      or(
-        ilike(bankTx.description, `%${search}%`),
-        ilike(payee.name, `%${search}%`),
-        ilike(bankTx.memo, `%${search}%`),
-      ),
+    search && or(ilike(bankTx.description, `%${search}%`), ilike(payee.name, `%${search}%`)),
   ].filter((condition) => !!condition);
 
   // Fetch one extra row: its presence is the has-more signal, which avoids a final empty
@@ -83,7 +77,6 @@ export async function listTransactionsQuery(input: {
       id: bankTx.id,
       date: bankTx.date,
       description: bankTx.description,
-      memo: bankTx.memo,
       amountCents: bankTx.amountCents,
       reconcile: bankTx.reconcile,
       accountId: bankAccount.id,
@@ -116,7 +109,6 @@ export async function listTransactionsQuery(input: {
       id: row.id,
       date: row.date,
       description: row.description,
-      memo: row.memo,
       amountCents: Number(row.amountCents),
       reconcile: row.reconcile,
       accountId: row.accountId,
@@ -133,7 +125,7 @@ export async function listTransactionsQuery(input: {
 }
 
 /**
- * Updates a transaction's payee, category and/or memo.
+ * Updates a transaction's payee and/or category.
  *
  * These are the ONLY writable columns on `bank_tx`. `bank_account_id`, `date`, `doc_no`,
  * `description` and `amount_cents` form `bank_tx_unique_cols` — the scraper's upsert conflict
@@ -149,12 +141,10 @@ export async function updateTransactionQuery(input: {
   id: string;
   payeeId?: string | null;
   categoryId?: string | null;
-  memo?: string | null;
 }): Promise<TxRow> {
   const patch: Partial<{
     payeeId: string | null;
     categoryId: string | null;
-    memo: string | null;
   }> = {};
 
   if ('payeeId' in input) {
@@ -162,9 +152,6 @@ export async function updateTransactionQuery(input: {
   }
   if ('categoryId' in input) {
     patch.categoryId = input.categoryId ?? null;
-  }
-  if ('memo' in input) {
-    patch.memo = input.memo?.trim() ? input.memo.trim() : null;
   }
 
   if (Object.keys(patch).length === 0) {

@@ -94,7 +94,7 @@ export function Register({ filters, showAccountColumn = false }: RegisterProps) 
           <div>Date</div>
           <div>Payee</div>
           <div>Category</div>
-          <div>Memo</div>
+          <div>Description</div>
           <div className="text-right">Outflow</div>
           <div className="text-right">Inflow</div>
         </div>

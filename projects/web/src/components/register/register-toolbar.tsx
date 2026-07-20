@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
@@ -165,9 +165,23 @@ export function RegisterToolbar({
         <Input
           value={term}
           onChange={(event) => setTerm(event.target.value)}
+          // Escape clears, matching the browser-native search-input convention.
+          onKeyDown={(event) => event.key === 'Escape' && setTerm('')}
           placeholder="Search description or payee"
-          className="ps-8"
+          className="ps-8 pe-8"
         />
+        {term && (
+          <button
+            type="button"
+            // Clears `term`, and the debounce effect drops `search` from the URL from there — no
+            // separate navigate call, so there's one code path for changing the search.
+            onClick={() => setTerm('')}
+            aria-label="Clear search"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute end-2 top-1/2 -translate-y-1/2 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
     </div>
   );

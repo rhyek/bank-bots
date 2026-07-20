@@ -92,10 +92,6 @@ export const bankTx = pgTable(
     date: date({ mode: 'string' }).notNull(),
     docNo: text('doc_no').notNull(),
     description: text().notNull(),
-    // Free-text note written from the web app. Deliberately NOT `description`, which is part of
-    // `bank_tx_unique_cols` — the scraper's upsert conflict target and delete-pass match key — so
-    // editing it would resurrect the original row as a duplicate on the next scrape.
-    memo: text(),
     amountCents: bigint('amount_cents', { mode: 'number' }).notNull(),
     // Nullable mappings backfilled from YNAB; a transfer sets `transfer_bank_account_id` (the other
     // account) and leaves payee/category null.

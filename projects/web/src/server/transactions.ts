@@ -14,17 +14,10 @@ export const listTransactions = createServerFn()
   );
 
 /**
- * Writes payee / category / memo. Only fields present on the input are written, so passing
+ * Writes payee / category. Only fields present on the input are written, so passing
  * `payeeId: null` clears it while omitting it leaves the column alone — see updateTransactionQuery
  * for why the writable set is exactly these three.
  */
 export const updateTransaction = createServerFn({ method: 'POST' })
-  .validator(
-    (input: {
-      id: string;
-      payeeId?: string | null;
-      categoryId?: string | null;
-      memo?: string | null;
-    }) => input,
-  )
+  .validator((input: { id: string; payeeId?: string | null; categoryId?: string | null }) => input)
   .handler(({ data }) => updateTransactionQuery(data));
