@@ -59,9 +59,23 @@ Three "bank keys", each = one bank login. `scrape-txs` picks one per run.
 
 | Bank key | Bank / country | Login flow | Config accounts |
 | --- | --- | --- | --- |
-| `bancoIndustrialGt` | Banco Industrial, Guatemala | `bienlinea.bi.com.gt` (código + usuario + contraseña) | `3250099185` (checking) |
+| `bancoIndustrialGt` | Banco Industrial, Guatemala | `bienlinea.bi.com.gt` (código + usuario + contraseña) | `3250099185` (checking), `3388707` (savings) |
 | `bacGt` | BAC Credomatic, Guatemala | `baccredomatic.com` → pick country → "Banca en Línea" → `sucursalelectronica.com` login | `904201043` (USD checking), `CR07010200009697902868` (USD checking) |
 | `bacCr` | BAC Credomatic, Costa Rica | same code as bacGt, `country: 'Costa Rica'` | `CR93010200009615666272` (USD checking) |
+
+**Account types.** `config.banks.<key>.accounts[].type` selects the scrape path, and for
+`bancoIndustrialGt` it is `checking` (Bi en Línea's *Monetarias*) or `savings` (*Ahorros*) — two
+different sections of the site with different navigation, so the type is load-bearing, not a label.
+An unknown type is now a build error rather than a silent skip.
+
+> **Savings accounts reach back only two months.** Bi en Línea publishes savings statements as
+> ACTUAL (current month) and ANTERIOR (previous) only. Its *Personalizado* form looks like a free
+> date range, but the month selector offers exactly those two values and the date inputs only narrow
+> within them — an older range returns "La cuenta no posee movimientos" rather than an error. So
+> **`3388707` has no reachable history before the previous month**, and asking for an older month
+> logs a skip and leaves stored rows untouched (it must not return an empty list: `run.ts` reads
+> "nothing scraped" as "the bank deleted these" and would wipe the month). A checking account in the
+> same run still backfills normally.
 
 `bacGt` and `bacCr` share `src/lib/bac/scrape.ts`; `bancoIndustrialGt` has its own
 `src/lib/banco-industrial/scrape.ts`. A bank config supports **multiple accounts** (the `accounts`

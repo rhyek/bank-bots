@@ -11,7 +11,12 @@ export async function ensureBankAccount(input: {
 }): Promise<string> {
   await db
     .insert(bankAccount)
-    .values(input)
+    // `currency` is not in `input` because `config.banks` doesn't carry one — every tracked account
+    // is USD (see the root CLAUDE.md). Stamping it here rather than leaving it null keeps the column
+    // the single source of truth it's documented to be: without this, an account created by a scrape
+    // got a null currency while the pre-existing rows all read 'USD'. If a non-USD account is ever
+    // added, this needs to come from config instead.
+    .values({ ...input, currency: 'USD' })
     .onConflictDoNothing({ target: [bankAccount.bankKey, bankAccount.accountNumber] });
 
   const row = await db.query.bankAccount.findFirst({
