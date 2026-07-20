@@ -1,11 +1,19 @@
+import { useState } from 'react';
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { TanStackDevtools } from '@tanstack/react-devtools';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import appCss from '~/styles.css?url';
 import { Toaster } from '~/components/ui/sonner';
+import { ThemeProvider } from '~/context/theme-provider';
+import { getChromeCookies } from '~/server/chrome';
 
 export const Route = createRootRoute({
+  // The one loader in the app that fetches — it's layout state (theme + sidebar width), read
+  // server-side so first paint already reflects it instead of flashing the default and correcting
+  // itself after hydration.
+  loader: () => getChromeCookies(),
   head: () => ({
     meta: [
       {
@@ -42,13 +50,45 @@ export const Route = createRootRoute({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const { theme } = Route.useLoaderData();
+  // Creating the QueryClient in useState (not module scope) matters: a module-level client on the
+  // server would be shared across every request.
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            // The register is immutable history; refetching on every window focus is pure noise.
+            refetchOnWindowFocus: false,
+            staleTime: 30_000,
+          },
+        },
+      }),
+  );
+
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the no-flash script below mutates this element's class list
+    // directly (before hydration), which React would otherwise flag as a hydration mismatch since
+    // our JSX never renders a className here. It's scoped to this one element only — React still
+    // fully validates every other attribute and the rest of the tree.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        {/* Blocking (no defer/async/module) so it runs before first paint. Only needed for
+            theme === 'system': SSR can't call matchMedia, so ThemeProvider renders a 'light'
+            fallback server-side (see theme-provider.tsx) and applies the real preference in a
+            client useEffect — which runs after paint. This duplicates that same resolution
+            synchronously, before the browser paints, so a dark-OS user never sees a light flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=${JSON.stringify(theme)};var r=t==='system'?(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;document.documentElement.classList.add(r);}catch(e){}})();`,
+          }}
+        />
       </head>
       <body>
-        {children}
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider defaultTheme={theme}>{children}</ThemeProvider>
+        </QueryClientProvider>
         <Toaster />
         <TanStackDevtools
           config={{
