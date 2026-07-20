@@ -110,8 +110,8 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <Link to={ALL_ACCOUNTS_HREF}>
-                      <span>All Accounts</span>
-                      <span className="ms-auto text-xs font-medium tabular-nums">
+                      <span className="truncate">All Accounts</span>
+                      <span className="ms-auto shrink-0 text-xs font-medium tabular-nums">
                         {formatCents(totalCents)}
                       </span>
                     </Link>
@@ -164,7 +164,9 @@ function AccountMenuItem({
       <SidebarMenuButton asChild>
         <Link to={accountHref(account.id)}>
           <span className="truncate">{account.label}</span>
-          <span className="ms-auto text-xs text-muted-foreground tabular-nums">
+          {/* shrink-0 so flexbox truncates the LABEL, never the balance. Un-named accounts fall
+              back to a 22-character IBAN, which without this clips the number to "$24,7…". */}
+          <span className="ms-auto shrink-0 text-xs text-muted-foreground tabular-nums">
             {formatCents(account.balanceCents)}
           </span>
         </Link>
