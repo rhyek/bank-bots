@@ -23,8 +23,10 @@ export function MonthNav({
       >
         <ChevronLeft className="size-4" />
       </Button>
-      {/* Fixed width so the arrows don't shuffle sideways between "May 2026" and "September 2026". */}
-      <div className="w-44 text-center text-lg font-semibold">{formatMonth(month)}</div>
+      {/* Fixed width so the arrows don't shuffle sideways as the month name changes length. Sized
+          to the widest label — "September 2026" measures 143px at this font — so w-40 (160px) clears
+          it with a small margin and no dead space. */}
+      <div className="w-40 text-center text-lg font-semibold">{formatMonth(month)}</div>
       <Button
         variant="outline"
         size="icon"
