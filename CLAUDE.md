@@ -46,7 +46,7 @@ handler. Treat the scheduling/deploy story as in flux; the data pipeline below i
 | --- | --- |
 | `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs (and the planned web app). |
 | `projects/scrape-txs/` | TypeScript Playwright scraper (run via Node + `@swc-node/register`). Imports `@bank-bots/db`. |
-| `projects/tx-payees/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs its **`payee-resolver`** module, which matches unmapped transactions to a payee + category. See its own `CLAUDE.md`. |
+| `projects/tx-payees/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs its **`payee-resolver`** module, which matches unmapped transactions to a payee + category in three tiers: exact description, `matching_rule` regex, then an **agent** (Claude Agent SDK) that can research a merchant and create the payees/rules its answer needs. See its own `CLAUDE.md`. |
 | `projects/update-ynab/` | Go program that syncs `bank_txs` → YNAB. |
 | `infra/` | Terraform for AWS (ECR/IAM/S3/Lambda). Currently being removed/reworked. |
 | `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
@@ -95,8 +95,8 @@ Key files:
 
 **Upsert semantics** (`run.ts` + the per-bank scrapers): each account is first resolved to its
 `bank_account.id` (`ensureBankAccount()` upserts the registry row). Insert into `bank_tx`; on
-conflict against the `(bank_account_id, date, doc_no, description, amount)` unique index, only
-`amount` is updated (this leaves any backfilled `payee_id`/`category_id` intact on re-scrape). It
+conflict against the `(bank_account_id, date, doc_no, description, amount_cents)` unique index, only
+`amount_cents` is updated (this leaves any backfilled `payee_id`/`category_id` intact on re-scrape). It
 also computes deletes (transactions in the DB for the scraped months that are no longer present on
 the bank site) and removes them — so a scrape reconciles a month, it doesn't just append.
 
@@ -140,7 +140,7 @@ replaced by the `bank_account_id` FK). Amounts are the bank's raw number (curren
 | `date` | date | transaction date |
 | `doc_no` | text | bank's document number (often non-unique / generic) |
 | `description` | text | bank's description |
-| `amount` | numeric | negative = debit, positive = credit |
+| `amount_cents` | bigint | integer cents; negative = debit, positive = credit |
 | `payee_id` | text | nullable FK → `payee.id`; backfilled from YNAB |
 | `category_id` | text | nullable FK → `category.id`; backfilled from YNAB |
 | `transfer_bank_account_id` | uuid | nullable FK → `bank_account.id`; the *other* account for a transfer (payee/category stay null) |
@@ -148,8 +148,16 @@ replaced by the `bank_account_id` FK). Amounts are the bank's raw number (curren
 | `created_at` | timestamptz | `now()` on insert (not touched on conflict-update) |
 | `updated_at` | timestamptz | maintained by the `trg_set_updated_at` trigger; the replica's delta-sync watermark |
 
-Unique index `bank_tx_unique_cols` on `(bank_account_id, date, doc_no, description, amount)` — the
-upsert conflict target and effective natural key.
+Unique index `bank_tx_unique_cols` on `(bank_account_id, date, doc_no, description, amount_cents)` —
+the upsert conflict target and effective natural key.
+
+**`matcher_result`** — audit log of every payee/category decision, from every matching tier
+(`id` uuidv7, `bank_tx_id` → `bank_tx`, `type` = `exact`|`rule`|`ai`|`none`, `payee_id`,
+`category_id`, `source_tx_id` = the transaction an exact/rule match copied from, `matching_rule_id` =
+the rule that fired, `data` jsonb, timestamps). Written by `tx-payees`. A `type = 'none'` row is
+**terminal**: the backlog sweep skips that transaction from then on, which is what keeps
+inter-account transfers (which can never have a payee) from costing an AI call on every boot. Re-ask
+one with `DELETE FROM matcher_result WHERE bank_tx_id = '<uuid>' AND type = 'none';`
 
 **`payee`** (`id`, `name`), **`category_group`** (`id`, `name`, `hidden`), **`category`** (`id`,
 `name`, `group_id` → `category_group`, `hidden`) — imported wholesale from YNAB by the **backfill

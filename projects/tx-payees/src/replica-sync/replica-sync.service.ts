@@ -8,6 +8,8 @@ import { Client, type Notification } from 'pg';
 import {
   bankTx as pgBankTx,
   category as pgCategory,
+  categoryGroup as pgCategoryGroup,
+  matcherResult as pgMatcherResult,
   matchingRule as pgMatchingRule,
   payee as pgPayee,
   count as pgCount,
@@ -19,6 +21,8 @@ import { eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import {
   bankTx as liteBankTx,
   category as liteCategory,
+  categoryGroup as liteCategoryGroup,
+  matcherResult as liteMatcherResult,
   matchingRule as liteMatchingRule,
   payee as litePayee,
 } from '~/replica-db/replica-schema';
@@ -53,12 +57,15 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   private reconnectMs = 1_000;
   private startupSyncEmitted = false;
 
-  // Dependency order: payee + category before bank_tx (which references them).
+  // Dependency order: payee + category before bank_tx (which references them), and matcher_result
+  // last since it references bank_tx, payee, category and matching_rule.
   private readonly tables: Descriptor[] = [
     { name: 'payee', pg: pgPayee, lite: litePayee },
+    { name: 'category_group', pg: pgCategoryGroup, lite: liteCategoryGroup },
     { name: 'category', pg: pgCategory, lite: liteCategory },
     { name: 'bank_tx', pg: pgBankTx, lite: liteBankTx },
     { name: 'matching_rule', pg: pgMatchingRule, lite: liteMatchingRule },
+    { name: 'matcher_result', pg: pgMatcherResult, lite: liteMatcherResult },
   ];
   private readonly byName = new Map(this.tables.map((t) => [t.name, t]));
 
@@ -245,14 +252,21 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
       this.logger.warn(`bad payload: ${msg.payload}`);
       return;
     }
+    if (process.env.TX_DEBUG_BARRIER) {
+      this.logger.log(`[notify] ${evt.op} ${evt.table}#${evt.id}`);
+    }
     const t = this.byName.get(evt.table);
     if (!t) {
+      if (process.env.TX_DEBUG_BARRIER) {
+        this.logger.warn(`[notify] no descriptor for table '${evt.table}' — dropped`);
+      }
       return;
     }
     const id = evt.id;
     try {
       if (evt.op === 'delete') {
         this.replica.db.delete(t.lite).where(eq(t.lite.id, id)).run();
+        void this.events.emit('replica-sync.row-persisted', { table: evt.table, op: 'delete', id });
       } else {
         const [row] = await pgDb.select().from(t.pg).where(pgEq(t.pg.id, id));
         // already gone; a delete event will follow
@@ -264,12 +278,14 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
           .values(row)
           .onConflictDoUpdate({ target: t.lite.id, set: this.excludedSet(t.lite) })
           .run();
-        // Inserts only. A scraped transaction always arrives with no payee, so 'new-tx' means
-        // exactly "there is fresh work". Restricting to inserts also means our own payee writes —
-        // which arrive as updates — can never feed back into the queue.
-        if (evt.table === 'bank_tx' && evt.op === 'insert') {
-          void this.events.emit('replica-sync.new-tx', { id });
-        }
+        // Emitted only after the SQLite write, so an awaiting writer can treat this as proof the
+        // replica reflects the row. It reports what happened and nothing more — deciding whether an
+        // insert means "fresh work" is the consumer's business, not replica-sync's.
+        void this.events.emit('replica-sync.row-persisted', {
+          table: evt.table,
+          op: evt.op === 'insert' ? 'insert' : 'update',
+          id,
+        });
       }
     } catch (err) {
       this.logger.error(`apply ${evt.op} ${evt.table}#${evt.id}: ${(err as Error).message}`);

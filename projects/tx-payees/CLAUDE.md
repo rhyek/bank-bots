@@ -64,10 +64,11 @@ skill for how those libraries are shaped.
 
 ```
 src/
-  events/          the typed event bus (@Global) — AppEvents + the event contract
+  events/          the typed event bus (@Global) — AppEvents, the event contract, ReplicaSettled
   replica-db/      the SQLite client only — connection, schema, regexp(), version stamp
   replica-sync/    Postgres -> SQLite replication (delta sync + LISTEN/NOTIFY) + /replica/status
   payee-resolver/  matches unmapped bank_tx rows to a payee + category
+    ai/            the AI tier's tools, prompt and output schema
   status/          /status/health
 ```
 
@@ -78,7 +79,7 @@ or removed without touching the other. The contract is `AppEventData` in `events
 | Event | Payload | Meaning |
 | --- | --- | --- |
 | `replica-sync.startup-sync-finished` | *(none)* | first full delta sync completed; history is safe to read |
-| `replica-sync.new-tx` | `{ id: string }` | a transaction was **inserted** in Postgres (scraped) |
+| `replica-sync.row-persisted` | `{ table, op, id }` | a row was applied **to SQLite**; emitted after the write |
 
 `AppEvents` extends **emittery** (`Emittery<AppEventData>`), so `emit` and `on` are both checked
 against that map — an unknown event name, a missing payload, or a wrong payload shape is a compile
@@ -102,16 +103,107 @@ initial sync fails nothing is emitted; the existing backoff retries and the swee
 sync that succeeds.
 
 **`payee-resolver`.** A `p-queue` with `concurrency: 1`. `start()` sweeps unmapped transactions since
-2026-01-01 on `startup-sync-finished`; `new-tx` queues a single freshly scraped row. Both funnel
-through `enqueue(txId)`. Matching is two tiers — exact description, then `matching_rule` patterns by
-priority — and both copy the payee/category from the most recent already-mapped transaction. Hits are
-written to **Postgres**, whose trigger notifies the replica.
+2026-01-01 on `startup-sync-finished`; `row-persisted` queues a single freshly scraped row. Both
+funnel through `enqueue(txId)`. Matching is **three tiers**:
 
-**Why `new-tx` is inserts-only.** A scraped transaction always arrives unmapped, so an insert always
-means real work. It also makes the feedback loop structurally impossible: this module's own payee
-writes come back as *updates*, which are never emitted. The trade-off is that a transaction that
-fails to match and is later updated (a re-scrape changing `amount_cents`, say) is not re-queued
-immediately — it is picked up by the next startup sweep.
+1. **exact** — same description in already-mapped history
+2. **rule** — `matching_rule` patterns by priority
+3. **ai** — `TxAiMatcher`, only when 1 and 2 both miss
+
+Tiers 1 and 2 copy the payee/category from the most recent already-mapped transaction; a rule only
+decides *where to look* and never carries an answer. Hits are written to **Postgres**, whose trigger
+notifies the replica.
+
+**Why `concurrency: 1` is a feedback loop, not just serialization.** Each resolved transaction
+becomes history the next one can copy from — resolving `PLAYSTATION 650-2` once should make the other
+six occurrences free. That only holds if the write is visible locally before the next job's
+exact-tier `SELECT`, which runs microseconds later. See `ReplicaSettled`.
+
+**Why the insert-only filter lives in the consumer.** `row-persisted` is a bare replication fact, so
+payee-resolver filters for `table === 'bank_tx' && op === 'insert'` itself. That filter is *not* what
+prevents a feedback loop from our own payee writes — the `payeeId != null` check in `onNewTx` does
+that, and would hold without it. What inserts-only actually prevents is narrower: re-queueing a
+still-unmatched row when an unrelated field changes (a re-scrape touching `amount_cents`). Those wait
+for the next startup sweep.
+
+**`ReplicaSettled` — the write barrier.** `settle.around(table, id, write)` registers a one-off
+`row-persisted` listener, *then* runs the write, then waits for confirmation. Registering after the
+write would let a fast notification land in the gap and cost the full timeout every time; taking the
+write as a callback makes that ordering impossible to invert. On timeout it warns and continues —
+Postgres already has the truth, so a lost notification must never fail the work it guards.
+
+Waiting, rather than writing through to SQLite ourselves, keeps `replica-sync` the single writer to
+the replica and avoids duplicating its `Descriptor`/`excludedSet()` row mapping in a second module.
+
+**`matcher_result`** records every decision from every tier. A `type = 'none'` row is terminal: the
+backlog sweep excludes it, which is what stops the ~17 inter-account transfers (which can never have
+a payee) from costing an agent call on every boot. Re-ask one by hand:
+
+```sql
+DELETE FROM matcher_result WHERE bank_tx_id = '<uuid>' AND type = 'none';
+```
+
+**The AI tier (`TxAiMatcher`).** Built on `@anthropic-ai/claude-agent-sdk`, authenticated with
+`CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token` — treat it like a password). It reads the SQLite
+replica through four read tools and mutates Postgres through four write tools:
+
+| Read (SQLite, `readOnlyHint`) | Write (Postgres, barriered) |
+| --- | --- |
+| `find_similar_transactions` | `create_payee` |
+| `search_payees` (with per-payee country breakdown) | `create_category` |
+| `list_matching_rules` | `create_matching_rule` |
+| `test_regex` | `update_matching_rule` |
+
+Three options are load-bearing and must not be dropped:
+
+- **`tools: ['WebSearch']`** removes every *other* built-in — `Bash`, `Read`, `Write`, `Edit`,
+  `Glob`, `Grep` — from the agent's context. Its whole capability surface is those eight tools plus
+  web search.
+- **`settingSources: []`** stops the SDK loading `~/.claude`, project `.claude/`, or this repo's
+  `CLAUDE.md`, so agent behavior can't drift with the owner's dotfiles.
+- **`effort`** is set explicitly rather than defaulted; the SDK has silently injected a flag-driven
+  effort default before ([#214](https://github.com/anthropics/claude-agent-sdk-typescript/issues/214)).
+
+`z.toJSONSchema(..., { target: 'draft-7' })` is required — the SDK validates draft-07, Zod emits
+2020-12 by default, and the mismatch fails the run at startup.
+
+**Rule patterns are gated on liveness, not correctness.** Rules go live enabled with no review. But
+`create_matching_rule` rejects a pattern that doesn't compile, that **nests an unbounded quantifier**
+(`(a+)+`), or that matches >30% of mapped history. The nesting check is *static* and deliberately so:
+timing a regex means running it first, and `(a+)+$` against a 34-character description is ~2^34 steps
+— a timing-only guard hangs instead of reporting. The share check is skipped below 50 mapped rows,
+since on a small or freshly-rebuilt replica a good rule can legitimately match most of what's there.
+
+| Env var | Default | Purpose |
+| --- | --- | --- |
+| `TX_AI_ENABLED` | `true` | kill switch; when false the tier throws (does **not** write a terminal `none`) |
+| `TX_AI_MODEL` | `claude-sonnet-5` | model |
+| `TX_AI_EFFORT` | `medium` | effort |
+| `TX_AI_MAX_PER_SWEEP` | *(unset — unlimited)* | opt-in throttle for a large backfill; see below |
+| `TX_AI_IDLE_TIMEOUT_MS` | `120000` | **silence**, not duration — rearmed by every message |
+| `TX_AI_SETTLE_TIMEOUT_MS` | `15000` | how long a write waits for `row-persisted` |
+
+**Why there is no default call budget.** A per-sweep cap guards against runaway spend under metered
+API billing. This runs on a Claude subscription: there is no per-call charge, and the only ceiling is
+rate limits — which are self-correcting, since a limited call errors, the transaction stays unmapped,
+and the next sweep retries it. A default cap bought nothing and cost availability: once spent, the
+service kept running while silently skipping every transaction, including newly scraped ones, until
+someone restarted it. The work is bounded anyway (finite backlog, terminal `none` verdicts,
+`maxTurns`). When the budget *is* set, it now resets whenever the queue drains, so it throttles a
+batch rather than the process.
+
+**Why the agent timeout measures silence.** A wall-clock cap kills the wrong runs: an agent working
+through several web searches on an unfamiliar merchant is making progress, and cutting it off throws
+all of that away. The clock is rearmed by every message the session emits, so it only fires when the
+agent has genuinely stopped producing output. Total runtime stays bounded by `maxTurns`.
+
+**Why the settle timeout is 15s and not 2s.** A NOTIFY round trip measures ~70ms on an idle process,
+which made 2s look like enormous headroom. It isn't: under real queue load the same round trip takes
+~1s, and during an agent run it routinely exceeds 2s — so a 2s budget timed out on essentially every
+write and silently dropped the feedback loop it exists to protect. Waiting longer is nearly free (it
+only delays the next transaction, and the agent run ahead of it takes 20–60s); timing out early costs
+a duplicate payee per repeated description. `TX_DEBUG_BARRIER=1` traces registrations, notifications
+and matches if this ever needs re-diagnosing.
 
 **`regexp()` is registered by `ReplicaDb`.** SQLite defines no `REGEXP` function — the grammar
 accepts `X REGEXP Y` (which compiles to `regexp(Y, X)`, **pattern first**) but the statement fails at

@@ -7,7 +7,7 @@ import * as schema from '~/replica-db/replica-schema';
 
 // Bump whenever replica-schema.ts changes shape. Files written before this stamp existed read 0,
 // so they rebuild on first boot.
-const EXPECTED_SCHEMA_VERSION = 1;
+const EXPECTED_SCHEMA_VERSION = 2;
 
 // Owns the better-sqlite3 connection + its (typed) Drizzle instance for the local replica cache.
 // Opens the file and creates the schema (if absent) on init; the file persists across restarts, so

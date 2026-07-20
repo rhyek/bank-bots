@@ -11,8 +11,16 @@ import Emittery from 'emittery';
 export interface AppEventData {
   /** The replica finished its first full delta sync, so history is complete enough to read. */
   'replica-sync.startup-sync-finished': undefined;
-  /** A transaction was newly inserted in Postgres (scraped). Not emitted for updates. */
-  'replica-sync.new-tx': { id: string };
+  /**
+   * A row was applied to the local replica. Emitted *after* the SQLite write, so a listener that
+   * observes it can rely on the replica already reflecting the row — that is what makes it usable
+   * as a write barrier (see ReplicaSettled).
+   *
+   * Deliberately a bare replication fact, not an interpretation: replica-sync reports what it did
+   * and each consumer decides what that means. A consumer that wants "there is fresh work" filters
+   * for `table === 'bank_tx' && op === 'insert'` itself.
+   */
+  'replica-sync.row-persisted': { table: string; op: 'insert' | 'update' | 'delete'; id: string };
 }
 
 /**
