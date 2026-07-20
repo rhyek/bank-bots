@@ -2,6 +2,7 @@ packages:
   - 'projects/db'
   - 'projects/scrape-txs'
   - 'projects/tx-payees'
+  - 'projects/web'
 allowBuilds:
   '@nestjs/core': false
   '@swc/core': true

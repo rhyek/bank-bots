@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+/* Your app's base chrome lives here so NO page can forget it — e.g. a dark background + base text
+   colour applied on <body>, so every route inherits it and pages only override specifics. The
+   values below are an example; customize or delete. */
+html,
+body {
+  margin: 0;
+  background-color: #0d1117;
+  color: #e2e8f0;
+}

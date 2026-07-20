@@ -1,0 +1,15 @@
+node_modules
+dist
+.output
+.git
+.github
+.tanstack
+.vscode
+.cta.json
+*.log
+.env
+.env.*
+k8s
+README.md
+AGENTS.md
+CLAUDE.md

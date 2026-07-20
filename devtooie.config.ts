@@ -17,5 +17,16 @@ export default defineConfig({
       port: 3001,
       healthcheck: 'http://localhost:$port/status/health',
     },
+    {
+      name: 'web',
+      relativeDir: 'projects/web',
+      // Bare-string form — devtooie's tuple `command` form requires a 2-element
+      // `[name, options]` (a lone `['dev']` fails schema validation); `'dev'` resolves to the
+      // same defaults (`watches: true, builds: true, cleans: false`), matching `vite dev`'s own
+      // hot-reload/watch behavior.
+      command: 'dev',
+      port: 3002,
+      healthcheck: 'http://localhost:$port/api/health',
+    },
   ],
 });

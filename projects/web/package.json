@@ -1,0 +1,48 @@
+{
+  "name": "@bank-bots/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port ${PORT:-3002}",
+    "generate-routes": "tsr generate",
+    "build": "vite build",
+    "start": "NODE_ENV=production node server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bank-bots/db": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-devtools": "^0.10.8",
+    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-router": "^1.170.18",
+    "@tanstack/react-router-devtools": "^1.167.0",
+    "@tanstack/react-router-ssr-query": "^1.167.1",
+    "@tanstack/react-start": "^1.168.30",
+    "@tanstack/react-virtual": "^3.14.6",
+    "@tanstack/router-plugin": "^1.168.22",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.25.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sonner": "^2.0.7",
+    "srvx": "^0.11.22",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@tanstack/devtools-vite": "^0.8.1",
+    "@tanstack/router-cli": "^1.167.21",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "shadcn": "^4.13.1",
+    "typescript": "~6.0.3",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}
