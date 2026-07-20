@@ -2,7 +2,9 @@ import {
   bigint,
   boolean,
   date,
+  index,
   json,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -35,6 +37,9 @@ export const bankAccount = pgTable(
     accountNumber: text('account_number').notNull(),
     type: text().notNull(),
     currency: text(),
+    // Human-friendly label set from the web app (e.g. "BAC CR Mamá"). Null → the UI falls back to
+    // `bank_key` + `account_number`.
+    name: text(),
     // Ledger balance in cents, captured at scrape time: the last row's "Balance" on the current
     // month's statement (= Saldo disponible + Retenido). Reconcile against SUM(bank_tx.amount_cents).
     runningBalanceCents: bigint('running_balance_cents', { mode: 'number' }),
@@ -54,10 +59,15 @@ export const payee = pgTable('payee', {
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
+// Replicated to tx-payees so the AI tier can name a category's group. Replication requires the
+// updated_at pair: replica-sync uses max(updated_at) as its delta watermark, so a replicated table
+// without it would re-pull in full on every boot.
 export const categoryGroup = pgTable('category_group', {
   id: text().primaryKey(),
   name: text().notNull(),
   hidden: boolean().notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
 export const category = pgTable('category', {
@@ -82,6 +92,10 @@ export const bankTx = pgTable(
     date: date({ mode: 'string' }).notNull(),
     docNo: text('doc_no').notNull(),
     description: text().notNull(),
+    // Free-text note written from the web app. Deliberately NOT `description`, which is part of
+    // `bank_tx_unique_cols` — the scraper's upsert conflict target and delete-pass match key — so
+    // editing it would resurrect the original row as a duplicate on the next scrape.
+    memo: text(),
     amountCents: bigint('amount_cents', { mode: 'number' }).notNull(),
     // Nullable mappings backfilled from YNAB; a transfer sets `transfer_bank_account_id` (the other
     // account) and leaves payee/category null.
@@ -107,6 +121,11 @@ export const bankTx = pgTable(
       table.description,
       table.amountCents,
     ),
+    // Serves the register's `ORDER BY date DESC, id DESC` keyset pagination (see keyset.ts).
+    // Required, not an optimization: the only other indexes are the pkey and `bank_tx_unique_cols`,
+    // and the latter leads with `bank_account_id` so it cannot serve this ordering. Plain ASC is
+    // enough — Postgres scans it backward and keeps the index seek.
+    index('bank_tx_date_id_idx').on(table.date, table.id),
   ],
 );
 
@@ -133,6 +152,43 @@ export const matchingRule = pgTable(
   },
   // Unique so the seed script can upsert on label (onConflictDoUpdate needs a unique target).
   (table) => [uniqueIndex('matching_rule_label_unique').on(table.label)],
+);
+
+// Audit log of every matching decision, from every tier. One row per attempt that reached a verdict.
+//
+// It is not just a log: a `type = 'none'` row is the terminal "there is no answer for this
+// transaction" marker that keeps the backlog sweep from re-asking on every boot. Roughly one in
+// eight unmapped rows is an inter-account transfer with no possible payee, and without this they
+// would burn an agent call per restart, forever. Clear one to re-ask:
+//   DELETE FROM matcher_result WHERE bank_tx_id = '<uuid>' AND type = 'none';
+//
+// Append-only, so there is deliberately no unique constraint on bank_tx_id.
+export const matcherResult = pgTable(
+  'matcher_result',
+  {
+    id: uuid().primaryKey().$defaultFn(uuidv7),
+    bankTxId: uuid('bank_tx_id')
+      .notNull()
+      .references(() => bankTx.id, { onDelete: 'cascade' }),
+    /** 'exact' | 'rule' | 'ai' | 'none' */
+    type: text().notNull(),
+    payeeId: text('payee_id').references(() => payee.id),
+    categoryId: text('category_id').references(() => category.id),
+    /** Which already-mapped transaction the answer was copied from (exact + rule tiers). */
+    sourceTxId: uuid('source_tx_id').references(() => bankTx.id),
+    /** Which rule fired (rule tier). */
+    matchingRuleId: uuid('matching_rule_id').references(() => matchingRule.id),
+    /** AI tier only: { summary, confidence, created: {...}, updated: {...} }. The created/updated
+     *  ids are recorded by the write tools as they fire, not self-reported by the model. */
+    data: jsonb(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index('matcher_result_bank_tx_id_idx').on(table.bankTxId)],
 );
 
 export const config = pgTable('config', {

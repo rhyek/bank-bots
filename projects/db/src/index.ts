@@ -17,7 +17,10 @@ export {
   category,
   config,
   matchingRule,
+  matcherResult,
 } from './schema';
+
+export { keysetBefore, type TxCursor } from './keyset';
 
 // Re-export the drizzle-orm query helpers consumers need, so @bank-bots/db is the single owner of
 // the drizzle-orm dependency. Importing drizzle-orm directly from a consumer creates a second
@@ -44,4 +47,7 @@ export {
   desc,
   count,
   sql,
+  sum,
+  countDistinct,
+  type SQL,
 } from 'drizzle-orm';
