@@ -165,7 +165,7 @@ export function RegisterToolbar({
         <Input
           value={term}
           onChange={(event) => setTerm(event.target.value)}
-          placeholder="Search description, payee, memo"
+          placeholder="Search description or payee"
           className="ps-8"
         />
       </div>

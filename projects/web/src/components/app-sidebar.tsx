@@ -164,12 +164,19 @@ function AccountMenuItem({
 }) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild>
+      {/* SidebarMenuButton permanently reserves `pe-8` on any row carrying an action, which parked
+          every balance 2rem short of the sidebar edge to make room for a `⋯` that stays hidden
+          until hover. Put the padding back to the normal `pe-2` so the balances sit flush; the
+          balance itself steps aside on hover (see below). */}
+      <SidebarMenuButton asChild className="group-has-data-[sidebar=menu-action]/menu-item:pe-2">
         <Link to={accountHref(account.id)}>
           <span className="truncate">{account.label}</span>
           {/* shrink-0 so flexbox truncates the LABEL, never the balance. Un-named accounts fall
-              back to a 22-character IBAN, which without this clips the number to "$24,7…". */}
-          <span className="ms-auto shrink-0 text-xs text-muted-foreground tabular-nums">
+              back to a 22-character IBAN, which without this clips the number to "$24,7…".
+              The margin (not padding) is what steps aside for the `⋯` on hover: the button's own
+              padding is decided by a `group-has-[…]` variant, and Tailwind orders that after
+              `group-hover`, so a padding-based override silently loses. */}
+          <span className="ms-auto me-0 shrink-0 text-xs text-muted-foreground tabular-nums transition-[margin] group-focus-within/menu-item:me-6 group-hover/menu-item:me-6">
             {formatCents(account.balanceCents)}
           </span>
         </Link>

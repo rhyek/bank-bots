@@ -3,9 +3,7 @@ import type { TxFilters } from '~/lib/filters';
 import { listTransactionsQuery, updateTransactionQuery } from './queries/transactions';
 
 export const listTransactions = createServerFn()
-  .inputValidator(
-    (input: { filters: TxFilters; cursor: string | null; pageSize?: number }) => input,
-  )
+  .validator((input: { filters: TxFilters; cursor: string | null; pageSize?: number }) => input)
   .handler(({ data }) =>
     listTransactionsQuery({
       filters: data.filters,
@@ -21,7 +19,7 @@ export const listTransactions = createServerFn()
  * for why the writable set is exactly these three.
  */
 export const updateTransaction = createServerFn({ method: 'POST' })
-  .inputValidator(
+  .validator(
     (input: {
       id: string;
       payeeId?: string | null;
