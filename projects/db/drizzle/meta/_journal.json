@@ -85,6 +85,13 @@
       "when": 1784489427083,
       "tag": "0011_category_group_replica_timestamps",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784510504719,
+      "tag": "0012_web_register_columns",
+      "breakpoints": true
     }
   ]
 }
