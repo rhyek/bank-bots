@@ -26,25 +26,31 @@ describe('listAccountsQuery', () => {
   });
 });
 
-// This runs against the live personal-finance database (same as the suite above), so it must
-// leave `bank_account` byte-identical afterward: read the target row's current name up front and
-// restore it in `afterAll`, no matter which assertion (if any) fails.
+// This runs against the live personal-finance database (same as the suite above). It operates on a
+// dedicated fixture account it inserts and deletes — never a real one — so an interrupted run can't
+// leave a real account renamed "Test Rename". The marker bank_key/account_number keep the fixture
+// unmistakable and let the next run sweep one an interrupted run left behind.
+const FIXTURE_BANK_KEY = 'test-fixture';
+
 describe('renameAccountQuery', () => {
   let accountId: string;
-  let originalName: string | null;
 
   beforeAll(async () => {
-    const accounts = await listAccountsQuery();
-    const account = accounts[0];
-    if (!account) {
-      throw new Error('No accounts in the database to test renameAccountQuery against');
-    }
-    accountId = account.id;
-    originalName = account.name;
+    await db.delete(bankAccount).where(eq(bankAccount.bankKey, FIXTURE_BANK_KEY));
+    const [row] = await db
+      .insert(bankAccount)
+      .values({
+        bankKey: FIXTURE_BANK_KEY,
+        accountNumber: 'TEST-RENAME-FIXTURE',
+        type: 'checking',
+        currency: 'USD',
+      })
+      .returning({ id: bankAccount.id });
+    accountId = row.id;
   });
 
   afterAll(async () => {
-    await db.update(bankAccount).set({ name: originalName }).where(eq(bankAccount.id, accountId));
+    await db.delete(bankAccount).where(eq(bankAccount.bankKey, FIXTURE_BANK_KEY));
   });
 
   it('sets a name and reflects it in label', async () => {

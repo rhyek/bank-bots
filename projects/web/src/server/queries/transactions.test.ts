@@ -118,9 +118,12 @@ describe('listTransactionsQuery', () => {
 
   it('searches description and payee name case-insensitively', async () => {
     // Take a real description from the newest page so the search is guaranteed to have a hit,
-    // and lowercase it to prove the match is case-insensitive.
+    // and lowercase it to prove the match is case-insensitive. Trim it too: the query itself trims
+    // the search term (see `filters.search?.trim()` in listTransactionsQuery), so a 12-char slice
+    // that lands on a space — e.g. "NETFLIX.COM " out of "NETFLIX.COM  US" — would otherwise assert
+    // on a trailing space the query never searched for, failing on the clean "NETFLIX.COM" rows.
     const [seed] = (await listTransactionsQuery({ filters: ALL, cursor: null, pageSize: 1 })).rows;
-    const term = seed.description.slice(0, 12).toLowerCase();
+    const term = seed.description.slice(0, 12).trim().toLowerCase();
 
     const page = await listTransactionsQuery({
       filters: { ...ALL, search: term },
