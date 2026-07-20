@@ -4,3 +4,6 @@ tmp/*
 .idea
 node_modules/
 storage/
+
+# superpowers agent scratch (SDD ledger, task briefs, review packages)
+.superpowers/
