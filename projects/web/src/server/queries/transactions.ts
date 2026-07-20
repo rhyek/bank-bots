@@ -52,6 +52,9 @@ export async function listTransactionsQuery(input: {
   filters: TxFilters;
   cursor: string | null;
   pageSize: number;
+  /** Narrow to one transaction. Used to re-read a single row after an update, so the caller gets
+   *  the fully-joined shape (payee name, category group, account label) rather than raw ids. */
+  onlyId?: string;
 }): Promise<TxPage> {
   const { filters, pageSize } = input;
   const transferAccount = alias(bankAccount, 'transfer_account');
@@ -59,6 +62,7 @@ export async function listTransactionsQuery(input: {
   const search = filters.search?.trim();
 
   const conditions = [
+    input.onlyId && eq(bankTx.id, input.onlyId),
     keysetBefore(decodeCursor(input.cursor)),
     range && gte(bankTx.date, range.from),
     range && lte(bankTx.date, range.to),
@@ -126,4 +130,63 @@ export async function listTransactionsQuery(input: {
     })),
     nextCursor: hasMore && last ? encodeCursor({ date: last.date, id: last.id }) : null,
   };
+}
+
+/**
+ * Updates a transaction's payee, category and/or memo.
+ *
+ * These are the ONLY writable columns on `bank_tx`. `bank_account_id`, `date`, `doc_no`,
+ * `description` and `amount_cents` form `bank_tx_unique_cols` — the scraper's upsert conflict
+ * target and the match key of its delete pass (projects/scrape-txs/src/lib/bac/scrape.ts). Changing
+ * any of them here would, on the next scrape of that month, re-insert the original row as a
+ * duplicate AND delete this one. The row editor renders them read-only for the same reason.
+ * Do not widen this set without changing scrape-txs to match.
+ *
+ * Uses `'key' in input` rather than a truthiness check so that explicitly passing `null` clears a
+ * field, while omitting it leaves the column untouched.
+ */
+export async function updateTransactionQuery(input: {
+  id: string;
+  payeeId?: string | null;
+  categoryId?: string | null;
+  memo?: string | null;
+}): Promise<TxRow> {
+  const patch: Partial<{
+    payeeId: string | null;
+    categoryId: string | null;
+    memo: string | null;
+  }> = {};
+
+  if ('payeeId' in input) {
+    patch.payeeId = input.payeeId ?? null;
+  }
+  if ('categoryId' in input) {
+    patch.categoryId = input.categoryId ?? null;
+  }
+  if ('memo' in input) {
+    patch.memo = input.memo?.trim() ? input.memo.trim() : null;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    throw new Error('updateTransactionQuery called with nothing to update');
+  }
+
+  const [updated] = await db
+    .update(bankTx)
+    .set(patch)
+    .where(eq(bankTx.id, input.id))
+    .returning({ id: bankTx.id });
+
+  if (!updated) {
+    throw new Error(`No transaction with id ${input.id}`);
+  }
+
+  const page = await listTransactionsQuery({
+    filters: { window: 'all' },
+    cursor: null,
+    pageSize: 1,
+    onlyId: input.id,
+  });
+
+  return page.rows[0];
 }

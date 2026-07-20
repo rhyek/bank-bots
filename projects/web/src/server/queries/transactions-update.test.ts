@@ -1,0 +1,82 @@
+import { bankTx, db, eq } from '@bank-bots/db';
+import { afterAll, describe, expect, it } from 'vitest';
+import { listTransactionsQuery, updateTransactionQuery } from './transactions';
+
+/**
+ * These tests mutate the REAL database — this project has no test database. Every test captures the
+ * target row's prior values up front and registers a restore, so the data is byte-identical
+ * afterwards. Restores run in `afterAll` even if an expectation fails mid-test.
+ */
+describe('updateTransactionQuery', () => {
+  const restores: (() => Promise<unknown>)[] = [];
+
+  afterAll(async () => {
+    for (const restore of restores) {
+      await restore();
+    }
+  });
+
+  async function claimRow() {
+    const { rows } = await listTransactionsQuery({
+      filters: { window: 'all' },
+      cursor: null,
+      pageSize: 1,
+    });
+    const [row] = await db.select().from(bankTx).where(eq(bankTx.id, rows[0].id));
+
+    restores.push(() =>
+      db
+        .update(bankTx)
+        .set({ payeeId: row.payeeId, categoryId: row.categoryId, memo: row.memo })
+        .where(eq(bankTx.id, row.id)),
+    );
+
+    return row;
+  }
+
+  it('writes the memo and leaves the scraper natural key untouched', async () => {
+    const before = await claimRow();
+
+    const updated = await updateTransactionQuery({ id: before.id, memo: 'test memo' });
+    expect(updated.memo).toBe('test memo');
+
+    const [after] = await db.select().from(bankTx).where(eq(bankTx.id, before.id));
+
+    // The five columns of bank_tx_unique_cols must be byte-identical: the scraper matches rows on
+    // them, so a change here would duplicate this transaction on the next scrape of its month.
+    expect(after.bankAccountId).toBe(before.bankAccountId);
+    expect(after.date).toBe(before.date);
+    expect(after.docNo).toBe(before.docNo);
+    expect(after.description).toBe(before.description);
+    expect(after.amountCents).toBe(before.amountCents);
+  });
+
+  it('clears a field when passed null, and leaves omitted fields alone', async () => {
+    const before = await claimRow();
+
+    await updateTransactionQuery({ id: before.id, memo: 'seeded' });
+    const cleared = await updateTransactionQuery({ id: before.id, payeeId: null });
+
+    expect(cleared.payeeId).toBeNull();
+    // memo was not in the second call's input, so it must survive it.
+    expect(cleared.memo).toBe('seeded');
+  });
+
+  it('treats a whitespace-only memo as clearing it', async () => {
+    const before = await claimRow();
+
+    const updated = await updateTransactionQuery({ id: before.id, memo: '   ' });
+    expect(updated.memo).toBeNull();
+  });
+
+  it('rejects a call with nothing to update', async () => {
+    const before = await claimRow();
+    await expect(updateTransactionQuery({ id: before.id })).rejects.toThrow(/nothing to update/);
+  });
+
+  it('rejects an unknown transaction id', async () => {
+    await expect(
+      updateTransactionQuery({ id: '00000000-0000-7000-8000-000000000000', memo: 'nope' }),
+    ).rejects.toThrow(/No transaction with id/);
+  });
+});

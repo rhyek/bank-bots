@@ -9,14 +9,17 @@ type RegisterRowProps = {
   showAccountColumn: boolean;
   /** Absolute positioning + translateY, computed by the virtualizer in <Register/>. */
   style: React.CSSProperties;
+  /** Double-click opens the row editor, YNAB-style. */
+  onEdit: () => void;
 };
 
-export function RegisterRow({ row, showAccountColumn, style }: RegisterRowProps) {
+export function RegisterRow({ row, showAccountColumn, style, onEdit }: RegisterRowProps) {
   return (
     <div
       style={style}
+      onDoubleClick={onEdit}
       className={cn(
-        'grid items-center gap-3 border-b px-3 text-sm hover:bg-muted/50',
+        'grid cursor-default items-center gap-3 border-b px-3 text-sm hover:bg-muted/50',
         showAccountColumn ? REGISTER_GRID.withAccount : REGISTER_GRID.withoutAccount,
       )}
     >

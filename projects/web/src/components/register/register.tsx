@@ -6,6 +6,7 @@ import type { TxFilters } from '~/lib/filters';
 import { listTransactions } from '~/server/transactions';
 import { Skeleton } from '~/components/ui/skeleton';
 import { RegisterRow } from './register-row';
+import { RowEditor } from './row-editor';
 import { HEADER_HEIGHT, REGISTER_GRID, REGISTER_MIN_WIDTH, ROW_HEIGHT } from './columns';
 
 type RegisterProps = {
@@ -17,6 +18,10 @@ type RegisterProps = {
 const PREFETCH_THRESHOLD = 10;
 
 export function Register({ filters, showAccountColumn = false }: RegisterProps) {
+  // Only one row edits at a time, YNAB-style. Held here rather than in the row so that
+  // opening a second editor implicitly closes the first.
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
 
@@ -102,21 +107,35 @@ export function Register({ filters, showAccountColumn = false }: RegisterProps) 
           </p>
         ) : (
           <div style={{ height: `${virtualizer.getTotalSize()}px` }} className="relative">
-            {virtualItems.map((virtualRow) => (
-              <RegisterRow
-                key={rows[virtualRow.index].id}
-                row={rows[virtualRow.index]}
-                showAccountColumn={showAccountColumn}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: `${virtualRow.size}px`,
-                  transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
-                }}
-              />
-            ))}
+            {virtualItems.map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              const style: React.CSSProperties = {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
+              };
+
+              return row.id === editingId ? (
+                <RowEditor
+                  key={row.id}
+                  row={row}
+                  showAccountColumn={showAccountColumn}
+                  style={style}
+                  onClose={() => setEditingId(null)}
+                />
+              ) : (
+                <RegisterRow
+                  key={row.id}
+                  row={row}
+                  showAccountColumn={showAccountColumn}
+                  style={style}
+                  onEdit={() => setEditingId(row.id)}
+                />
+              );
+            })}
           </div>
         )}
       </div>
