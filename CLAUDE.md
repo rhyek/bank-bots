@@ -44,9 +44,10 @@ handler. Treat the scheduling/deploy story as in flux; the data pipeline below i
 
 | Path | What |
 | --- | --- |
-| `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs (and the planned web app). |
+| `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs, tx-payees and web. |
 | `projects/scrape-txs/` | TypeScript Playwright scraper (run via Node + `@swc-node/register`). Imports `@bank-bots/db`. |
 | `projects/tx-payees/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs its **`payee-resolver`** module, which matches unmapped transactions to a payee + category in three tiers: exact description, `matching_rule` regex, then an **agent** (Claude Agent SDK) that can research a merchant and create the payees/rules its answer needs. See its own `CLAUDE.md`. |
+| `projects/web/` | `@bank-bots/web` — TanStack Start (SSR) web app for browsing transactions: a YNAB-style register with payee/category, time-window + search filters, and inline payee/category/memo editing. Reads/writes Postgres via server functions over `@bank-bots/db`. Port **3002**. See its own `CLAUDE.md`. |
 | `projects/update-ynab/` | Go program that syncs `bank_txs` → YNAB. |
 | `infra/` | Terraform for AWS (ECR/IAM/S3/Lambda). Currently being removed/reworked. |
 | `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
@@ -127,6 +128,7 @@ The scraper upserts rows here at scrape time via `ensureBankAccount()`.
 | `account_number` | text | e.g. `904201043`, `CR93…` |
 | `type` | text | `checking` (from config) |
 | `currency` | text | `'USD'` for all rows (every tracked account is USD) |
+| `name` | text | nullable; human label set from the web app. Null → UI falls back to `account_number` |
 | `created_at` | timestamptz | `now()` |
 
 **`bank_tx`** — one row per bank transaction (renamed from `bank_txs`; `bank_key`/`account_number`
@@ -140,6 +142,7 @@ replaced by the `bank_account_id` FK). Amounts are the bank's raw number (curren
 | `date` | date | transaction date |
 | `doc_no` | text | bank's document number (often non-unique / generic) |
 | `description` | text | bank's description |
+| `memo` | text | nullable free-text note written from the web app. Deliberately separate from `description`, which is part of the natural key |
 | `amount_cents` | bigint | integer cents; negative = debit, positive = credit |
 | `payee_id` | text | nullable FK → `payee.id`; backfilled from YNAB |
 | `category_id` | text | nullable FK → `category.id`; backfilled from YNAB |
@@ -265,6 +268,13 @@ pnpm -C projects/scrape-txs run backfill-ynab-mappings
 # tx-payees app: replica + payee-resolver. Matches unmapped transactions on boot, then continuously.
 pnpm -C projects/tx-payees start
 pnpm -C projects/tx-payees run seed-matching-rules   # one-shot, idempotent; seeds matching_rule
+
+# web app: the transaction register. Hot-reloading dev server on :3002 (devtooie injects DATABASE_URL).
+pnpm devtooie                                # whole workspace
+pnpm devtooie cmd -p web -c dev              # just the web app
+pnpm -C projects/web test                    # vitest (queries hit the real DB; mutations restore)
+pnpm -C projects/web run typecheck
+pnpm -C projects/web run build                # must pass: proves the ~/ alias + srvx bundle emit
 
 # update-ynab (Go) is legacy/retired (see Component 2) — targets the old `bank_txs` schema, not run.
 ```
