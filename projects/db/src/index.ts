@@ -51,3 +51,8 @@ export {
   countDistinct,
   type SQL,
 } from 'drizzle-orm';
+
+// Same reasoning as above, for the pg-specific helpers. `alias` is needed by any consumer doing a
+// self-join (e.g. resolving a transfer's counterpart account off `bank_tx`), and the table it
+// returns must come from this package's drizzle instance to stay assignable to the query builder.
+export { alias } from 'drizzle-orm/pg-core';
