@@ -1,5 +1,5 @@
 export type TimeWindow =
-  'this-month' | 'last-3-months' | 'this-year' | 'last-year' | 'all' | 'custom';
+  'this-month' | 'last-month' | 'last-3-months' | 'this-year' | 'last-year' | 'all' | 'custom';
 
 export type TxFilters = {
   accountId?: string;
@@ -32,6 +32,14 @@ export function resolveWindow(
       return null;
     case 'this-month':
       return { from: iso(year, month, 1), to: iso(year, month, lastDay(year, month)) };
+    case 'last-month': {
+      // Built via `new Date` rather than `month - 1` so January correctly rolls back to the
+      // previous December instead of producing month 0.
+      const start = new Date(year, today.getMonth() - 1, 1);
+      const y = start.getFullYear();
+      const m = start.getMonth() + 1;
+      return { from: iso(y, m, 1), to: iso(y, m, lastDay(y, m)) };
+    }
     case 'last-3-months': {
       // Inclusive of the current month, so "latest 3 months" spans this month and the two before.
       const start = new Date(year, today.getMonth() - 2, 1);
@@ -51,6 +59,7 @@ export function resolveWindow(
 
 export const TIME_WINDOWS: TimeWindow[] = [
   'this-month',
+  'last-month',
   'last-3-months',
   'this-year',
   'last-year',
@@ -61,6 +70,7 @@ export const TIME_WINDOWS: TimeWindow[] = [
 /** Labels for the preset buttons, mirroring YNAB's View Options. `custom` has no button. */
 export const WINDOW_LABELS: Record<Exclude<TimeWindow, 'custom'>, string> = {
   'this-month': 'This Month',
+  'last-month': 'Last Month',
   'last-3-months': 'Latest 3 Months',
   'this-year': 'This Year',
   'last-year': 'Last Year',

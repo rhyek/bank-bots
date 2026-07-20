@@ -15,6 +15,28 @@ describe('resolveWindow', () => {
     });
   });
 
+  it('spans the previous calendar month', () => {
+    expect(resolveWindow({ window: 'last-month' }, today)).toEqual({
+      from: '2026-06-01',
+      to: '2026-06-30',
+    });
+  });
+
+  it('rolls back to the previous December when today is in January', () => {
+    // The bug this guards: computing `month - 1` arithmetically yields month 0 in January.
+    expect(resolveWindow({ window: 'last-month' }, new Date(2026, 0, 15))).toEqual({
+      from: '2025-12-01',
+      to: '2025-12-31',
+    });
+  });
+
+  it('ends last month on the 28th in a non-leap February', () => {
+    expect(resolveWindow({ window: 'last-month' }, new Date(2026, 2, 10))).toEqual({
+      from: '2026-02-01',
+      to: '2026-02-28',
+    });
+  });
+
   it('includes the current month in the latest 3 months', () => {
     expect(resolveWindow({ window: 'last-3-months' }, today)).toEqual({
       from: '2026-05-01',
