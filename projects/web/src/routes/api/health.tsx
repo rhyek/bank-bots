@@ -1,7 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-// Liveness/readiness endpoint for Kubernetes probes. Intentionally does NOT
-// touch the DB so the pod stays "live" while the DB reconnects.
+// Liveness endpoint. devtooie polls it to decide when the dev server is up
+// (see the `healthcheck` field on this package's entry in devtooie.config.ts).
+// Intentionally does NOT touch the database, so a DB outage doesn't read as
+// "the web app failed to start".
 export const Route = createFileRoute('/api/health')({
   server: {
     handlers: {

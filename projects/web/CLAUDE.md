@@ -8,11 +8,10 @@ shared layout component, link defaults, …), keep those in `src/CLAUDE.md`.
 
 TanStack Start (SSR, file-based routing) + React 19 + Vite + Tailwind v4 + **shadcn/ui**. **No
 Nitro** — `vite build` emits a Web `fetch` handler (`dist/server`) plus a static client
-(`dist/client`). In production **srvx** (`server.ts`) runs that handler on Node and serves the
-assets. The image keeps **real production `node_modules`** (not a self-contained bundle), so deps
-stay real runtime imports — and, unlike a bundled `.output/server`, a new server-rendered dep needs
-**no `ssr.noExternal` entry**. Node ≥22.18 runs the `.ts` files directly. Booted via plain
-`node server.ts` — **no tracer** (see Instrumentation below).
+(`dist/client`). **srvx** (`server.ts`) runs that handler on Node and serves the assets. Deps stay
+**real runtime imports** (not a self-contained bundle), so — unlike a bundled `.output/server` — a
+new server-rendered dep needs **no `ssr.noExternal` entry**. Node ≥22.18 runs the `.ts` files
+directly. Booted via plain `node server.ts` — **no tracer** (see Instrumentation below).
 
 ## Routes (`src/routes`)
 
@@ -125,9 +124,23 @@ srvx runs the built `fetch` handler and serves `dist/client`. The `@ts-expect-er
 This app ships **no tracer** (a documented deviation from the source `prepare-tanstack-start-app`
 skill, which offers OpenTelemetry or Datadog). Both assume a collector to export to; this is a
 single-user app on the owner's machine with no collector and no operator to page. Do not copy
-`instrumentation.otel.ts` or add `@opentelemetry/*`/`dd-trace` packages — the `Dockerfile`'s `CMD` is
-a plain `node server.ts`. Add instrumentation if this is ever deployed somewhere real.
+`instrumentation.otel.ts` or add `@opentelemetry/*`/`dd-trace` packages. Add instrumentation if this
+is ever deployed somewhere real.
 
-## Build / deploy
+## Build / deploy — no Dockerfile
 
-`Dockerfile` (multi-stage, pnpm, `node:24-slim`, srvx runtime). Local dev: `pnpm dev`.
+There is **deliberately no `Dockerfile`**, matching `projects/tx-payees` ("No Dockerfile is
+scaffolded by default; add one if the service is deployed standalone"). The skill's template
+Dockerfile was scaffolded and then removed: it `COPY`s a package-local `pnpm-lock.yaml` that doesn't
+exist in this monorepo (only the root lockfile does), and `@bank-bots/db` is a `workspace:*`
+**TypeScript-source** dependency, so a working image needs a monorepo-aware build (`pnpm deploy` or
+a filtered install from the repo root). Nothing here was ever deployed, so that was an unbuildable
+artifact nobody would notice was broken.
+
+Run it locally:
+
+```bash
+pnpm devtooie                       # whole workspace
+pnpm devtooie cmd -p web -c dev     # just this app
+pnpm -C projects/web run dev        # without devtooie (needs DATABASE_URL in env)
+```

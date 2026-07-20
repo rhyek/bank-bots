@@ -1,12 +1,12 @@
 // Production server. srvx — the web-standard universal server TanStack Start already builds on —
 // runs the app's Web `fetch` handler on Node and serves dist/client (MIME, path-traversal guard,
-// range/compression). No hand-rolled node↔fetch bridge, no static/MIME code. Deps stay REAL runtime
-// imports so the tracer (OTel or dd-trace) can auto-instrument srvx's node:http server + the app's
-// outbound calls. Server-fn CSRF/origin is handled in src/start.ts. Node (≥22.18) strips the TS at
-// load.
+// range/compression). No hand-rolled node↔fetch bridge, no static/MIME code. Server-fn CSRF/origin
+// is handled in src/start.ts. Node (≥22.18) strips the TS at load.
 //
-// Run via:  node --import ./instrumentation.ts server.ts     (OpenTelemetry)
-//      or:  node --import dd-trace/register.js server.ts      (Datadog)
+// Run via:  node server.ts
+//
+// This app ships no tracer — see "Instrumentation" in CLAUDE.md for why. Deps are still REAL
+// runtime imports rather than a bundle, so adding one later needs no build change.
 import { serve, type ServerMiddleware } from 'srvx';
 import { serveStatic } from 'srvx/static';
 // @ts-expect-error — a `vite build` artifact under dist/; it has no type declarations.
