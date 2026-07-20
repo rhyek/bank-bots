@@ -11,8 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppPayeesRouteImport } from './routes/_app/payees'
+import { Route as AppUnmatchedRouteImport } from './routes/_app/unmatched'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppAccountsIndexRouteImport } from './routes/_app/accounts/index'
+import { Route as AppAccountsAccountIdRouteImport } from './routes/_app/accounts/$accountId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -21,6 +24,16 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPayeesRoute = AppPayeesRouteImport.update({
+  id: '/payees',
+  path: '/payees',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUnmatchedRoute = AppUnmatchedRouteImport.update({
+  id: '/unmatched',
+  path: '/unmatched',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -33,30 +46,64 @@ const AppAccountsIndexRoute = AppAccountsIndexRouteImport.update({
   path: '/accounts/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAccountsAccountIdRoute = AppAccountsAccountIdRouteImport.update({
+  id: '/accounts/$accountId',
+  path: '/accounts/$accountId',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/payees': typeof AppPayeesRoute
+  '/unmatched': typeof AppUnmatchedRoute
   '/api/health': typeof ApiHealthRoute
+  '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/accounts/': typeof AppAccountsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/payees': typeof AppPayeesRoute
+  '/unmatched': typeof AppUnmatchedRoute
   '/api/health': typeof ApiHealthRoute
   '/': typeof AppIndexRoute
+  '/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/accounts': typeof AppAccountsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/_app/payees': typeof AppPayeesRoute
+  '/_app/unmatched': typeof AppUnmatchedRoute
   '/api/health': typeof ApiHealthRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/accounts/$accountId': typeof AppAccountsAccountIdRoute
   '/_app/accounts/': typeof AppAccountsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/health' | '/accounts/'
+  fullPaths:
+    | '/'
+    | '/payees'
+    | '/unmatched'
+    | '/api/health'
+    | '/accounts/$accountId'
+    | '/accounts/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/api/health' | '/' | '/accounts'
-  id: '__root__' | '/_app' | '/api/health' | '/_app/' | '/_app/accounts/'
+  to:
+    | '/payees'
+    | '/unmatched'
+    | '/api/health'
+    | '/'
+    | '/accounts/$accountId'
+    | '/accounts'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_app/payees'
+    | '/_app/unmatched'
+    | '/api/health'
+    | '/_app/'
+    | '/_app/accounts/$accountId'
+    | '/_app/accounts/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -80,6 +127,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/payees': {
+      id: '/_app/payees'
+      path: '/payees'
+      fullPath: '/payees'
+      preLoaderRoute: typeof AppPayeesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/unmatched': {
+      id: '/_app/unmatched'
+      path: '/unmatched'
+      fullPath: '/unmatched'
+      preLoaderRoute: typeof AppUnmatchedRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -94,16 +155,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/accounts/$accountId': {
+      id: '/_app/accounts/$accountId'
+      path: '/accounts/$accountId'
+      fullPath: '/accounts/$accountId'
+      preLoaderRoute: typeof AppAccountsAccountIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppPayeesRoute: typeof AppPayeesRoute
+  AppUnmatchedRoute: typeof AppUnmatchedRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppAccountsAccountIdRoute: typeof AppAccountsAccountIdRoute
   AppAccountsIndexRoute: typeof AppAccountsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppPayeesRoute: AppPayeesRoute,
+  AppUnmatchedRoute: AppUnmatchedRoute,
   AppIndexRoute: AppIndexRoute,
+  AppAccountsAccountIdRoute: AppAccountsAccountIdRoute,
   AppAccountsIndexRoute: AppAccountsIndexRoute,
 }
 

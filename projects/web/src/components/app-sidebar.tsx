@@ -4,7 +4,7 @@ import type { LinkProps } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { MoreHorizontal } from 'lucide-react';
 import { useLayout } from '~/context/layout-provider';
-import { accountsQueryOptions } from '~/lib/queries';
+import { accountsQueryOptions, unmatchedCountQueryOptions } from '~/lib/queries';
 import { formatCents } from '~/lib/format';
 import type { AccountSummary } from '~/server/queries/accounts';
 import {
@@ -30,9 +30,8 @@ import { NavGroup } from '~/components/layout/nav-group';
 import type { NavGroup as NavGroupData } from '~/components/layout/types';
 import { RenameAccountDialog } from '~/components/rename-account-dialog';
 
-// The route tree doesn't have `/accounts` or `/accounts/$accountId` yet (a later task adds them),
-// so links to them go through this escape hatch — same trick as NavLink/NavCollapsible in
-// ~/components/layout/types — rather than a hard TS error on an unregistered route string.
+// `/accounts/$accountId` is a dynamic route, so its href is built from a template string rather
+// than typed params. Same escape hatch as NavLink/NavCollapsible in ~/components/layout/types.
 type Href = LinkProps['to'] | (string & {});
 
 const ALL_ACCOUNTS_HREF: Href = '/accounts';
@@ -40,15 +39,18 @@ function accountHref(accountId: string): Href {
   return `/accounts/${accountId}`;
 }
 
-// Fixed nav — Task 5 only replaces the (previously empty) Accounts group below.
-const generalNavGroup: NavGroupData = {
-  title: 'General',
-  items: [
-    { title: 'Overview', url: '/' },
-    { title: 'Unmatched', url: '/unmatched' },
-    { title: 'Payees', url: '/payees' },
-  ],
-};
+// `badge` carries the live count of transactions with no payee, so the backlog is visible without
+// navigating. Built per-render because the count is a query result.
+function buildGeneralNavGroup(unmatched: number | undefined): NavGroupData {
+  return {
+    title: 'General',
+    items: [
+      { title: 'Overview', url: '/' },
+      { title: 'Unmatched', url: '/unmatched', badge: unmatched ? String(unmatched) : undefined },
+      { title: 'Payees', url: '/payees' },
+    ],
+  };
+}
 
 // Display names for each `bankKey` — only these three exist. Put here (not derived) since the
 // mapping is a presentation choice, not data.
@@ -76,6 +78,7 @@ function groupByBank(accounts: AccountSummary[]): [string, AccountSummary[]][] {
 export function AppSidebar() {
   const { collapsible, variant } = useLayout();
   const { data: accounts, isPending } = useQuery(accountsQueryOptions());
+  const { data: unmatched } = useQuery(unmatchedCountQueryOptions());
   const [renamingAccount, setRenamingAccount] = useState<AccountSummary | null>(null);
 
   const totalCents = accounts?.reduce((sum, account) => sum + account.balanceCents, 0) ?? 0;
@@ -99,7 +102,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavGroup {...generalNavGroup} />
+        <NavGroup {...buildGeneralNavGroup(unmatched)} />
         <SidebarGroup>
           <SidebarGroupLabel>Accounts</SidebarGroupLabel>
           {isPending ? (

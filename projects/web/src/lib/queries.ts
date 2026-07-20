@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { listAccounts } from '~/server/accounts';
 import { listCategories, listPayees } from '~/server/lookups';
+import { listPayeeSummaries, unmatchedCount } from '~/server/payees';
 
 export function accountsQueryOptions() {
   return queryOptions({
@@ -27,5 +28,19 @@ export function categoriesQueryOptions() {
     queryKey: ['categories'],
     queryFn: () => listCategories(),
     staleTime: LOOKUP_STALE_TIME,
+  });
+}
+
+export function payeeSummariesQueryOptions() {
+  return queryOptions({
+    queryKey: ['payee-summaries'],
+    queryFn: () => listPayeeSummaries(),
+  });
+}
+
+export function unmatchedCountQueryOptions() {
+  return queryOptions({
+    queryKey: ['unmatched-count'],
+    queryFn: () => unmatchedCount(),
   });
 }

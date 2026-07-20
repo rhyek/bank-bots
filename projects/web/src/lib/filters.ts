@@ -77,10 +77,15 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * deliberately absent; it comes from the route path (`/accounts/$accountId`), so an account's URL
  * stays clean.
  */
-export function registerSearchSchema(search: Record<string, unknown>): TxFilters {
+export function registerSearchSchema(
+  search: Record<string, unknown>,
+  /** What an absent/invalid `window` falls back to. `/unmatched` overrides it to 'all', because
+   *  that backlog spans every year and a current-month default would read as "nothing to do". */
+  defaultWindow: TimeWindow = 'this-month',
+): TxFilters {
   const window = TIME_WINDOWS.includes(search.window as TimeWindow)
     ? (search.window as TimeWindow)
-    : 'this-month';
+    : defaultWindow;
 
   // Only trust well-formed dates — a garbage `from` would otherwise reach Postgres as a date literal.
   const date = (value: unknown) =>
@@ -105,3 +110,14 @@ export function monthStart(year: number, month: number) {
 export function monthEnd(year: number, month: number) {
   return iso(year, month, new Date(year, month, 0).getDate());
 }
+
+/**
+ * The search object a `<Link>` must supply when navigating to a register route.
+ *
+ * `validateSearch` would fill these in anyway, but TanStack Router requires the caller to provide
+ * required search params at the type level, so links carry them explicitly.
+ */
+export const defaultSearch = (window: TimeWindow = 'this-month'): TxFilters => ({
+  window,
+  unmatchedOnly: false,
+});
