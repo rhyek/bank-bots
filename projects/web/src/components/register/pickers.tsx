@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import {
   Command,
   CommandEmpty,
@@ -13,6 +14,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
 import { categoriesQueryOptions, payeesQueryOptions } from '~/lib/queries';
+import { createPayee } from '~/server/lookups';
+import type { PayeeOption } from '~/server/queries/lookups';
 
 /**
  * cmdk filters and renders every item it is given. With 685 payees that is a visible cost on each
@@ -58,6 +61,8 @@ export function PayeeCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState('');
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data: payees } = useQuery(payeesQueryOptions());
 
   const matches = useMemo(() => {
@@ -71,6 +76,35 @@ export function PayeeCombobox({
 
   const selected = payees?.find((payee) => payee.id === value);
 
+  const trimmed = term.trim();
+  // Offer "Create" only when the text has no exact (case-insensitive) match — an existing payee is
+  // already selectable from the list, so creating would just duplicate it.
+  const exactExists =
+    trimmed !== '' && (payees ?? []).some((p) => p.name.toLowerCase() === trimmed.toLowerCase());
+  const showCreate = trimmed !== '' && !exactExists;
+
+  const create = useMutation({
+    mutationFn: (name: string) => createPayee({ data: { name } }),
+    onSuccess: (created: PayeeOption) => {
+      // Seed the cache so the new payee is usable immediately: payeesQueryOptions has a 5-minute
+      // staleTime, so without this the trigger would read "No payee" until a refetch. Insert in name
+      // order to match listPayeesQuery; the invalidation then reconciles with the server.
+      queryClient.setQueryData<PayeeOption[]>(['payees'], (old) => {
+        if (!old) {
+          return [created];
+        }
+        if (old.some((p) => p.id === created.id)) {
+          return old; // an existing payee was reused, not created
+        }
+        return [...old, created].sort((a, b) => a.name.localeCompare(b.name));
+      });
+      void queryClient.invalidateQueries({ queryKey: ['payees'] });
+      onSelect(created.id);
+      setTerm('');
+      setOpen(false);
+    },
+  });
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -80,9 +114,23 @@ export function PayeeCombobox({
         {/* shouldFilter={false}: we filter ourselves so the cap applies to the MATCHES, not to an
             arbitrary first 100 that cmdk would then filter down to almost nothing. */}
         <Command shouldFilter={false}>
-          <CommandInput placeholder="Search payees…" value={term} onValueChange={setTerm} />
+          <CommandInput placeholder="Search or create…" value={term} onValueChange={setTerm} />
           <CommandList>
             <CommandEmpty>No payee found.</CommandEmpty>
+            {showCreate && (
+              <CommandGroup>
+                <CommandItem
+                  value={`__create__${trimmed}`}
+                  disabled={create.isPending}
+                  onSelect={() => create.mutate(trimmed)}
+                >
+                  <Plus className="size-4" />
+                  <span className="truncate">
+                    Create <span className="font-medium">“{trimmed}”</span>
+                  </span>
+                </CommandItem>
+              </CommandGroup>
+            )}
             <CommandGroup>
               <CommandItem
                 value={NONE}
@@ -116,6 +164,19 @@ export function PayeeCombobox({
               </p>
             )}
           </CommandList>
+          {/* YNAB's "Manage Payees". Leaves the editor (route change), which is the intended exit. */}
+          <div className="border-t p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                void navigate({ to: '/payees' });
+              }}
+              className="text-primary hover:bg-muted w-full rounded-sm px-2 py-1.5 text-left text-sm"
+            >
+              Manage payees
+            </button>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>

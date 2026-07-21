@@ -22,6 +22,11 @@ export {
 
 export { keysetBefore, type TxCursor } from './keyset';
 
+// This package owns the `uuid` dependency (see schema.ts, which uses it for uuidv7 primary keys).
+// Re-exported so consumers minting an id app-side — e.g. the web app creating a payee — use the
+// same generator rather than adding their own `uuid` dependency.
+export { v7 as uuidv7 } from 'uuid';
+
 // Re-export the drizzle-orm query helpers consumers need, so @bank-bots/db is the single owner of
 // the drizzle-orm dependency. Importing drizzle-orm directly from a consumer creates a second
 // physical instance under pnpm (its optional `pg` peer resolves differently), whose SQL types are
