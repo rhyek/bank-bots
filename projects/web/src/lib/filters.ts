@@ -81,13 +81,13 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_MONTH = /^\d{4}-\d{2}$/;
 
 /**
- * What the register routes read out of the URL: the filters, plus `highlight`.
+ * What the transactions routes read out of the URL: the filters, plus `highlight`.
  *
  * `highlight` is NOT a filter, and keeping it out of `TxFilters` is load-bearing: `TxFilters` is the
  * React Query key, so folding a view concern into it would throw away every loaded page and refetch
  * the list each time the highlighted row changed.
  */
-export type RegisterSearch = TxFilters & { highlight?: string };
+export type TransactionsSearch = TxFilters & { highlight?: string };
 
 /** 'YYYY-MM' for a date. The spending page's month lives in the URL in this form. */
 export function currentMonth(today = new Date()): string {
@@ -119,8 +119,8 @@ export function formatMonth(month: string): string {
 }
 
 /**
- * Parses the spending page's URL search params. Like `registerSearchSchema`, it never throws on a
- * hand-edited URL — a malformed month falls back to the current one.
+ * Parses the spending page's URL search params. Like `transactionsSearchSchema`, it never throws on
+ * a hand-edited URL — a malformed month falls back to the current one.
  */
 export function spendingSearchSchema(search: Record<string, unknown>): { month: string } {
   const month = search.month;
@@ -130,19 +130,19 @@ export function spendingSearchSchema(search: Record<string, unknown>): { month: 
 }
 
 /**
- * Parses the register's URL search params.
+ * Parses the transactions pages' URL search params.
  *
  * Hand-written rather than zod: it is five fields, and `validateSearch` must never throw on a
  * hand-edited or stale URL — every field falls back to a default instead. `accountId` is
  * deliberately absent; it comes from the route path (`/accounts/$accountId`), so an account's URL
  * stays clean.
  */
-export function registerSearchSchema(
+export function transactionsSearchSchema(
   search: Record<string, unknown>,
   /** What an absent/invalid `window` falls back to. `/unmatched` overrides it to 'all', because
    *  that backlog spans every year and a current-month default would read as "nothing to do". */
   defaultWindow: TimeWindow = 'this-month',
-): RegisterSearch {
+): TransactionsSearch {
   const window = TIME_WINDOWS.includes(search.window as TimeWindow)
     ? (search.window as TimeWindow)
     : defaultWindow;
@@ -173,7 +173,7 @@ export function monthEnd(year: number, month: number) {
 }
 
 /**
- * The search object a `<Link>` must supply when navigating to a register route.
+ * The search object a `<Link>` must supply when navigating to a transactions route.
  *
  * `validateSearch` would fill these in anyway, but TanStack Router requires the caller to provide
  * required search params at the type level, so links carry them explicitly.

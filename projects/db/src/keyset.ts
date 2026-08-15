@@ -1,7 +1,7 @@
 import { sql, type SQL } from 'drizzle-orm';
 import { bankTx } from './schema';
 
-/** A cursor into the `bank_tx` register, which is always ordered `date DESC, id DESC`. */
+/** A cursor into `bank_tx`, which is always ordered `date DESC, id DESC`. */
 export type TxCursor = { date: string; id: string };
 
 /**

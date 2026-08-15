@@ -19,7 +19,7 @@ function Payees() {
   const [term, setTerm] = useState('');
   const { data: payees, isPending } = useQuery(payeeSummariesQueryOptions());
 
-  // ~685 rows: small enough to filter and render without virtualizing, unlike the register.
+  // ~685 rows: small enough to filter and render without virtualizing, unlike the transactions list.
   const rows = useMemo(() => {
     const needle = term.trim().toLowerCase();
     if (!needle) {
@@ -78,7 +78,7 @@ function Payees() {
                 key={payee.id}
                 type="button"
                 // Jumps to every transaction for this payee. Searching by NAME rather than id keeps
-                // the register's filter model to one text field instead of a payee-id special case.
+                // the transactions filter model to one text field instead of a payee-id special case.
                 onClick={() =>
                   void navigate({
                     to: '/accounts',

@@ -58,7 +58,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // The register is immutable history; refetching on every window focus is pure noise.
+            // Transaction history is immutable; refetching on every window focus is pure noise.
             refetchOnWindowFocus: false,
             staleTime: 30_000,
           },

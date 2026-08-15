@@ -7,7 +7,7 @@ import { cn } from '~/lib/utils';
 import { formatCents, formatDate } from '~/lib/format';
 import { updateTransaction } from '~/server/transactions';
 import type { TxPage, TxRow } from '~/server/queries/transactions';
-import { REGISTER_GRID } from './columns';
+import { TRANSACTIONS_GRID } from './columns';
 import { CategoryCombobox, PayeeCombobox } from './pickers';
 
 const LOCKED_REASON =
@@ -137,7 +137,7 @@ export function RowEditor({
       style={style}
       className={cn(
         'bg-muted/60 ring-primary/40 grid items-center gap-3 border-b px-3 text-sm ring-1 ring-inset',
-        showAccountColumn ? REGISTER_GRID.withAccount : REGISTER_GRID.withoutAccount,
+        showAccountColumn ? TRANSACTIONS_GRID.withAccount : TRANSACTIONS_GRID.withoutAccount,
       )}
     >
       {showAccountColumn && <LockedCell>{row.accountLabel}</LockedCell>}

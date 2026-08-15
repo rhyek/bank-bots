@@ -117,7 +117,7 @@ export const bankTx = pgTable(
       table.description,
       table.amountCents,
     ),
-    // Serves the register's `ORDER BY date DESC, id DESC` keyset pagination (see keyset.ts).
+    // Serves the transactions list's `ORDER BY date DESC, id DESC` keyset pagination (see keyset.ts).
     // Required, not an optimization: the only other indexes are the pkey and `bank_tx_unique_cols`,
     // and the latter leads with `bank_account_id` so it cannot serve this ordering. Plain ASC is
     // enough — Postgres scans it backward and keeps the index seek.

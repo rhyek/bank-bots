@@ -1,9 +1,9 @@
 /**
- * The register is a CSS grid, not a <table>. Virtualized rows are absolutely positioned, which
- * native table layout cannot express — and every column here is fixed or bounded, so the grid
+ * The transactions list is a CSS grid, not a <table>. Virtualized rows are absolutely positioned,
+ * which native table layout cannot express — and every column here is fixed or bounded, so the grid
  * gives identical alignment without a row model.
  */
-export const REGISTER_GRID = {
+export const TRANSACTIONS_GRID = {
   withAccount:
     'grid-cols-[minmax(110px,140px)_110px_minmax(140px,1fr)_minmax(160px,1fr)_minmax(180px,2fr)_120px_120px]',
   withoutAccount:
@@ -18,7 +18,7 @@ export const ROW_HEIGHT = 44;
  * narrow viewport lets the header's background stop at the container edge while the columns keep
  * going, so the sticky header visibly detaches from the rows once you scroll right.
  */
-export const REGISTER_MIN_WIDTH = {
+export const TRANSACTIONS_MIN_WIDTH = {
   withAccount: 'min-w-[940px]',
   withoutAccount: 'min-w-[830px]',
 } as const;

@@ -179,7 +179,7 @@ export async function monthSummaryQuery(input: { month: string }): Promise<Month
  *
  * Unpaginated: a bucket is bounded by a single month, and the largest in this data is 37 rows
  * (January's `Variable → Miscellaneous`). The cap is a guard against a pathological month, not a
- * paging mechanism — if it is ever hit, this needs the register's keyset paging rather than a
+ * paging mechanism — if it is ever hit, this needs the transactions list's keyset paging rather than a
  * bigger number.
  */
 const BUCKET_LIMIT = 500;

@@ -2,12 +2,12 @@ import { cn } from '~/lib/utils';
 import { formatCents, formatDate } from '~/lib/format';
 import { Badge } from '~/components/ui/badge';
 import type { TxRow } from '~/server/queries/transactions';
-import { REGISTER_GRID } from './columns';
+import { TRANSACTIONS_GRID } from './columns';
 
-type RegisterRowProps = {
+type TransactionRowProps = {
   row: TxRow;
   showAccountColumn: boolean;
-  /** Absolute positioning + translateY, computed by the virtualizer in <Register/>. */
+  /** Absolute positioning + translateY, computed by the virtualizer in <Transactions/>. */
   style: React.CSSProperties;
   /** Arrived here from the spending page's drill-down — ring it so it's findable on a dense page. */
   highlighted?: boolean;
@@ -15,20 +15,20 @@ type RegisterRowProps = {
   onEdit: () => void;
 };
 
-export function RegisterRow({
+export function TransactionRow({
   row,
   showAccountColumn,
   style,
   highlighted,
   onEdit,
-}: RegisterRowProps) {
+}: TransactionRowProps) {
   return (
     <div
       style={style}
       onDoubleClick={onEdit}
       className={cn(
         'grid cursor-default items-center gap-3 border-b px-3 text-sm hover:bg-muted/50',
-        showAccountColumn ? REGISTER_GRID.withAccount : REGISTER_GRID.withoutAccount,
+        showAccountColumn ? TRANSACTIONS_GRID.withAccount : TRANSACTIONS_GRID.withoutAccount,
         highlighted && 'bg-primary/10 ring-1 ring-primary/50 ring-inset hover:bg-primary/15',
       )}
     >

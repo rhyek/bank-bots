@@ -56,7 +56,7 @@ export type FilterPatch = Partial<Pick<TxFilters, 'window' | 'from' | 'to' | 'se
  * the URL. That keeps a view linkable and makes the filters part of the React Query key, so
  * changing one starts a fresh infinite query rather than appending to the previous result set.
  */
-export function RegisterToolbar({
+export function TransactionsToolbar({
   filters,
   onChange,
 }: {

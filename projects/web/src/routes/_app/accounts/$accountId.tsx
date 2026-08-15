@@ -7,19 +7,22 @@ import { Skeleton } from '~/components/ui/skeleton';
 import { Header } from '~/components/layout/header';
 import { Main } from '~/components/layout/main';
 import { ThemeSwitch } from '~/components/theme-switch';
-import { Register } from '~/components/register/register';
-import { RegisterToolbar, type FilterPatch } from '~/components/register/register-toolbar';
+import { Transactions } from '~/components/transactions/transactions';
+import {
+  TransactionsToolbar,
+  type FilterPatch,
+} from '~/components/transactions/transactions-toolbar';
 import { RenameAccountDialog } from '~/components/rename-account-dialog';
-import { registerSearchSchema } from '~/lib/filters';
+import { transactionsSearchSchema } from '~/lib/filters';
 import { formatCents } from '~/lib/format';
 import { accountsQueryOptions } from '~/lib/queries';
 
 export const Route = createFileRoute('/_app/accounts/$accountId')({
-  component: AccountRegister,
-  validateSearch: registerSearchSchema,
+  component: AccountTransactions,
+  validateSearch: transactionsSearchSchema,
 });
 
-function AccountRegister() {
+function AccountTransactions() {
   const { accountId } = Route.useParams();
   const { highlight, ...filters } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -59,10 +62,10 @@ function AccountRegister() {
         </div>
       </Header>
       <Main fixed fluid className="h-[calc(100svh-4rem)]">
-        <RegisterToolbar filters={filters} onChange={onChange} />
+        <TransactionsToolbar filters={filters} onChange={onChange} />
         {/* The account is fixed by the route, so its column would repeat the page title on every
             row — hence showAccountColumn is left off here. */}
-        <Register filters={{ ...filters, accountId }} highlight={highlight} />
+        <Transactions filters={{ ...filters, accountId }} highlight={highlight} />
       </Main>
 
       <RenameAccountDialog account={account ?? null} open={renaming} onOpenChange={setRenaming} />

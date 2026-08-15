@@ -31,7 +31,7 @@ function Spending() {
           <ThemeSwitch />
         </div>
       </Header>
-      {/* The category table owns the only scrollbar, same arrangement as the register pages. */}
+      {/* The category table owns the only scrollbar, same arrangement as the transactions pages. */}
       <Main fixed fluid className="h-[calc(100svh-4rem)]">
         <div className="flex flex-col gap-3 pb-3">
           <MonthNav

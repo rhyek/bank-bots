@@ -3,7 +3,7 @@ import { alias, bankAccount, bankTx, category, categoryGroup, db, eq, payee } fr
 /**
  * One transaction, with every foreign key already resolved to something displayable.
  *
- * Shared by the register and the spending page's drill-down so the two render identical rows. The
+ * Shared by the transactions list and the spending page's drill-down so the two render identical rows. The
  * join set is wide enough that duplicating it would drift the first time a column was added to one
  * and not the other.
  */

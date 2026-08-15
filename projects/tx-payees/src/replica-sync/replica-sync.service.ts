@@ -28,10 +28,21 @@ import {
 } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
 import { AppEvents } from '~/events/app-events';
+import { ListenerHeartbeat } from '~/replica-sync/listener-heartbeat';
 
 const CHANNEL = 'replica_events';
 const MAX_RECONNECT_MS = 30_000;
 const UPSERT_CHUNK = 200;
+
+// A LISTEN connection only ever reads, so a silently dropped socket is invisible until we write to
+// it. These probe it on a cadence well under any idle timeout (AWS recommends a TCP keepalive of
+// ≤200s; the Supabase pooler in front of this reaps idle connections sooner), which both keeps the
+// connection warm and, via listener-heartbeat.ts, surfaces a death that no `error` event reports.
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const HEARTBEAT_PROBE_TIMEOUT_MS = 10_000;
+// TCP keepalive is the cheaper, coarser second layer under the heartbeat — it lets the OS notice a
+// dead peer even between probes. Not sufficient on its own (node-postgres#2362), hence both.
+const KEEPALIVE_INITIAL_DELAY_MS = 30_000;
 
 // A replicated table: its Postgres source (@bank-bots/db) + SQLite mirror. Every replicated id is
 // text (bank_tx is a uuidv7; payee/category are the YNAB uuids), so the notify payload's id needs no
@@ -51,6 +62,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(ReplicaSync.name);
   private client: Client | null = null;
+  private heartbeat: ListenerHeartbeat | null = null;
   private shuttingDown = false;
   private syncing = false;
   private reconnectScheduled = false;
@@ -83,6 +95,8 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
 
   async onModuleDestroy() {
     this.shuttingDown = true;
+    this.heartbeat?.stop();
+    this.heartbeat = null;
     await this.client?.end().catch(() => undefined);
   }
 
@@ -202,14 +216,33 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   // ---------- realtime (LISTEN/NOTIFY) ----------
 
   private async connectListener() {
-    const client = new Client({ connectionString: process.env.DATABASE_URL });
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: KEEPALIVE_INITIAL_DELAY_MS,
+    });
     client.on('notification', (msg) => void this.onNotification(msg));
     client.on('error', (err) => this.scheduleReconnect(err));
     await client.connect();
     await client.query(`LISTEN ${CHANNEL}`);
     this.client = client;
     this.reconnectMs = 1_000;
+    this.startHeartbeat(client);
     this.logger.log(`listening on '${CHANNEL}'`);
+  }
+
+  // Probe this specific client, so a beat that fires mid-reconnect can never accidentally query a
+  // newer connection. A failed probe routes into the same reconnect path as an `error` event —
+  // scheduleReconnect is idempotent (one pending timer), so the two racing is harmless.
+  private startHeartbeat(client: Client) {
+    this.heartbeat?.stop();
+    this.heartbeat = new ListenerHeartbeat({
+      intervalMs: HEARTBEAT_INTERVAL_MS,
+      probeTimeoutMs: HEARTBEAT_PROBE_TIMEOUT_MS,
+      probe: () => client.query('SELECT 1'),
+      onDead: (err) => this.scheduleReconnect(new Error(`heartbeat failed: ${err.message}`)),
+    });
+    this.heartbeat.start();
   }
 
   private scheduleReconnect(err: Error) {
@@ -221,6 +254,8 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
     this.logger.warn(
       `replica listener down (${err.message}); reconnecting in ${this.reconnectMs}ms`,
     );
+    this.heartbeat?.stop();
+    this.heartbeat = null;
     void this.client?.end().catch(() => undefined);
     this.client = null;
     const delay = this.reconnectMs;

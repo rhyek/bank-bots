@@ -2,13 +2,16 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Header } from '~/components/layout/header';
 import { Main } from '~/components/layout/main';
 import { ThemeSwitch } from '~/components/theme-switch';
-import { Register } from '~/components/register/register';
-import { RegisterToolbar, type FilterPatch } from '~/components/register/register-toolbar';
-import { registerSearchSchema } from '~/lib/filters';
+import { Transactions } from '~/components/transactions/transactions';
+import {
+  TransactionsToolbar,
+  type FilterPatch,
+} from '~/components/transactions/transactions-toolbar';
+import { transactionsSearchSchema } from '~/lib/filters';
 
 export const Route = createFileRoute('/_app/unmatched')({
   component: Unmatched,
-  validateSearch: (search: Record<string, unknown>) => registerSearchSchema(search, 'all'),
+  validateSearch: (search: Record<string, unknown>) => transactionsSearchSchema(search, 'all'),
 });
 
 function Unmatched() {
@@ -27,8 +30,8 @@ function Unmatched() {
         </div>
       </Header>
       <Main fixed fluid className="h-[calc(100svh-4rem)]">
-        <RegisterToolbar filters={search} onChange={onChange} />
-        <Register
+        <TransactionsToolbar filters={search} onChange={onChange} />
+        <Transactions
           filters={{ ...search, unmatchedOnly: true }}
           showAccountColumn
           highlight={highlight}

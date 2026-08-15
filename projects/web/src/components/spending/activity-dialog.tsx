@@ -85,13 +85,13 @@ export function ActivityDialog({
   );
 
   /**
-   * Hand off to the register, scoped to this month and pointing at the row.
+   * Hand off to the transactions page, scoped to this month and pointing at the row.
    *
    * The window is set to the month rather than left alone so the target is a page or two into the
-   * result set — the register seeks by fetching pages until it finds the id, which an "all dates"
+   * result set — the list seeks by fetching pages until it finds the id, which an "all dates"
    * window would turn into a walk through the whole table.
    */
-  const openInRegister = (txId: string) => {
+  const openInTransactions = (txId: string) => {
     const range = monthRange(month);
     onClose();
     void navigate({
@@ -118,7 +118,7 @@ export function ActivityDialog({
           <DialogTitle>{drilldown?.title}</DialogTitle>
           <DialogDescription>
             {rows ? `${rows.length} transaction${rows.length === 1 ? '' : 's'} — ` : ''}
-            select one to open it in the register
+            select one to open it in the transactions list
           </DialogDescription>
         </DialogHeader>
 
@@ -163,7 +163,7 @@ export function ActivityDialog({
                   </span>
                 </div>
                 {group.rows.map((row) => (
-                  <ChildRow key={row.id} row={row} onClick={() => openInRegister(row.id)} />
+                  <ChildRow key={row.id} row={row} onClick={() => openInTransactions(row.id)} />
                 ))}
               </div>
             ))
@@ -172,7 +172,7 @@ export function ActivityDialog({
               <button
                 key={row.id}
                 type="button"
-                onClick={() => openInRegister(row.id)}
+                onClick={() => openInTransactions(row.id)}
                 className={cn(
                   'grid w-full items-center gap-3 border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                   FLAT_GRID,

@@ -3,7 +3,7 @@
 Date: 2026-07-19
 
 A TanStack Start app for reading (and lightly correcting) the transactions the scraper collects.
-It replaces the part of YNAB the owner actually looks at: a register of transactions with their
+It replaces the part of YNAB the owner actually looks at: a list of transactions with their
 payee and category, filtered by account and time window. It is the first consumer of the
 payee/category data that `tx-payees` produces, and the first UI in this repo.
 
@@ -145,9 +145,9 @@ There is no upstream TanStack Start version, so this is a subset vendor, not a f
 `hooks/use-mobile.tsx`, `lib/{utils,cookies}.ts`.
 
 **Not taken, though initially planned:** `components/data-table/*` and `hooks/use-table-url-state.ts`.
-Both exist to map TanStack Table's client-side pagination/filter state to URL params. This register
+Both exist to map TanStack Table's client-side pagination/filter state to URL params. This list
 paginates and filters *server-side* and renders through a virtualizer, so a `<tr>`-based table row
-model buys nothing — the register is built directly on shadcn `Table` primitives with a CSS-grid row
+model buys nothing — the list is built directly on shadcn `Table` primitives with a CSS-grid row
 layout (virtualized rows can't participate in native table layout). Filter state is held in
 TanStack Router `validateSearch` schemas read via `useSearch`/`useNavigate`. `@tanstack/react-table`
 is therefore not a dependency.
@@ -187,9 +187,9 @@ Routes under a single layout route that renders the sidebar.
 | Route | Content |
 | --- | --- |
 | `/` | Overview: balance cards per account, total, unmatched count. The smallest screen; trimmable. |
-| `/accounts` | All Accounts register. |
-| `/accounts/$accountId` | One account's register, plus rename. |
-| `/unmatched` | Same register, `payee_id is null` (696 rows today). |
+| `/accounts` | All Accounts transactions list. |
+| `/accounts/$accountId` | One account's transactions, plus rename. |
+| `/unmatched` | Same list, `payee_id is null` (696 rows today). |
 | `/payees` | 685 payees with transaction counts; click through to that payee's transactions. |
 
 ### Sidebar
@@ -219,7 +219,7 @@ Full history is scraped, so summing is sound.
 
 No user button, no avatar, no email in the sidebar footer — the app is single-user.
 
-### Register table
+### Transactions table
 
 Columns, mirroring YNAB: **Account · Date · Payee · Category · Memo · Outflow · Inflow**.
 
@@ -280,4 +280,4 @@ shows "No transactions in this period", not a spinner or an error.
 Recorded so they are not rediscovered later: setting transfers from the payee dropdown; a Manage
 Payees screen; creating manual `reconcile` rows; making `date` editable via a `user_date` override
 column; surfacing `matcher_result` (which tier assigned a payee, and the AI tier's summary) in the
-register.
+transactions list.

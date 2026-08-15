@@ -2,11 +2,11 @@
 
 A per-month view of where the money went, modelled on YNAB's Plan page but **read-only**: no
 budgeting, no assigning, no buckets to fund. Category group → category → the transactions behind a
-number → that transaction highlighted in the register.
+number → that transaction highlighted in the transactions list.
 
 ## Why
 
-The register answers "what did I spend on July 3rd". It cannot answer "how much did I spend on
+The transactions list answers "what did I spend on July 3rd". It cannot answer "how much did I spend on
 restaurants in May, and did I save anything". This page does, from the same `bank_tx` rows — no new
 schema, no migration.
 
@@ -83,17 +83,17 @@ Clicking a row in that dialog navigates to:
 /accounts?window=custom&from=<month start>&to=<month end>&highlight=<txId>
 ```
 
-The register reads `highlight`, fetches pages until that row is loaded, scrolls it into view, and
+The transactions list reads `highlight`, fetches pages until that row is loaded, scrolls it into view, and
 rings it.
 
-**Why this over the alternatives.** Filtering the register to the category instead would need no
+**Why this over the alternatives.** Filtering the transactions list to the category instead would need no
 seek logic, but loses seeing the transaction among its neighbours — which is the point. Having the
 server return the row's rank so the client can jump straight to it is more precise, but needs a
 window-function count and a new query shape to save one page fetch on a ~100–200 row month.
 
 `highlight` is deliberately **not** part of `TxFilters`. `TxFilters` is the React Query key, so
 folding a view concern into it would refetch the whole list every time the highlight changed. The
-route parses it alongside the filters and passes it to `<Register>` as its own prop.
+route parses it alongside the filters and passes it to `<Transactions>` as its own prop.
 
 Seeking is bounded twice: by `hasNextPage` (it stops at the end of the filtered set) and by a
 row cap, so a `highlight` pointing at a transaction outside the current window — a hand-edited URL,
@@ -105,7 +105,7 @@ or a filter changed after arriving — cannot walk the entire table.
 
 | File | Responsibility |
 | --- | --- |
-| `server/queries/tx-row.ts` | The joined `TxRow` select, joins and row mapping, extracted from `transactions.ts` so both the register and the drill-down produce identical rows |
+| `server/queries/tx-row.ts` | The joined `TxRow` select, joins and row mapping, extracted from `transactions.ts` so both the transactions list and the drill-down produce identical rows |
 | `server/queries/spending.ts` | `monthSummaryQuery`, `listBucketTransactionsQuery` |
 | `server/spending.ts` | The two server fns |
 | `routes/_app/spending.tsx` | Route + page |
@@ -114,8 +114,8 @@ or a filter changed after arriving — cannot walk the entire table.
 | `components/spending/category-table.tsx` | Groups + categories + Uncategorized |
 | `components/spending/activity-dialog.tsx` | The drill-down |
 
-**Modified:** `server/queries/transactions.ts` (use the extracted row helpers), `components/register/register.tsx`
-(seek + scroll), `components/register/register-row.tsx` (highlight styling), `lib/filters.ts`
+**Modified:** `server/queries/transactions.ts` (use the extracted row helpers), `components/transactions/transactions.tsx`
+(seek + scroll), `components/transactions/transaction-row.tsx` (highlight styling), `lib/filters.ts`
 (`highlight` param + month helpers), `components/app-sidebar.tsx` (nav item), `lib/queries.ts` (query options).
 
 `monthSummaryQuery` is a **single** grouped query that returns inflow and outflow per category. The

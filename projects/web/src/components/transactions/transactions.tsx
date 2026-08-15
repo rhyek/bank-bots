@@ -5,15 +5,15 @@ import { cn } from '~/lib/utils';
 import type { TxFilters } from '~/lib/filters';
 import { listTransactions } from '~/server/transactions';
 import { Skeleton } from '~/components/ui/skeleton';
-import { RegisterRow } from './register-row';
+import { TransactionRow } from './transaction-row';
 import { RowEditor } from './row-editor';
-import { HEADER_HEIGHT, REGISTER_GRID, REGISTER_MIN_WIDTH, ROW_HEIGHT } from './columns';
+import { HEADER_HEIGHT, TRANSACTIONS_GRID, TRANSACTIONS_MIN_WIDTH, ROW_HEIGHT } from './columns';
 
-type RegisterProps = {
+type TransactionsProps = {
   filters: TxFilters;
   showAccountColumn?: boolean;
   /**
-   * A transaction to scroll to and ring — how the spending page hands off to the register.
+   * A transaction to scroll to and ring — how the spending page hands off to this list.
    *
    * Deliberately separate from `filters`: `filters` is the React Query key, so carrying this inside
    * it would discard every loaded page and refetch the list each time the highlight changed.
@@ -34,7 +34,7 @@ const PREFETCH_THRESHOLD = 10;
  */
 const MAX_SEEK_ROWS = 2000;
 
-export function Register({ filters, showAccountColumn = false, highlight }: RegisterProps) {
+export function Transactions({ filters, showAccountColumn = false, highlight }: TransactionsProps) {
   // Only one row edits at a time, YNAB-style. Held here rather than in the row so that
   // opening a second editor implicitly closes the first.
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -115,10 +115,12 @@ export function Register({ filters, showAccountColumn = false, highlight }: Regi
     return () => observer.disconnect();
   }, []);
 
-  const gridClass = showAccountColumn ? REGISTER_GRID.withAccount : REGISTER_GRID.withoutAccount;
+  const gridClass = showAccountColumn
+    ? TRANSACTIONS_GRID.withAccount
+    : TRANSACTIONS_GRID.withoutAccount;
   const minWidthClass = showAccountColumn
-    ? REGISTER_MIN_WIDTH.withAccount
-    : REGISTER_MIN_WIDTH.withoutAccount;
+    ? TRANSACTIONS_MIN_WIDTH.withAccount
+    : TRANSACTIONS_MIN_WIDTH.withoutAccount;
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto rounded-md border">
@@ -168,7 +170,7 @@ export function Register({ filters, showAccountColumn = false, highlight }: Regi
                   onClose={() => setEditingId(null)}
                 />
               ) : (
-                <RegisterRow
+                <TransactionRow
                   key={row.id}
                   row={row}
                   showAccountColumn={showAccountColumn}
