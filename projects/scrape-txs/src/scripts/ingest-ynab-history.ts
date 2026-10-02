@@ -181,6 +181,7 @@ async function main() {
           bankTx.docNo,
           bankTx.description,
           bankTx.amountCents,
+          bankTx.occurrence,
         ],
       });
   }

@@ -6,6 +6,7 @@ import { isMatching } from 'ts-pattern';
 import { AccountType } from '../types';
 import { db, type bankTx } from '@bank-bots/db';
 import { ensureBankAccount } from '../bank-accounts';
+import { numberOccurrences } from '../occurrences';
 import { waitRandomMs } from '../utils';
 
 export type BiConfig = {
@@ -48,6 +49,9 @@ export async function bancoIndustrialScrape({
   await page.waitForURL('https://www.bienlinea.bi.com.gt/InicioSesion/Token/BienvenidoDashBoard');
   const createTxs: (typeof bankTx.$inferInsert)[] = [];
   const deleteTxIds: string[] = [];
+  // running_balance_cents per account: the balance on the last row of the latest savings statement
+  // that had movements (months are scraped oldest first, so later ones overwrite earlier ones).
+  const runningBalances: Record<string, number> = {};
   for (const account of accounts) {
     const bankAccountId = await ensureBankAccount({
       bankKey,
@@ -72,21 +76,30 @@ export async function bancoIndustrialScrape({
       if (rawTransactions === null) {
         continue;
       }
-      const _bankTxs: (typeof bankTx.$inferInsert)[] = rawTransactions.map((tx) => {
-        const [_, dateStr] = tx.date.match(DAY_MONTH)!;
-        const amountCents =
-          tx.credit && tx.credit !== ''
-            ? Math.round(Number(tx.credit) * 100)
-            : -Math.round(Number(tx.debit) * 100);
-        return {
-          bankAccountId,
-          month: monthDayJs.format('YYYY-MM'),
-          date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
-          description: tx.description,
-          docNo: tx.docNo,
-          amountCents,
-        };
-      });
+      const lastBalance = Number(rawTransactions.at(-1)?.balance || NaN);
+      if (!Number.isNaN(lastBalance)) {
+        runningBalances[bankAccountId] = Math.round(lastBalance * 100);
+        console.log(
+          `Bank balance for ${account.number} after ${monthDayJs.format('YYYY-MM')}: ${lastBalance.toFixed(2)}`,
+        );
+      }
+      const _bankTxs: (typeof bankTx.$inferInsert)[] = numberOccurrences(
+        rawTransactions.map((tx) => {
+          const [_, dateStr] = tx.date.match(DAY_MONTH)!;
+          const amountCents =
+            tx.credit && tx.credit !== ''
+              ? Math.round(Number(tx.credit) * 100)
+              : -Math.round(Number(tx.debit) * 100);
+          return {
+            bankAccountId,
+            month: monthDayJs.format('YYYY-MM'),
+            date: monthDayJs.date(Number(dateStr)).format('YYYY-MM-DD'),
+            description: tx.description,
+            docNo: tx.docNo,
+            amountCents,
+          };
+        }),
+      );
       const _deleteTxIds = currentTxs
         .filter((currentTx) => {
           // Never delete manual reconciliation rows — they aren't on the bank statement, so the
@@ -100,6 +113,7 @@ export async function bancoIndustrialScrape({
             docNo: currentTx.docNo,
             description: currentTx.description,
             amountCents: currentTx.amountCents,
+            occurrence: currentTx.occurrence,
           };
           return !_bankTxs.some((scrapedTx) => isMatching(objToMatch, scrapedTx));
         })
@@ -108,7 +122,7 @@ export async function bancoIndustrialScrape({
       deleteTxIds.push(..._deleteTxIds);
     }
   }
-  return { createTxs, deleteTxIds };
+  return { createTxs, deleteTxIds, runningBalances };
 }
 
 /**
@@ -121,7 +135,7 @@ const DAY_MONTH = /(\d{2})\s*-\s*(\d{2})/;
  * A statement row, in the shape both account types produce.
  *
  * The two statements share their first six columns exactly (date, type, description, doc no, debit,
- * credit); savings adds a running-balance column that nothing here needs.
+ * credit); savings adds a seventh, running-balance column (`balance` — empty on monetary rows).
  */
 type RawTx = {
   date: string;
@@ -130,6 +144,7 @@ type RawTx = {
   docNo: string;
   debit: string;
   credit: string;
+  balance: string;
 };
 
 /** Resolves to `null` when the bank cannot serve this account/month — see the caller. */
@@ -166,6 +181,7 @@ function readStatementRows(page: Page): Promise<RawTx[]> {
       docNo: tr.querySelector('td:nth-child(4)')!.textContent!.trim(),
       debit: tr.querySelector('td:nth-child(5)')!.textContent!.trim().replace(/,/g, ''),
       credit: tr.querySelector('td:nth-child(6)')!.textContent!.trim().replace(/,/g, ''),
+      balance: (tr.querySelector('td:nth-child(7)')?.textContent?.trim() ?? '').replace(/,/g, ''),
     }));
   });
 }

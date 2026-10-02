@@ -5,7 +5,7 @@
     "start": "node --import @swc-node/register/esm-register src/console.ts",
     "backfill-ynab-mappings": "node --import @swc-node/register/esm-register src/scripts/backfill-ynab-mappings.ts",
     "backfill-mappings-by-description": "node --import @swc-node/register/esm-register src/scripts/backfill-mappings-by-description.ts",
-    "test": "node --import @swc-node/register/esm-register --test --test-isolation=none 'src/**/*.test.ts'",
+    "test": "node --import @swc-node/register/esm-register --test --test-isolation=none 'src/**/*.spec.ts'",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

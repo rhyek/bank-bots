@@ -5,8 +5,15 @@ import { chromium } from 'playwright';
 import { z } from 'zod';
 import { bacScrape } from './bac/scrape';
 import { bancoIndustrialScrape } from './banco-industrial/scrape';
+import { fetchBankCredentials } from './bitwarden';
 import { configSchema } from './config-schema';
 import { bankAccount, bankTx, db, eq, inArray, pool, sql } from '@bank-bots/db';
+
+const bankKeys = ['bancoIndustrialGt', 'bacGt', 'bacCr'] as const;
+
+function isBankKey(key: string): key is (typeof bankKeys)[number] {
+  return (bankKeys as readonly string[]).includes(key);
+}
 
 export async function run(
   months: dayjs.Dayjs[],
@@ -23,6 +30,15 @@ export async function run(
     throw new Error("config row 'general' not found");
   }
   const config = configSchema.parse(configRow.data);
+  if (!isBankKey(bankKey)) {
+    throw new Error(`Unknown bank key: ${bankKey}`);
+  }
+  // Before the browser launches, so a Bitwarden failure never reaches the bank's login form.
+  // Bi en Línea's third login value ("Código") is the item's `campoInstalacion` custom field.
+  const auth = await fetchBankCredentials(
+    config.banks[bankKey].bitwardenItemId,
+    bankKey === 'bancoIndustrialGt' ? { codeField: 'campoInstalacion' } : {},
+  );
   const browserArgs = ['--deny-permission-prompts'];
   const browser = await chromium.launch({
     args: browserArgs,
@@ -55,7 +71,10 @@ export async function run(
         const page = await context.newPage();
         const result = await (async () => {
           if (bankKey === 'bancoIndustrialGt') {
-            const biConfig = config.banks.bancoIndustrialGt;
+            const biConfig = {
+              auth: { ...auth, code: z.string().parse(auth.code) },
+              accounts: config.banks.bancoIndustrialGt.accounts,
+            };
             return await bancoIndustrialScrape({
               bankKey,
               biConfig: accountNumber
@@ -67,8 +86,8 @@ export async function run(
               months,
               page,
             });
-          } else if (['bacGt', 'bacCr'].includes(bankKey)) {
-            const bankConfig = config.banks[bankKey as 'bacGt' | 'bacCr'];
+          } else {
+            const bankConfig = { ...config.banks[bankKey], auth };
             return await bacScrape({
               bankKey,
               config: accountNumber
@@ -80,8 +99,6 @@ export async function run(
               months,
               page,
             });
-          } else {
-            throw new Error(`Unknown bank key: ${bankKey}`);
           }
         })();
         createTxs = result.createTxs;
@@ -155,6 +172,7 @@ export async function run(
               bankTx.docNo,
               bankTx.description,
               bankTx.amountCents,
+              bankTx.occurrence,
             ],
             set: { amountCents: sql`excluded.amount_cents` },
           });

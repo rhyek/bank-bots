@@ -6,6 +6,7 @@ import {
   json,
   jsonb,
   pgTable,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -93,6 +94,10 @@ export const bankTx = pgTable(
     docNo: text('doc_no').notNull(),
     description: text().notNull(),
     amountCents: bigint('amount_cents', { mode: 'number' }).notNull(),
+    // Tells apart bank rows identical on the five columns above (BAC's doc numbers are generic, so
+    // two same-day charges at one merchant can match on all of them): 1 for the first such row on
+    // the statement, 2 for the next. Set by the scraper; see scrape-txs `numberOccurrences`.
+    occurrence: smallint().notNull().default(1),
     // Nullable mappings backfilled from YNAB; a transfer sets `transfer_bank_account_id` (the other
     // account) and leaves payee/category null.
     payeeId: text('payee_id').references(() => payee.id),
@@ -116,6 +121,7 @@ export const bankTx = pgTable(
       table.docNo,
       table.description,
       table.amountCents,
+      table.occurrence,
     ),
     // Serves the transactions list's `ORDER BY date DESC, id DESC` keyset pagination (see keyset.ts).
     // Required, not an optimization: the only other indexes are the pkey and `bank_tx_unique_cols`,

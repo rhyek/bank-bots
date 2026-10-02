@@ -2,10 +2,8 @@ import { z } from 'zod';
 import { AccountType } from './types';
 
 export const bacSchema = z.object({
-  auth: z.object({
-    username: z.string(),
-    password: z.string(),
-  }),
+  // Credentials are not stored here: this is the id of the bank's login item in Bitwarden.
+  bitwardenItemId: z.string(),
   country: z.string(),
   accounts: z.array(
     z.object({
@@ -18,11 +16,7 @@ export const bacSchema = z.object({
 export const configSchema = z.object({
   banks: z.object({
     bancoIndustrialGt: z.object({
-      auth: z.object({
-        code: z.string(),
-        username: z.string(),
-        password: z.string(),
-      }),
+      bitwardenItemId: z.string(),
       accounts: z.array(
         z.object({
           type: z.nativeEnum(AccountType),

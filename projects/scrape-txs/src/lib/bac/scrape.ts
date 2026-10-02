@@ -3,12 +3,62 @@ import customParseFormat from 'dayjs/plugin/customParseFormat.js';
 import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import type { z } from 'zod';
+import type { BankCredentials } from '../bitwarden';
 import type { bacSchema } from '../config-schema';
 import { db, type bankTx } from '@bank-bots/db';
 import { ensureBankAccount } from '../bank-accounts';
+import { numberOccurrences } from '../occurrences';
 import { waitRandomMs } from '../utils';
 
 dayjs.extend(customParseFormat);
+
+const NO_TXS_DESCRIPTION = 'No hay detalle de movimientos';
+
+/**
+ * Reads the statement table once the page has actually switched to `month`. Picking a month
+ * reloads the table asynchronously, so a read taken too early sees the previous month's rows or
+ * an empty table — which the caller would turn into wrong inserts and a wiped month. "Switched"
+ * means: every row is dated inside `month` (or the bank's explicit no-transactions row is shown),
+ * and two reads in a row agree.
+ */
+async function readStatementRows(page: Page, month: dayjs.Dayjs) {
+  const read = () =>
+    page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll('#transactionTable1 tbody tr:not(.bel-table_row__neutral)'),
+      ).map((tr) => ({
+        date: tr.querySelector('td:nth-of-type(1)')?.textContent?.trim() ?? '',
+        docNo: tr.querySelector('td:nth-of-type(2)')?.textContent?.trim() ?? '',
+        description: tr.querySelector('td:nth-of-type(3)')?.textContent?.trim() ?? '',
+        debit: (tr.querySelector('td:nth-of-type(4)')?.textContent?.trim() ?? '').replace(/,/g, ''),
+        credit: (tr.querySelector('td:nth-of-type(5)')?.textContent?.trim() ?? '').replace(
+          /[+,]/g,
+          '',
+        ),
+      })),
+    );
+  const isForMonth = (rows: Awaited<ReturnType<typeof read>>) =>
+    rows.length > 0 &&
+    rows.every(
+      (row) =>
+        row.description === NO_TXS_DESCRIPTION ||
+        dayjs(row.date, 'DD/MM/YYYY', true).isSame(month, 'month'),
+    );
+  const deadline = Date.now() + 30_000;
+  let previous: string | undefined;
+  while (Date.now() < deadline) {
+    const rows = await read();
+    const snapshot = JSON.stringify(rows);
+    if (isForMonth(rows) && snapshot === previous) {
+      return rows;
+    }
+    previous = snapshot;
+    await page.waitForTimeout(1000);
+  }
+  throw new Error(
+    `BAC statement table never settled on ${month.format('YYYY-MM')} (still showing other dates or no rows)`,
+  );
+}
 
 export async function bacScrape({
   bankKey,
@@ -17,7 +67,7 @@ export async function bacScrape({
   page,
 }: {
   bankKey: string;
-  config: z.infer<typeof bacSchema>;
+  config: z.infer<typeof bacSchema> & { auth: BankCredentials };
   months: dayjs.Dayjs[];
   page: Page;
 }) {
@@ -30,7 +80,6 @@ export async function bacScrape({
   const deleteTxIds: string[] = [];
   // running_balance_cents = the last row's "Balance" (in cents) on the current month, per account.
   const runningBalances: Record<string, number> = {};
-  const currentMonth = dayjs().format('YYYY-MM');
 
   await page.goto('https://www.baccredomatic.com/');
   await waitRandomMs();
@@ -73,7 +122,7 @@ export async function bacScrape({
       accountNumber: account.number,
       type: account.type,
     });
-    const accountScrapedTxs: (typeof bankTx.$inferInsert)[] = [];
+    let accountScrapedTxs: (typeof bankTx.$inferInsert)[] = [];
     const accountCurrentTxs = await db.query.bankTx.findMany({
       where: (t, { and, eq, inArray }) =>
         and(
@@ -99,6 +148,7 @@ export async function bacScrape({
         .locator(`form[name^="BankAccountBalanceItem"] > button`)
         .click();
       await page.waitForURL(`https://${host}/ebac/module/accountbalance/accountBalance.go`);
+      let latestBalance: { month: dayjs.Dayjs; cents: number } | undefined;
       for (const monthDayJs of months) {
         await waitRandomMs();
         let monthStr = monthDayJs.toDate().toLocaleDateString('es-ES', { month: 'long' });
@@ -111,24 +161,9 @@ export async function bacScrape({
           .getByText(`${monthStr} ${monthDayJs.year()}`)
           .click();
         await waitRandomMs();
-        const scrapedConfirmedTxs = (
-          await page.evaluate(() => {
-            return Array.from(
-              document.querySelectorAll('#transactionTable1 tbody tr:not(.bel-table_row__neutral)'),
-            ).map((tr) => ({
-              date: tr.querySelector('td:nth-of-type(1)')!.textContent!.trim(),
-              docNo: tr.querySelector('td:nth-of-type(2)')!.textContent!.trim(),
-              description: tr.querySelector('td:nth-of-type(3)')!.textContent!.trim(),
-              debit: tr.querySelector('td:nth-of-type(4)')!.textContent!.trim().replace(/,/g, ''),
-              credit: tr
-                .querySelector('td:nth-of-type(5)')!
-                .textContent!.trim()
-                .replace(/[+,]/g, ''),
-            }));
-          })
-        )
+        const scrapedConfirmedTxs = (await readStatementRows(page, monthDayJs))
           .map((tx) => {
-            if (tx.description === 'No hay detalle de movimientos') {
+            if (tx.description === NO_TXS_DESCRIPTION) {
               return null;
             }
             const date = dayjs(tx.date, 'DD/MM/YYYY');
@@ -144,11 +179,24 @@ export async function bacScrape({
             };
           })
           .filter((tx) => !!tx);
+        // A real statement never loses every row of a month. Scraping none where rows are stored
+        // means the page was read wrong — returning it would delete that month from the DB.
+        const month = monthDayJs.format('YYYY-MM');
+        if (
+          scrapedConfirmedTxs.length === 0 &&
+          accountCurrentTxs.some((t) => t.month === month && !t.reconcile)
+        ) {
+          throw new Error(
+            `BAC account ${account.number}: scraped no transactions for ${month}, but the DB has some — refusing to delete them`,
+          );
+        }
         accountScrapedTxs.push(...scrapedConfirmedTxs);
 
-        // Capture the ledger balance from the current month's statement: the last data row's
-        // "Balance" column (td:6). This is Saldo disponible + Retenido — reconcile vs SUM(bank_tx).
-        if (monthDayJs.format('YYYY-MM') === currentMonth) {
+        // Capture the ledger balance: the last data row's "Balance" column (td:6) — Saldo
+        // disponible + Retenido, reconciled vs SUM(bank_tx). Taken from the latest month that has
+        // rows; it only counts as the CURRENT balance if every month after it, through this one,
+        // was also scraped (and so is known to be empty) — checked after the loop.
+        if (scrapedConfirmedTxs.length > 0) {
           const lastBalance = await page.evaluate(() => {
             const rows = document.querySelectorAll(
               '#transactionTable1 tbody tr:not(.bel-table_row__neutral)',
@@ -157,9 +205,26 @@ export async function bacScrape({
             return cell?.textContent?.trim() ?? null;
           });
           const dollars = lastBalance ? parseFloat(lastBalance.replace(/,/g, '')) : NaN;
-          if (!Number.isNaN(dollars)) {
-            runningBalances[bankAccountId] = Math.round(dollars * 100);
+          if (
+            !Number.isNaN(dollars) &&
+            (!latestBalance || monthDayJs.isAfter(latestBalance.month, 'month'))
+          ) {
+            latestBalance = { month: monthDayJs, cents: Math.round(dollars * 100) };
           }
+        }
+      }
+      if (latestBalance) {
+        const scraped = new Set(months.map((m) => m.format('YYYY-MM')));
+        let covered = true;
+        for (
+          let m = latestBalance.month.add(1, 'month');
+          !m.isAfter(dayjs(), 'month');
+          m = m.add(1, 'month')
+        ) {
+          covered &&= scraped.has(m.format('YYYY-MM'));
+        }
+        if (covered) {
+          runningBalances[bankAccountId] = latestBalance.cents;
         }
       }
       // // retenidos y diferidos
@@ -274,6 +339,7 @@ export async function bacScrape({
       //   .filter((tx) => !!tx);
       // accountScrapedTxs.push(...retainedAndDeferred);
 
+      accountScrapedTxs = numberOccurrences(accountScrapedTxs);
       deleteTxIds.push(
         ...accountCurrentTxs
           .filter((currentTx) => {
@@ -288,6 +354,7 @@ export async function bacScrape({
               docNo: currentTx.docNo,
               description: currentTx.description,
               amountCents: currentTx.amountCents,
+              occurrence: currentTx.occurrence,
             };
             return !accountScrapedTxs.some((scrapedTx) => isMatching(objToMatch, scrapedTx));
           })

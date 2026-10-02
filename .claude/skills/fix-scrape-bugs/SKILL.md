@@ -243,6 +243,38 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   **config/credentials change** (move it to the right bank key, or the owner updates the stored bank
   credentials) — credentials are owner-only (see [When to stop](#when-to-stop-and-ask)).
 
+### Login rejected — check Bitwarden before the scraper — 2026-10-01
+- **Symptom:** the bank refuses the login on the first attempt, with no selector timeout before it.
+- **Cause seen:** the stored Banco Industrial password was stale. Credentials now come from Bitwarden
+  per run (`src/lib/bitwarden.ts`; see CLAUDE.md → `config`), so the fix is the owner updating the
+  item in Bitwarden — never a scraper edit. **Do not re-run a bank whose login was rejected**: each
+  run makes two attempts and repeated failures can lock the user.
+- A `Bitwarden: …` error means the run stopped before any browser opened (bad bot API key or master
+  password, item missing, `bw` not on `PATH` — cron and systemd keep a minimal one).
+
+### BAC month picker read too early → an empty month — FIXED 2026-10-01
+- **Symptom:** a run scrapes **zero** rows for a month that has plenty (seen: July for `904201043`,
+  127 rows on the next run two minutes later). `run.ts` treats "not scraped" as "the bank deleted
+  it", so this would have wiped the stored month; it only didn't because the same run crashed on
+  the insert below.
+- **Cause:** after picking a month the code waited a random delay and read `#transactionTable1`
+  without confirming the table had switched.
+- **Fix applied:** `readStatementRows()` in `bac/scrape.ts` polls until every row is dated inside
+  the requested month (or the bank's "No hay detalle de movimientos" row shows) and two reads agree;
+  and a month that scrapes empty while the DB has rows for it now throws instead of deleting.
+
+### Upsert aborts: "ON CONFLICT DO UPDATE command cannot affect row a second time" — FIXED 2026-10-01
+- **Cause:** the bank lists two transactions identical on account, date, doc no, description and
+  amount (BAC doc numbers are generic; seen with two same-day PedidosYa tips). The batched upsert
+  cannot hold both, and the whole transaction rolls back — nothing is written for that bank.
+- **Fix applied:** `bank_tx.occurrence` (migration 0014) is now part of `bank_tx_unique_cols`. Each
+  scraper passes an account's rows through `numberOccurrences()` (`src/lib/occurrences.ts`), which
+  numbers identical rows 1, 2, … in statement order, so every copy is stored and a re-scrape lands on
+  the same rows. A new scraper path must call it before computing deletes.
+- **Completeness check that works:** compare `bank_account.running_balance_cents` with
+  `SUM(bank_tx.amount_cents)` for the account. It is only meaningful for an account whose balance
+  was refreshed in that run (one with rows in the current month).
+
 ### Diagnosing tips that generalize
 - Trust **durations + the Playwright Call log + stdout error** to find the hung step. Don't rely
   only on extracting the structured `error` from trace `after` entries — its shape varies across

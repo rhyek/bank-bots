@@ -51,6 +51,7 @@ async function main() {
           bankTx.docNo,
           bankTx.description,
           bankTx.amountCents,
+          bankTx.occurrence,
         ],
       });
     inserted += res.rowCount ?? 0;

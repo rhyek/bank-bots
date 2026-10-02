@@ -51,7 +51,7 @@ handler. Treat the scheduling/deploy story as in flux; the data pipeline below i
 | `projects/update-ynab/` | Go program that syncs `bank_txs` → YNAB. |
 | `infra/` | Terraform for AWS (ECR/IAM/S3/Lambda). Currently being removed/reworked. |
 | `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
-| `.env.local` | Secrets (gitignored): `DATABASE_URL`, `YNAB_BUDGET_ID`, `YNAB_ACCESS_TOKEN`, `MAILER_*`. |
+| `.env.local` | Secrets (gitignored): `DATABASE_URL`, `YNAB_BUDGET_ID`, `YNAB_ACCESS_TOKEN`, `MAILER_*`. The scraper's Bitwarden bot credentials are in `projects/scrape-txs/.env.local`. |
 
 ## The banks
 
@@ -110,7 +110,7 @@ Key files:
 
 **Upsert semantics** (`run.ts` + the per-bank scrapers): each account is first resolved to its
 `bank_account.id` (`ensureBankAccount()` upserts the registry row). Insert into `bank_tx`; on
-conflict against the `(bank_account_id, date, doc_no, description, amount_cents)` unique index, only
+conflict against the `(bank_account_id, date, doc_no, description, amount_cents, occurrence)` unique index, only
 `amount_cents` is updated (this leaves any backfilled `payee_id`/`category_id` intact on re-scrape). It
 also computes deletes (transactions in the DB for the scraped months that are no longer present on
 the bank site) and removes them — so a scrape reconciles a month, it doesn't just append.
@@ -157,6 +157,7 @@ replaced by the `bank_account_id` FK). Amounts are the bank's raw number (curren
 | `doc_no` | text | bank's document number (often non-unique / generic) |
 | `description` | text | bank's description |
 | `amount_cents` | bigint | integer cents; negative = debit, positive = credit |
+| `occurrence` | smallint | default 1. Tells apart bank rows identical on account, date, doc no, description and amount (BAC doc numbers are generic): 1 for the first such row on the statement, 2 for the next. Set by the scraper (`numberOccurrences`) |
 | `payee_id` | text | nullable FK → `payee.id`; backfilled from YNAB |
 | `category_id` | text | nullable FK → `category.id`; backfilled from YNAB |
 | `transfer_bank_account_id` | uuid | nullable FK → `bank_account.id`; the *other* account for a transfer (payee/category stay null) |
@@ -164,8 +165,10 @@ replaced by the `bank_account_id` FK). Amounts are the bank's raw number (curren
 | `created_at` | timestamptz | `now()` on insert (not touched on conflict-update) |
 | `updated_at` | timestamptz | maintained by the `trg_set_updated_at` trigger; the replica's delta-sync watermark |
 
-Unique index `bank_tx_unique_cols` on `(bank_account_id, date, doc_no, description, amount_cents)` —
-the upsert conflict target and effective natural key.
+Unique index `bank_tx_unique_cols` on `(bank_account_id, date, doc_no, description, amount_cents,
+occurrence)` — the upsert conflict target and effective natural key. Without `occurrence` a bank
+listing the same charge twice could be stored only once, and `SUM(amount_cents)` drifted from the
+bank's balance.
 
 **`matcher_result`** — audit log of every payee/category decision, from every matching tier
 (`id` uuidv7, `bank_tx_id` → `bank_tx`, `type` = `exact`|`rule`|`ai`|`none`, `payee_id`,
@@ -196,14 +199,14 @@ cannot express the negative lookahead some patterns need. Seed with
 live-replicated, so editing one in `psql` takes effect without restarting the agent.
 
 **`config`** — single row, `id = 'general'`, `data json`. The whole app config lives in this JSON
-blob (bank credentials + YNAB settings). Shape:
+blob (which accounts to scrape + YNAB settings). Shape:
 
 ```jsonc
 {
   "banks": {
-    "bancoIndustrialGt": { "auth": { "code", "username", "password" }, "accounts": [{ "type", "number" }] },
-    "bacGt": { "auth": { "username", "password" }, "country": "Guatemala",  "accounts": [{ "type", "number" }] },
-    "bacCr": { "auth": { "username", "password" }, "country": "Costa Rica", "accounts": [{ "type", "number" }] }
+    "bancoIndustrialGt": { "bitwardenItemId": "…", "accounts": [{ "type", "number" }] },
+    "bacGt": { "bitwardenItemId": "…", "country": "Guatemala",  "accounts": [{ "type", "number" }] },
+    "bacCr": { "bitwardenItemId": "…", "country": "Costa Rica", "accounts": [{ "type", "number" }] }
   },
   "ynab": {                                   // ← the part being replaced
     "budgetId": "…", "accessToken": "…",
@@ -212,9 +215,19 @@ blob (bank credentials + YNAB settings). Shape:
 }
 ```
 
-> **Secrets live in this JSON** (bank passwords, YNAB token). `.env.local` also carries
-> `DATABASE_URL` + the YNAB token/budget. Never print these; when reading `config.data` in shell,
-> redact `auth` and `accessToken`.
+> **Bank credentials live in Bitwarden, not here.** Each bank's `bitwardenItemId` names a login item
+> in the `automation` collection of the owner's `Personal` Bitwarden organization; the owner updates
+> passwords there (e.g. from the browser extension) and nowhere else. The scraper reads them per run
+> through the `bw` CLI (`src/lib/bitwarden.ts`: unlock → `sync` → `get item` → lock), logged in as a
+> dedicated read-only bot account whose CLI state is in `storage/bitwarden-cli/`. The bot's
+> `BW_CLIENTID` / `BW_CLIENTSECRET` / `BW_PASSWORD` are in `projects/scrape-txs/.env.local`
+> (gitignored; single-quote values containing `$`, or devtooie's loader expands them). Username and
+> password are the item's own login fields; Bi en Línea's "Código" is its `campoInstalacion` custom
+> field. A Bitwarden failure aborts the run before any browser opens.
+>
+> **This JSON still holds the YNAB token**, and `.env.local` carries `DATABASE_URL` + the YNAB
+> token/budget. Never print these; when reading `config.data` in shell, redact `accessToken` (and
+> any leftover `auth`).
 
 ## Component 2 — `update-ynab` (the YNAB sync) — *legacy / retired*
 
@@ -302,7 +315,7 @@ Inspect the DB directly with `psql "$DATABASE_URL"` (grab `DATABASE_URL` from `.
   break: BAC renamed its login button `.login-form__submit-btn` → `#confirm`.
 - **`storage/`** is gitignored (traces, run logs). Never commit trace zips.
 - **Never handle bank passwords / the YNAB token in plaintext.** Credential changes are done by the
-  owner directly (e.g. a `psql` update they run themselves).
+  owner directly, in Bitwarden.
 - **Currency** — **every account currently tracked is USD-denominated**. Currency lives once, on
   `bank_account.currency` (`'USD'` for all rows); `bank_tx` has **no** currency column (dropped in
   migration 0004 as redundant — an account is single-currency). If a non-USD account is ever added,

@@ -99,6 +99,13 @@
       "when": 1784564167029,
       "tag": "0013_drop_bank_tx_memo",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790917983842,
+      "tag": "0014_bank_tx_occurrence",
+      "breakpoints": true
     }
   ]
 }
