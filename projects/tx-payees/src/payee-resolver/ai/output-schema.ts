@@ -10,7 +10,11 @@ import { z } from 'zod';
  * asking the model to report its own side effects.
  */
 export const Answer = z.object({
-  matched: z.boolean().describe('true only if you are confident of BOTH a payee and a category'),
+  matched: z
+    .boolean()
+    .describe(
+      'true when you know who the payee is and have chosen a category for it; false for no match',
+    ),
   payeeId: z
     .string()
     .nullable()
@@ -23,9 +27,3 @@ export const Answer = z.object({
 });
 
 export type Answer = z.infer<typeof Answer>;
-
-/**
- * The SDK validates against JSON Schema draft-07 while Zod emits 2020-12 by default; omitting the
- * target fails the run at startup with a schema error.
- */
-export const answerJsonSchema = z.toJSONSchema(Answer, { target: 'draft-7' });

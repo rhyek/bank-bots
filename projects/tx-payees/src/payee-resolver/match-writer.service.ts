@@ -8,6 +8,7 @@ import {
 import { v7 as uuidv7 } from 'uuid';
 import { ReplicaSettled } from '~/events/replica-settled.service';
 import type { MatchOutcome } from '~/payee-resolver/match-outcome';
+import type { TxLocation } from '~/owner-location/tx-location';
 
 /**
  * Every write payee-resolver makes, in one place.
@@ -56,6 +57,35 @@ export class MatchWriter {
       sourceTxId: outcome.type === 'exact' || outcome.type === 'rule' ? outcome.sourceTxId : null,
       matchingRuleId: outcome.type === 'rule' ? outcome.ruleId : null,
       data: outcome.type === 'ai' || outcome.type === 'none' ? (outcome.data ?? null) : null,
+    });
+  }
+
+  /**
+   * Write where the owner was when a transaction was bought, and append the lookup to the audit
+   * log as a `location` row.
+   *
+   * The two columns are only rewritten when they changed; the audit row is written either way,
+   * because a lookup that reaches the same place for good (`final`) is news the sweep needs.
+   *
+   * Both writes are barriered, unlike recordResult. Later work in the same sweep reads them back
+   * from the replica: the "did this lookup change anything" check compares against the last
+   * `location` row, and a re-lookup can follow within the same job once the payee's own place is
+   * known.
+   */
+  async applyLocation(txId: string, location: TxLocation, columnsChanged: boolean): Promise<void> {
+    if (columnsChanged) {
+      await this.settle.around('bank_tx', txId, async () => {
+        await pgDb
+          .update(pgBankTx)
+          .set({ country: location.country, location: location.location })
+          .where(pgEq(pgBankTx.id, txId));
+      });
+    }
+    const id = uuidv7();
+    await this.settle.around('matcher_result', id, async () => {
+      await pgDb
+        .insert(pgMatcherResult)
+        .values({ id, bankTxId: txId, type: 'location', data: location });
     });
   }
 }

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { AppEvents } from '~/events/app-events';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
 
@@ -49,11 +50,10 @@ const DEFAULT_TIMEOUT_MS = 15_000;
  */
 @Injectable()
 export class ReplicaSettled {
-  private readonly logger = new Logger(ReplicaSettled.name);
-
   constructor(
     private readonly events: AppEvents,
     private readonly replica: ReplicaDb,
+    private readonly logger: StructuredLoggerService,
   ) {}
 
   private get timeoutMs(): number {
@@ -80,7 +80,7 @@ export class ReplicaSettled {
     const off = this.events.on('replica-sync.row-persisted', ({ data }) => {
       if (data.table === table && data.id === id) {
         if (process.env.TX_DEBUG_BARRIER) {
-          this.logger.log(`[barrier ${table}#${id}] released by event`);
+          this.logger.info({ table, id }, 'barrier released by event');
         }
         landed();
       }
@@ -114,7 +114,7 @@ export class ReplicaSettled {
         }),
       ]);
       if (process.env.TX_DEBUG_BARRIER) {
-        this.logger.log(`[barrier ${table}#${id}] settled in ${Date.now() - started}ms`);
+        this.logger.info({ table, id, elapsedMs: Date.now() - started }, 'barrier settled');
       }
       return result;
     } finally {
@@ -128,12 +128,12 @@ export class ReplicaSettled {
     // Distinguish the two failures that otherwise look identical. If the row IS present, the
     // barrier's purpose was met and only the notification went missing. If it is absent,
     // replication itself is behind and the next transaction may not see this write.
+    const inReplica = this.isPresent(table, id);
     this.logger.warn(
-      this.isPresent(table, id)
-        ? `${table}#${id}: replication landed but no confirmation arrived within ` +
-            `${this.timeoutMs}ms (event missed; the local copy is correct)`
-        : `${table}#${id}: NOT in the replica after ${this.timeoutMs}ms — replication is behind; ` +
-            'the next transaction may not see this write',
+      { table, id, timeoutMs: this.timeoutMs, inReplica },
+      inReplica
+        ? 'replication landed but no confirmation arrived in time (event missed; the local copy is correct)'
+        : 'row NOT in the replica after the timeout — replication is behind; the next transaction may not see this write',
     );
   }
 

@@ -209,14 +209,23 @@ export function buildReadTools(replica: ReplicaDb) {
     'search_payees',
     'Find existing payees by name. Returns each one with how many transactions it has and the ' +
       'distinct trailing country codes seen across them — use that to tell a global brand billed ' +
-      'through several countries (one payee) from a company with separate national entities.',
+      'through several countries (one payee) from a company with separate national entities. ' +
+      'Also returns where the payee itself is, once that has been looked up: locationKind is ' +
+      '"local" (one place, named in location), "chain" (branches in one country), "remote" ' +
+      '(online or global; country is its head office) or "unknown"; null means not looked up yet.',
     {
       query: z.string().describe('Substring of the payee name, case-insensitive'),
       limit: z.number().int().min(1).max(50).default(20),
     },
     async (args) => {
       const payees = replica.db
-        .select({ id: payee.id, name: payee.name })
+        .select({
+          id: payee.id,
+          name: payee.name,
+          country: payee.country,
+          location: payee.location,
+          locationKind: payee.locationKind,
+        })
         .from(payee)
         .where(sql`lower(${payee.name}) LIKE ${'%' + args.query.toLowerCase() + '%'}`)
         .limit(args.limit)
@@ -231,7 +240,15 @@ export function buildReadTools(replica: ReplicaDb) {
         const countries = [...new Set(txs.map((t) => trailingCountry(t.description)))]
           .filter((c): c is string => c !== null)
           .sort();
-        return { id: p.id, name: p.name, txCount: txs.length, countries };
+        return {
+          id: p.id,
+          name: p.name,
+          txCount: txs.length,
+          countries,
+          locationKind: p.locationKind,
+          country: p.country,
+          location: p.location,
+        };
       });
       return json({ count: rows.length, payees: rows });
     },

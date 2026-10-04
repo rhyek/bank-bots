@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from '~/replica-db/replica-schema';
@@ -79,7 +80,11 @@ describe('TxMatcher', () => {
   before(() => {
     replica = makeReplica();
     ai = new StubAi();
-    matcher = new TxMatcher(replica as unknown as ConstructorParameters<typeof TxMatcher>[0], ai);
+    matcher = new TxMatcher(
+      replica as unknown as ConstructorParameters<typeof TxMatcher>[0],
+      ai,
+      new StructuredLoggerService(),
+    );
   });
   after(() => replica.raw.close());
 

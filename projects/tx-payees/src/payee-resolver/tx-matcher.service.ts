@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { and, eq, isNotNull, ne, sql, type SQL } from 'drizzle-orm';
 import { bankTx, matchingRule } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
@@ -21,11 +22,10 @@ export type { MatchableTx, MatchOutcome } from '~/payee-resolver/match-outcome';
 // That is why its writes go through a replica barrier — see ReplicaSettled.
 @Injectable()
 export class TxMatcher {
-  private readonly logger = new Logger(TxMatcher.name);
-
   constructor(
     private readonly replica: ReplicaDb,
     private readonly ai: TxAiResolver,
+    private readonly logger: StructuredLoggerService,
   ) {}
 
   async match(tx: MatchableTx): Promise<MatchOutcome> {
@@ -69,7 +69,10 @@ export class TxMatcher {
     try {
       return new RegExp(pattern, 'i').test(description);
     } catch (err) {
-      this.logger.warn(`skipping rule '${label}': invalid pattern (${(err as Error).message})`);
+      this.logger.warn(
+        { error: err as Error, rule: label, pattern },
+        'skipping rule: invalid pattern',
+      );
       return false;
     }
   }

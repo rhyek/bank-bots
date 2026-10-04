@@ -56,6 +56,17 @@ export const bankAccount = pgTable(
 export const payee = pgTable('payee', {
   id: text().primaryKey(),
   name: text().notNull(),
+  // Where the business is, which is not where the owner was when paying it (that is
+  // `bank_tx.country`): Amazon is US wherever it was ordered from. Set by tx-payees' payee location
+  // matcher. `country` is an ISO 3166-1 alpha-2 code; `location` is the one specific place, only
+  // for a `local` payee.
+  country: text(),
+  location: text(),
+  // 'local' (one physical place) | 'chain' (branches paid in person; `country` is set when they are
+  // all in one country and NULL for a brand found in many) | 'remote' (paid without going anywhere;
+  // `country` is where the company is based) | 'unknown' (looked up, not determinable). NULL = not
+  // looked up yet, and the only state the matcher runs for; set it back to NULL by hand to re-ask.
+  locationKind: text('location_kind'),
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
@@ -103,6 +114,11 @@ export const bankTx = pgTable(
     payeeId: text('payee_id').references(() => payee.id),
     categoryId: text('category_id').references(() => category.id),
     transferBankAccountId: uuid('transfer_bank_account_id').references(() => bankAccount.id),
+    // Where the OWNER was when the purchase happened (ISO alpha-2 + the place within it), looked up
+    // by tx-payees from `owner_day_location`. Never where the payee is, and never written by the
+    // scraper.
+    country: text(),
+    location: text(),
     // Manual reconciliation rows: not present on any bank statement, so a scrape must never delete
     // them and payee/category matching must never target them. Replaces the old convention of
     // marking such rows with `doc_no = 'RECONCILE'`.
@@ -172,7 +188,11 @@ export const matcherResult = pgTable(
     bankTxId: uuid('bank_tx_id')
       .notNull()
       .references(() => bankTx.id, { onDelete: 'cascade' }),
-    /** 'exact' | 'rule' | 'ai' | 'none' */
+    /**
+     * 'exact' | 'rule' | 'ai' | 'none' for a payee decision, or 'location' for a transaction's
+     * location lookup (`data` = { purchaseDate, rule, country, location, final }). Anything reading
+     * payee verdicts must filter on type.
+     */
     type: text().notNull(),
     payeeId: text('payee_id').references(() => payee.id),
     categoryId: text('category_id').references(() => category.id),
@@ -191,6 +211,98 @@ export const matcherResult = pgTable(
       .notNull(),
   },
   (table) => [index('matcher_result_bank_tx_id_idx').on(table.bankTxId)],
+);
+
+// Where the owner was on each calendar day (UTC-6), as resolved by tx-payees' day location resolver
+// from the location tracker and from card charges that name a place. One row per day, so the date is
+// the key — the exception to the uuidv7 convention. Transactions look their purchase day up here
+// without any AI. Not replicated to tx-payees' SQLite: only its owner-location module touches it.
+export const ownerDayLocation = pgTable('owner_day_location', {
+  date: date({ mode: 'string' }).primaryKey(),
+  /** ISO 3166-1 alpha-2; null when `basis` is 'unknown'. */
+  country: text(),
+  /** City or area. */
+  location: text(),
+  /** 'observed' (tracker) | 'inferred' (from charges, or overriding an assumed tracker day) | 'unknown' */
+  basis: text().notNull(),
+  /** 'high' | 'medium' | 'low' */
+  confidence: text().notNull(),
+  /** True until the day is resolved at 10+ days old; a provisional day is re-resolved. */
+  provisional: boolean().notNull(),
+  /** The evidence the resolver was shown for this day, and its one-line reason. */
+  data: jsonb(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+// What the 5-character "city" field at the end of a 30-character bank description stands for:
+// "GUATE" is Guatemala City, GT. Resolved once per distinct field by tx-payees (an agent), so that a
+// purchase at a physical business can be placed in the country its own description names — which
+// is how a charge from a global chain, whose payee has no country, is located around a trip.
+// `country` NULL means the field is not a place at all (a brand's own name, say). Keyed by the
+// field itself; not replicated.
+export const placeField = pgTable('place_field', {
+  field: text().primaryKey(),
+  /** ISO 3166-1 alpha-2, or null when the field does not name a place. */
+  country: text(),
+  /** The place spelled out, e.g. "Guatemala City". */
+  place: text(),
+  /** { samples }: the descriptions the resolver was shown for this field. */
+  data: jsonb(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+// Audit log of every payee location decision (the values themselves live on `payee`). Append-only.
+export const payeeLocationResult = pgTable(
+  'payee_location_result',
+  {
+    id: uuid().primaryKey().$defaultFn(uuidv7),
+    payeeId: text('payee_id')
+      .notNull()
+      .references(() => payee.id, { onDelete: 'cascade' }),
+    kind: text().notNull(),
+    country: text(),
+    location: text(),
+    /** { summary, confidence, triggerTxId } */
+    data: jsonb(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index('payee_location_result_payee_id_idx').on(table.payeeId)],
+);
+
+// One row per scrape of one bank login, written by scrape-txs: when it ran, what it was asked for
+// and how it ended. It is the service's run history, and it is what a run with no months requested
+// reads to decide how far back to scrape (from the bank's last successful full scrape).
+export const scrapeRun = pgTable(
+  'scrape_run',
+  {
+    id: uuid().primaryKey().$defaultFn(uuidv7),
+    bankKey: text('bank_key').notNull(),
+    /** 'schedule' | 'manual' */
+    trigger: text().notNull(),
+    /** 'running' | 'succeeded' | 'failed'. A row left 'running' by a stopped process is failed on
+     *  the next boot. */
+    status: text().notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true, mode: 'date' }),
+    /** The statement months scraped, `YYYY-MM`. */
+    months: text().array().notNull(),
+    /** Set when only one account of the bank was scraped. */
+    account: text(),
+    /** A dry run writes the scraped rows to a file and nothing to `bank_tx`. */
+    dryRun: boolean('dry_run').notNull().default(false),
+    /** When succeeded: { upserted, deleted, balancesUpdated, dryRunPath? }. */
+    result: jsonb(),
+    /** When failed: { message, stage: 'config'|'credentials'|'scrape'|'persist', tracePath? }. */
+    error: jsonb(),
+  },
+  (table) => [index('scrape_run_bank_key_started_at_idx').on(table.bankKey, table.startedAt)],
 );
 
 export const config = pgTable('config', {

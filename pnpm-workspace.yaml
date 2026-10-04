@@ -3,11 +3,22 @@ packages:
   - 'projects/scrape-txs'
   - 'projects/tx-payees'
   - 'projects/web'
+  - 'synced-utils/*'
 allowBuilds:
   '@nestjs/core': false
   '@swc/core': true
   better-sqlite3: true
   esbuild: true
   simple-git-hooks: true
+# The Agent SDK may be installed the day it is published: tx-payees takes its Sonnet version from
+# the SDK, so a new Sonnet is only reachable by upgrading it. The pattern also covers the
+# per-platform binary packages (@anthropic-ai/claude-agent-sdk-darwin-arm64, …).
+minimumReleaseAgeExclude:
+  - '@anthropic-ai/claude-agent-sdk*'
+# nestjs-zod 5.5.0 declares `@nestjs/common ^10 || ^11`; it works on 12 (see
+# projects/scrape-txs/CLAUDE.md). Drop this once a release widens the range.
+peerDependencyRules:
+  allowedVersions:
+    'nestjs-zod>@nestjs/common': '12'
 overrides:
   devtooie: link:../published/devtooie/packages/devtooie

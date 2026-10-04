@@ -1,7 +1,7 @@
 # payee.country — country of the paying entity
 
 **Date:** 2026-07-19
-**Status:** design approved, not yet implemented
+**Status:** superseded on 2026-10-04 by `2026-10-04-owner-and-payee-location-design.md`; never implemented
 **Depends on:** `2026-07-19-tx-ai-matcher-design.md` (the AI tier writes this column)
 
 ## Goal

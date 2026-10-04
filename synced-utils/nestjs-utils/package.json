@@ -1,0 +1,34 @@
+{
+  "name": "@rhyek/nestjs-utils",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "NestJS utilities. structured-logger: structured JSON logging on pino with per-request context, mixins, an axios-aware error serializer and credential redaction. Consumed as TypeScript source.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'src/**/*.spec.ts'"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">=10.0.0",
+    "@nestjs/core": ">=10.0.0",
+    "pino": ">=9.0.0",
+    "rxjs": ">=7.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/platform-express": "^12.1.2",
+    "@swc-node/register": "^1.12.1",
+    "@swc/core": "^1.16.13",
+    "@types/node": "^26.6.4",
+    "pino": "^10.4.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "typescript": "^6.0.3"
+  }
+}

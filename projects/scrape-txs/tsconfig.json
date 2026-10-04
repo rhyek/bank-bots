@@ -1,30 +1,29 @@
 {
   "compilerOptions": {
-    // Enable latest features
-    "lib": ["ESNext", "DOM"],
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
-
-    // Bundler mode
+    // Native-ESM NestJS, run via `node --import @swc-node/register/esm-register` — NOT Node's native
+    // type stripping, which can't emit the decorator metadata Nest's DI relies on. `bundler`
+    // resolution + `esnext` module give extensionless relative imports and top-level await; swc-node
+    // reads the two decorator flags below to emit that metadata (no .swcrc needed).
+    "module": "esnext",
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": false,
+    "target": "esnext",
+    // DOM on top of esnext: the bank flows pass functions to Playwright that run inside the page.
+    "lib": ["esnext", "DOM"],
+    "types": ["node"],
+    "moduleDetection": "force",
     "verbatimModuleSyntax": true,
-    "noEmit": true,
-
-    // Best practices
-    "strict": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
-
-    "allowSyntheticDefaultImports": true
-
-    // Some stricter flags
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true
-    // "noPropertyAccessFromIndexSignature": true
+    "strict": true,
+    "noEmit": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    // TS 6 removed `baseUrl`; `paths` now resolve relative to this tsconfig's dir. swc-node honors
+    // these at runtime, so `~/…` works both in `tsc --noEmit` and when the app runs.
+    "paths": { "~/*": ["./src/*"] }
   },
-  "include": ["**/*.ts"]
+  // No `references`: workspace libraries are consumed as SOURCE (their package `exports` point at
+  // `src`), so there's nothing to build first — `tsc --noEmit` type-checks against the lib's source
+  // through its `exports`/`types`, and swc-node transpiles it at runtime. See CLAUDE.md.
+  "include": ["src"]
 }

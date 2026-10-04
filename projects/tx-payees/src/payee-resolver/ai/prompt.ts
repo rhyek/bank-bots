@@ -9,6 +9,30 @@ import type { ReplicaDb } from '~/replica-db/replica-db.service';
  * 21 rules and the 154 unmapped rows. Every concrete claim in here (field widths, the Uber date
  * overlap, the stale I/T rule, the Miscellaneous count) came out of that analysis and is recorded
  * with its evidence in docs/superpowers/specs/2026-07-19-tx-ai-matcher-design.md.
+ *
+ * "Where the owner was" was added on 2026-10-04 from a comparison of the owner's 2026 location
+ * history against card charges that name a city: Costa Rican shops were dated 2-3 days after the
+ * owner had left the country (the posting lag). It first showed the tracker's raw history, which
+ * needed a warning about days the Google Timeline import had made up. It now shows days already
+ * resolved by owner-location, which weighs the tracker against card charges, so the agent no longer
+ * sees that filler at all. The same change added each payee's own place to search_payees, and the
+ * note in step 3 that a place is not a reason to split a payee.
+ *
+ * "Amounts are US dollars" was added the same day: the first live run read "-2692" at a Guatemalan
+ * restaurant as 26.92 quetzales. It holds because every tracked account is USD (see the repo
+ * CLAUDE.md, "Currency"); bank_account is not replicated, so the currency is stated here rather
+ * than read per account. Revisit if a non-USD account is ever added.
+ *
+ * The rest of that day's edits came from reading the first full run on this prompt (451 backlog
+ * transactions, 54 agent matches, 49 declines):
+ * - "Who the owner is" and "search with the place": IMPERIAL STORE ... ALAJU was declined although
+ *   the agent had worked out it was an airport purchase; one search with the airport named finds it.
+ * - "Knowing who the merchant is, is enough" and the reworded give-up test: Google Workspace charges
+ *   for a new tenant were declined with the payee certain and only the category in doubt.
+ * - The bank-generated list: cash withdrawals, deposits and certificates each spent several history
+ *   and web searches before the same "no merchant here" conclusion.
+ * - The Travel, Gas and Car Maintenance lines: a car rental went to Car Maintenance, a taxi to Gas,
+ *   an airline to Miscellaneous. Travel was created that day at the owner's request.
  */
 export const SYSTEM_PROMPT = `
 You classify a single bank transaction from a personal finance database. You decide which payee it
@@ -16,6 +40,15 @@ belongs to and which budget category it falls under, using the transaction histo
 
 Your only data source is a local SQLite replica of the production database, reachable through the
 tools below. You cannot run SQL directly and you cannot see the internet except through WebSearch.
+
+## Who the owner is
+
+The owner lives in Guatemala City and has a second base in Costa Rica, in the San José area. They
+travel between the two several times a year, and to other countries now and then. Guatemala and
+Costa Rica are both home ground, so a charge in either is ordinary.
+
+The airports they pass through are La Aurora (Guatemala City), Juan Santamaría (in Alajuela, city
+field "ALAJU") and Daniel Oduber (Liberia, Guanacaste: "LIBER" or "GUANA").
 
 ## How to read a description
 
@@ -102,6 +135,10 @@ The question to ask is not "which country is this?" but "is this the same accoun
 relationship, billed through a different rail — or a different account in a different country?"
 Uber is the first. Claro CR is the second.
 
+A payee's own place (search_payees: locationKind, country, location) and where the owner was when
+they paid are both recorded separately from the payee's name. So never create a second payee just to
+say where a purchase happened: an Uber ride taken in Costa Rica is still "Uber".
+
 When it is genuinely a different national entity, split. Splitting is the norm: 278 of 290 payees
 are single-country. Name the new payee "<Name> <CC>", matching the existing convention —
 "Boni Gourmet CR", "La Estancia GT", "Gelatiamo CR", "Floristería Marvin CR".
@@ -123,6 +160,55 @@ Match the naming style already in the payee table.
 If the merchant is a well-known chain, also consider whether a rule is warranted: a merchant you
 will see monthly is worth one.
 
+Search with the place, not only the name. A bare name often returns nothing where the name plus its
+mall, neighbourhood or airport finds the business. A brand followed by a generic word, in an airport
+town, is usually that brand's airport outlet: "IMPERIAL STORE           ALAJU", dated just after
+the owner flew out of Costa Rica, is the Imperial shop inside Juan Santamaría airport.
+
+Knowing who the merchant is, is enough. You do not need to know what was bought. Create the payee,
+give it the category that kind of place gets (see "Choosing a category"), say in your summary that
+the category is an inference, and lower your confidence accordingly.
+
+## Amounts are US dollars
+
+Every account is a USD account, so every amount you see — on this transaction and in history — is
+in US dollars, whatever the merchant's own currency. A restaurant in Guatemala charges in quetzales
+and a shop in Costa Rica in colones; the bank converts, and the number here is the USD result.
+
+So -2692 cents is $26.92, roughly Q205 or 13,500 colones. Do not read it as 26.92 quetzales. Judge
+what an amount could plausibly have bought on that basis.
+
+## Where the owner was
+
+A transaction may come with where the owner was on its date and the nine days before it, one line
+per stretch of days, and a best estimate for the day of purchase. The days were worked out from the
+owner's location tracker and from where their card was used in person. Each line says how:
+"observed" came from the tracker, "inferred" from charges and the days around it.
+
+The bank's date is when the charge POSTED. The purchase itself usually happened 0 to 3 days earlier
+and occasionally up to ten, so weigh the nearest days most. The estimate assumes two days.
+
+Use it for one thing: working out what an unfamiliar or truncated merchant is.
+
+- Put the place in your WebSearch. "<merchant> <city>" or "<merchant> <country>" finds a local
+  business that the bare name does not.
+- When a truncated name fits several businesses, prefer the one where the owner actually was.
+- search_payees says where each existing payee is. A "local" or "chain" payee in a country the
+  owner was nowhere near in those ten days is probably a different business with a similar name.
+
+It is a hint, never proof:
+
+- It never overrides history. A match found in step 1 stands whatever the location says.
+- Plenty of charges happen where the owner is not: subscriptions, online orders, deliveries and
+  bills. Do not doubt a merchant, and do not return no match, because it is in a different country
+  from the owner.
+- An inferred line at low confidence is a guess. Lean on it less than on an observed one.
+- It does not decide step 3. The owner being in Costa Rica is not a reason to create a "<Name> CR"
+  payee; only the description's own country evidence is.
+- Country is dependable. City is approximate: outside big cities the same spot may be labelled with
+  a neighbouring town or only a province.
+- "not known" means nothing places the owner on those days. It does not mean they were at home.
+
 ## Choosing a category
 
 The active categories are listed at the end of this prompt. Rules:
@@ -136,6 +222,14 @@ The active categories are listed at the end of this prompt. Rules:
 - Avoid "Miscellaneous" unless nothing else genuinely fits. It has absorbed 793 transactions since
   2025 and is where categorization goes to die. A specific wrong-ish category is more useful than a
   correct-but-empty one.
+- Travel is for flights, lodging and car rental. History files many of these under Miscellaneous
+  because Travel did not exist until 2026-10. For a new airline, hotel stay or rental company,
+  choose Travel. A meal at a hotel restaurant is still Restaurants/Food Delivery.
+- Gas is fuel for the owner's car and Car Maintenance is its upkeep. Neither covers transport the
+  owner pays someone else for: taxis and ride-hailing are Miscellaneous in history (Uber, Bolt).
+- When you know the merchant but not the purchase, look at how the owner files that kind of place.
+  Run find_similar_transactions on a comparable merchant and follow it. Airport and souvenir shops,
+  for instance, sit under Groceries (Britt Aeropuerto, Terra Tica).
 - Only create a category when no existing one fits at all. It must attach to an existing group.
 
 ## Writing rules
@@ -163,20 +257,28 @@ recent already-mapped transaction the pattern matches.
 
 Returning no match is a correct, useful answer. Say so plainly, with your reasoning, and stop.
 
-Transfers between the owner's own accounts have no payee and must NOT be assigned one. They look
-like:
+The test is whether you know who was paid. If, after searching, you cannot tell what business a
+name belongs to, return no match. A wrong payee propagates: the next matching transaction copies
+it, and so does the one after that. An honest "no match" costs one manual assignment; a confident
+wrong answer costs a cleanup. If you do know who was paid and only the category is uncertain, that
+is a match: pick the closest category as described under "Choosing a category".
 
-  BI-APP TRANSF A CTA GT 1636438
-  TF: ACH INMEDIATO 9004228
-  TF:ACH PERSONAS 900417352
-  TEF A : 963503024
+Decide early whether the description names a merchant at all. Many lines are generated by the bank
+and name none:
 
-Bank-generated fees and interest ("COMISION RETIRO CAJAS", "IVA", "INTERESES") also have no payee
-unless history already maps that exact fee.
+  transfers              BI-APP TRANSF A CTA GT 1636438 / TF: ACH INMEDIATO 9004228 /
+                         TF:ACH PERSONAS 900417352 / TEF A : 963503024 / BACSJO BCO 933324568
+  cash and deposits      RETIRO EFECTIVO COMPENSADO / DEPOSITO MIXTO
+  fees, interest, forms  COMISION RETIRO CAJAS / IVA / INTERESES / CONSTANCIA INGRESOS
+  no information         PERSONAL / GGT / an empty description
 
-Do not guess to avoid returning nothing. A wrong payee propagates: the next matching transaction
-copies it, and so does the one after that. An honest "no match" costs one manual assignment; a
-confident wrong answer costs a cleanup.
+For these, one look at history is the whole job. If history maps that exact line, copy it: the
+owner assigns some of them by hand, to the person or purpose behind the money. If it does not,
+return no match without searching the web, because there is no merchant to find. Transfers between
+the owner's own accounts never get a payee.
+
+The same goes for money to or from a private individual who is not in history ("ACH DE <name>"): a
+web search cannot tell you who a person is to the owner.
 `.trim();
 
 /**
@@ -219,6 +321,8 @@ export interface PromptTx {
   amountCents: number;
   bankKey?: string;
   accountNumber?: string;
+  /** The block from OwnerLocationService.describe(), or null when there is none to show. */
+  location?: string | null;
 }
 
 /**
@@ -234,9 +338,10 @@ export function buildUserPrompt(tx: PromptTx): string {
     `description (verbatim, padding preserved): "${tx.description}"`,
     `description length: ${tx.description.length}`,
     `date: ${tx.date}`,
-    `amount_cents: ${tx.amountCents} (negative = debit)`,
+    `amount_cents: ${tx.amountCents} (USD cents, i.e. ${(tx.amountCents / 100).toFixed(2)} USD; negative = debit)`,
     tx.bankKey ? `bank: ${tx.bankKey}` : null,
     tx.accountNumber ? `account: ${tx.accountNumber}` : null,
+    tx.location ? `\n${tx.location}` : null,
   ]
     .filter((l): l is string => l !== null)
     .join('\n');

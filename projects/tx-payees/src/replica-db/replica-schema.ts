@@ -9,6 +9,10 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 export const payee = sqliteTable('payee', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  // Where the business is. `locationKind` NULL means the payee location matcher has not run yet.
+  country: text('country'),
+  location: text('location'),
+  locationKind: text('location_kind'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
@@ -44,6 +48,9 @@ export const bankTx = sqliteTable('bank_tx', {
   payeeId: text('payee_id'),
   categoryId: text('category_id'),
   transferBankAccountId: text('transfer_bank_account_id'),
+  // Where the owner was when the purchase happened — not where the payee is.
+  country: text('country'),
+  location: text('location'),
   reconcile: integer('reconcile', { mode: 'boolean' }).notNull(),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
@@ -66,6 +73,9 @@ export const matchingRule = sqliteTable('matching_rule', {
 // locally: a `type = 'none'` row means "already asked, there is no answer", and excluding those is
 // what stops permanently-unresolvable rows (inter-account transfers) from costing an agent call on
 // every boot. `data` is the JSON text Postgres returns for the jsonb column.
+//
+// It also carries `type = 'location'` rows, one per transaction location lookup, whose `data.final`
+// tells the sweep whether that lookup still needs redoing. A payee verdict query must filter on type.
 export const matcherResult = sqliteTable('matcher_result', {
   id: text('id').primaryKey(),
   bankTxId: text('bank_tx_id').notNull(),
@@ -85,6 +95,9 @@ export const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS payee (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  country TEXT,
+  location TEXT,
+  location_kind TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -114,6 +127,8 @@ CREATE TABLE IF NOT EXISTS bank_tx (
   payee_id TEXT,
   category_id TEXT,
   transfer_bank_account_id TEXT,
+  country TEXT,
+  location TEXT,
   reconcile INTEGER NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

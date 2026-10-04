@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  Logger,
-  type OnApplicationBootstrap,
-  type OnModuleDestroy,
-} from '@nestjs/common';
+import { Injectable, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
+import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { Client, type Notification } from 'pg';
 import {
   bankTx as pgBankTx,
@@ -60,7 +56,6 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 @Injectable()
 export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
-  private readonly logger = new Logger(ReplicaSync.name);
   private client: Client | null = null;
   private heartbeat: ListenerHeartbeat | null = null;
   private shuttingDown = false;
@@ -84,6 +79,7 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
   constructor(
     private readonly replica: ReplicaDb,
     private readonly events: AppEvents,
+    private readonly logger: StructuredLoggerService,
   ) {}
 
   // Kicked off in the background so a slow first-ever sync (the initial full pull can be large over a
@@ -124,7 +120,7 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
       for (const t of this.tables) {
         const upserts = await this.syncUpserts(t);
         const deletes = await this.syncDeletes(t);
-        this.logger.log(`sync ${t.name}: +${upserts} upserted, -${deletes} deleted`);
+        this.logger.info({ table: t.name, upserts, deletes }, 'replica table synced');
       }
       // Announced only once the replica is fully populated — a subscriber reading partial history
       // would copy from an incomplete source. A failed sync throws before reaching here, so this
@@ -228,7 +224,7 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
     this.client = client;
     this.reconnectMs = 1_000;
     this.startHeartbeat(client);
-    this.logger.log(`listening on '${CHANNEL}'`);
+    this.logger.info({ channel: CHANNEL }, 'listening for replica events');
   }
 
   // Probe this specific client, so a beat that fires mid-reconnect can never accidentally query a
@@ -252,7 +248,8 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
     }
     this.reconnectScheduled = true;
     this.logger.warn(
-      `replica listener down (${err.message}); reconnecting in ${this.reconnectMs}ms`,
+      { error: err, reconnectMs: this.reconnectMs },
+      'replica listener down; reconnecting',
     );
     this.heartbeat?.stop();
     this.heartbeat = null;
@@ -284,16 +281,16 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
     try {
       evt = JSON.parse(msg.payload);
     } catch {
-      this.logger.warn(`bad payload: ${msg.payload}`);
+      this.logger.warn({ payload: msg.payload }, 'bad notification payload');
       return;
     }
     if (process.env.TX_DEBUG_BARRIER) {
-      this.logger.log(`[notify] ${evt.op} ${evt.table}#${evt.id}`);
+      this.logger.info({ op: evt.op, table: evt.table, id: evt.id }, 'notification received');
     }
     const t = this.byName.get(evt.table);
     if (!t) {
       if (process.env.TX_DEBUG_BARRIER) {
-        this.logger.warn(`[notify] no descriptor for table '${evt.table}' — dropped`);
+        this.logger.warn({ table: evt.table }, 'notification dropped: no descriptor for its table');
       }
       return;
     }
@@ -323,7 +320,10 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
         });
       }
     } catch (err) {
-      this.logger.error(`apply ${evt.op} ${evt.table}#${evt.id}: ${(err as Error).message}`);
+      this.logger.error(
+        { error: err as Error, op: evt.op, table: evt.table, id: evt.id },
+        'could not apply notification',
+      );
     }
   }
 }

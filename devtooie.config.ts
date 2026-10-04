@@ -6,9 +6,13 @@ export default defineConfig({
     // @bank-bots/db (projects/db) is a source-only TS library (its `exports` point at src; no
     // build/emit) — consumers transpile it (scrape-txs via swc-node, the web app via Vite). It has
     // no dev process, so it isn't a devtooie package; the workspace link + package exports wire it.
+    // The first port of bank-bots' block (22250-22299) in ~/Dev/reserved_port_ranges.txt.
+    // `watches: false`: a reload in the middle of a scrape would kill it.
     'scrape-txs': {
       relativeDir: 'projects/scrape-txs',
-      selectable: false,
+      command: ['start', { watches: false }],
+      port: 22250,
+      healthcheck: ({ port }) => `http://localhost:${port}/status/health`,
     },
     'tx-payees': {
       relativeDir: 'projects/tx-payees',

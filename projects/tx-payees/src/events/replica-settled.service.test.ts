@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
+import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { AppEvents } from '~/events/app-events';
 import { ReplicaSettled } from '~/events/replica-settled.service';
 
@@ -13,7 +14,10 @@ function makeAbsentReplica() {
 
 function make() {
   const events = new AppEvents();
-  return { events, settled: new ReplicaSettled(events, makeAbsentReplica()) };
+  return {
+    events,
+    settled: new ReplicaSettled(events, makeAbsentReplica(), new StructuredLoggerService()),
+  };
 }
 
 describe('ReplicaSettled', () => {

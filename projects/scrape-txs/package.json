@@ -1,26 +1,34 @@
 {
   "name": "scrape-txs",
+  "private": true,
   "type": "module",
   "scripts": {
-    "start": "node --import @swc-node/register/esm-register src/console.ts",
-    "backfill-ynab-mappings": "node --import @swc-node/register/esm-register src/scripts/backfill-ynab-mappings.ts",
-    "backfill-mappings-by-description": "node --import @swc-node/register/esm-register src/scripts/backfill-mappings-by-description.ts",
+    "start": "node --import @swc-node/register/esm-register src/main.ts",
     "test": "node --import @swc-node/register/esm-register --test --test-isolation=none 'src/**/*.spec.ts'",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@swc-node/register": "^1.11.1",
     "@swc/core": "^1.15.43",
+    "@types/express": "^5.0.6",
     "@types/node": "^26.1.1",
     "@types/nodemailer": "^8.0.1",
     "typescript": "~6.0.3"
   },
   "dependencies": {
     "@bank-bots/db": "workspace:*",
-    "commander": "^15.0.0",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/platform-express": "^12.1.2",
+    "@nestjs/schedule": "^12.0.2",
+    "@rhyek/nestjs-utils": "workspace:*",
     "dayjs": "~1.11.21",
+    "nestjs-zod": "^5.5.0",
     "nodemailer": "^9.0.3",
-    "playwright": "1.61.1",
+    "pino": "^10.4.0",
+    "playwright": "1.63.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
     "ts-pattern": "^5.9.0",
     "zod": "^4.4.3"
   }

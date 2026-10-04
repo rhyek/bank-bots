@@ -18,6 +18,10 @@ export {
   config,
   matchingRule,
   matcherResult,
+  ownerDayLocation,
+  payeeLocationResult,
+  placeField,
+  scrapeRun,
 } from './schema';
 
 export { keysetBefore, type TxCursor } from './keyset';

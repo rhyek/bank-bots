@@ -1,5 +1,6 @@
 declare namespace NodeJS {
   export interface ProcessEnv {
+    readonly PORT?: string;
     readonly DATABASE_URL: string;
     readonly BANK_KEY?: 'bancoIndustrialGt' | 'bacGt' | 'bacCr';
     readonly MAILER_SMTP_ACCOUNT: string;

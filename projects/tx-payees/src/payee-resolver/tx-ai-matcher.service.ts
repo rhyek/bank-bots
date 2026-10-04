@@ -1,49 +1,41 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { createSdkMcpServer, query } from '@anthropic-ai/claude-agent-sdk';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { StructuredLoggerService } from '@rhyek/nestjs-utils';
+import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { eq } from 'drizzle-orm';
+import { idleTimeoutMs } from '~/agent/agent-config';
+import { AgentModels } from '~/agent/agent-models.service';
+import { runStructuredAgent } from '~/agent/structured-agent';
 import { bankTx, category, payee } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
 import { ReplicaSettled } from '~/events/replica-settled.service';
+import { OwnerLocationService } from '~/owner-location/owner-location.service';
 import { TxAiResolver, type MatchOutcome, type MatchableTx } from '~/payee-resolver/match-outcome';
 import { buildReadTools } from '~/payee-resolver/ai/read-tools';
 import { buildWriteTools } from '~/payee-resolver/ai/write-tools';
 import { SYSTEM_PROMPT, buildCategoryList, buildUserPrompt } from '~/payee-resolver/ai/prompt';
-import { Answer, answerJsonSchema } from '~/payee-resolver/ai/output-schema';
+import { Answer } from '~/payee-resolver/ai/output-schema';
 
-const DEFAULTS = {
-  model: 'claude-sonnet-5',
-  effort: 'medium',
-  maxTurns: 25,
-  /**
-   * Idle timeout, NOT a total-duration cap.
-   *
-   * A wall-clock cap punishes the wrong thing: an agent researching an unfamiliar merchant across
-   * several web searches is working, and killing it at N seconds throws away everything it has done.
-   * What actually needs catching is a run that has *stopped producing output*. So the clock is reset
-   * by every message the session emits, and only fires on genuine silence.
-   *
-   * Total runtime stays bounded by maxTurns, so there is no need for a second ceiling.
-   */
-  idleTimeoutMs: 120_000,
-} as const;
+const MAX_TURNS = 25;
 
 /**
  * The third matching tier: an agent, reached only when exact description and every regex rule have
  * missed.
  *
- * Its capability surface is exactly the eight tools built here plus WebSearch. `tools: ['WebSearch']`
- * removes every other built-in — Bash, Read, Write, Edit, Glob, Grep — from the agent's context
- * entirely, and `settingSources: []` stops the SDK loading ~/.claude or this repo's CLAUDE.md, so
- * its behavior can't drift with the owner's dotfiles.
+ * Its capability surface is exactly the eight tools built here plus WebSearch: naming WebSearch as
+ * the only built-in removes every other one — Bash, Read, Write, Edit, Glob, Grep — from the
+ * agent's context entirely. The session itself is run by runStructuredAgent, which holds the
+ * options every agent in this app shares.
  */
 @Injectable()
 export class TxAiMatcher extends TxAiResolver implements OnModuleInit {
-  private readonly logger = new Logger(TxAiMatcher.name);
   private calls = 0;
 
   constructor(
     private readonly replica: ReplicaDb,
     private readonly settle: ReplicaSettled,
+    private readonly ownerLocation: OwnerLocationService,
+    private readonly models: AgentModels,
+    private readonly logger: StructuredLoggerService,
   ) {
     super();
   }
@@ -61,7 +53,7 @@ export class TxAiMatcher extends TxAiResolver implements OnModuleInit {
       return;
     }
     if (!process.env.CLAUDE_CODE_OAUTH_TOKEN) {
-      this.logger.error(
+      this.logger.warn(
         'CLAUDE_CODE_OAUTH_TOKEN is not set — the AI tier cannot run. Generate one with ' +
           '`claude setup-token` and add it to .env.local, or set TX_AI_ENABLED=false to silence ' +
           'this. Exact and rule matching are unaffected.',
@@ -96,7 +88,7 @@ export class TxAiMatcher extends TxAiResolver implements OnModuleInit {
   /** Start a fresh budget for the next batch of work. Driven by PayeeResolver's queue-idle hook. */
   override resetBudget() {
     if (this.calls > 0) {
-      this.logger.log(`sweep finished after ${this.calls} agent call(s); budget reset`);
+      this.logger.info({ calls: this.calls }, 'sweep finished; agent call budget reset');
     }
     this.calls = 0;
   }
@@ -148,6 +140,8 @@ export class TxAiMatcher extends TxAiResolver implements OnModuleInit {
         date: row.date,
         amountCents: row.amountCents,
         accountNumber: row.bankAccountId,
+        // Where the owner was around this date. Null when unavailable — never a reason to fail.
+        location: await this.ownerLocation.describe(row.date),
       }),
       server,
     );
@@ -196,72 +190,18 @@ export class TxAiMatcher extends TxAiResolver implements OnModuleInit {
     }
   }
 
-  private async run(
-    prompt: string,
-    server: ReturnType<typeof createSdkMcpServer>,
-  ): Promise<Answer> {
-    const idleMs = Number(process.env.TX_AI_IDLE_TIMEOUT_MS ?? DEFAULTS.idleTimeoutMs);
-    const q = query({
+  private run(prompt: string, server: ReturnType<typeof createSdkMcpServer>): Promise<Answer> {
+    return runStructuredAgent({
       prompt,
-      options: {
-        model: process.env.TX_AI_MODEL ?? DEFAULTS.model,
-        // Set explicitly rather than left to the default: the SDK has silently injected a
-        // flag-driven effort default before (anthropics/claude-agent-sdk-typescript#214).
-        effort: (process.env.TX_AI_EFFORT ?? DEFAULTS.effort) as 'medium',
-        systemPrompt: `${SYSTEM_PROMPT}\n${buildCategoryList(this.replica)}`,
-        // [] would remove WebSearch too; naming it leaves exactly one built-in in context.
-        tools: ['WebSearch'],
-        // Do not inherit ~/.claude, project .claude/, or this repo's CLAUDE.md.
-        settingSources: [],
-        mcpServers: { txp: server },
-        allowedTools: ['WebSearch', 'mcp__txp__*'],
-        outputFormat: { type: 'json_schema', schema: answerJsonSchema },
-        maxTurns: DEFAULTS.maxTurns,
-        // `env` REPLACES the subprocess environment rather than merging, so process.env must be
-        // spread in or the agent loses PATH and its own auth token.
-        env: { ...process.env } as Record<string, string>,
-      },
+      systemPrompt: `${SYSTEM_PROMPT}\n${buildCategoryList(this.replica)}`,
+      schema: Answer,
+      ...this.models.payeeMatcher(),
+      // Naming WebSearch leaves exactly one built-in in context; [] would remove it too.
+      builtinTools: ['WebSearch'],
+      mcpServers: { txp: server },
+      maxTurns: MAX_TURNS,
+      idleTimeoutMs: idleTimeoutMs(),
+      logger: this.logger,
     });
-
-    // Heartbeat: rearmed by every message the session emits, so the clock measures silence rather
-    // than duration. A long run that keeps producing tool calls and messages is healthy and is left
-    // alone; only a genuinely stalled one is closed.
-    let stall: NodeJS.Timeout | undefined;
-    let stalled = false;
-    const beat = () => {
-      clearTimeout(stall);
-      stall = setTimeout(() => {
-        stalled = true;
-        this.logger.warn(`agent produced no output for ${idleMs}ms; closing the session`);
-        q.close();
-      }, idleMs);
-      stall.unref();
-    };
-    beat();
-
-    try {
-      for await (const message of q) {
-        beat();
-        if (message.type !== 'result') {
-          continue;
-        }
-        if (message.subtype !== 'success' || !message.structured_output) {
-          // Includes error_max_structured_output_retries and the success-with-no-output case, which
-          // the SDK docs are explicit must also be treated as a failure.
-          throw new Error(`agent returned no structured output (subtype: ${message.subtype})`);
-        }
-        const parsed = Answer.safeParse(message.structured_output);
-        if (!parsed.success) {
-          throw new Error(`agent output failed validation: ${parsed.error.message}`);
-        }
-        return parsed.data;
-      }
-      // Closing the session ends the iterator, so a stall lands here rather than at the timer.
-      throw new Error(
-        stalled ? `agent stalled (no output for ${idleMs}ms)` : 'agent produced no result message',
-      );
-    } finally {
-      clearTimeout(stall);
-    }
   }
 }

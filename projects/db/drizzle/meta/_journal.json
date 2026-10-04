@@ -106,6 +106,27 @@
       "when": 1790917983842,
       "tag": "0014_bank_tx_occurrence",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791137133216,
+      "tag": "0015_owner_and_payee_location",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791141964065,
+      "tag": "0016_place_field",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791150468337,
+      "tag": "0017_scrape_run",
+      "breakpoints": true
     }
   ]
 }

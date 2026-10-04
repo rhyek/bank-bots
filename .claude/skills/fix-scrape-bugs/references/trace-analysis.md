@@ -1,16 +1,18 @@
 # Playwright trace analysis cookbook
 
-A saved trace (`storage/playwright-traces/<ts>_<bankKey>.zip`) is your best evidence for a scraper
-failure. It's a zip of newline-delimited JSON plus captured resources. These recipes pull out the
-action timeline, the hung step, page navigations, DOM snapshots, and console output.
+A saved trace (`projects/scrape-txs/storage/runs/<runId>/trace.zip`) is your best evidence for a
+scraper failure. It's a zip of newline-delimited JSON plus captured resources. These recipes pull out
+the action timeline, the hung step, page navigations, DOM snapshots, and console output.
 
-Unzip first. Traces may live in the default dir (`projects/scrape-txs/storage/playwright-traces/`)
-or in a coupled per-run dir (`storage/scrape-txs/run/<bankKey>-<id>/`) when the run used
-`--trace-dir`, so search under `storage/` for the newest matching zip:
+Unzip first. A failed run reports its trace as `error.tracePath` (`GET /scrape/runs/<runId>`, or the
+`scrape_run.error` column); without a run id, take the newest one. (Traces from before the scraper
+became a service are `<ts>_<bankKey>.zip` under `projects/scrape-txs/storage/playwright-traces/` or
+`storage/scrape-txs/run/`.)
 
 ```bash
-tf=$(find projects/scrape-txs/storage storage -name "*_<bankKey>.zip" 2>/dev/null \
-       | xargs ls -t 2>/dev/null | head -1)   # newest trace for this bank, either location
+tf=projects/scrape-txs/storage/runs/<runId>/trace.zip
+# or the newest trace of any run:
+tf=$(ls -t projects/scrape-txs/storage/runs/*/trace.zip 2>/dev/null | head -1)
 work=/tmp/trace-inspect && rm -rf "$work" && mkdir -p "$work"
 unzip -oq "$tf" -d "$work"
 ls "$work"        # trace.trace  trace.network  trace.stacks  resources/

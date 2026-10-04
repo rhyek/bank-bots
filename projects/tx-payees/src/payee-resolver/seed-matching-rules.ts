@@ -11,6 +11,11 @@
 // Run (from repo root, with .env.local sourced for DATABASE_URL):
 //   pnpm -C projects/tx-payees run seed-matching-rules
 import { db, matchingRule, pool, sql } from '@bank-bots/db';
+import { StructuredLoggerService } from '@rhyek/nestjs-utils';
+
+// A script, so there is no Nest container to inject from: built by hand and named by hand.
+const logger = new StructuredLoggerService();
+logger.setContext('seed-matching-rules');
 
 const PATTERNS: [label: string, pattern: string][] = [
   ['san martin', String.raw`\bsan martin\b`],
@@ -58,13 +63,13 @@ async function main() {
         set: { pattern: sql`excluded.pattern`, priority: sql`excluded.priority` },
       });
   }
-  console.log(`seeded ${PATTERNS.length} matching rules`);
+  logger.info({ rules: PATTERNS.length }, 'seeded matching rules');
 }
 
 main()
   .then(() => pool.end())
   .catch(async (err) => {
-    console.error(err);
+    logger.error({ error: err as Error }, 'seeding matching rules failed');
     await pool.end();
     process.exit(1);
   });
