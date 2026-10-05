@@ -1,6 +1,6 @@
 node_modules
 .DS_Store
+# Only the personal tier is ignored (`*.local` covers .env.local and .env.<mode>.local).
+# .env.<mode> files are committed: .env.test holds this package's test-mode switches.
 *.local
-.env
-.env.*
 storage

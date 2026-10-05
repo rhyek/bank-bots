@@ -48,8 +48,10 @@ services) — organized into **feature folders**. `src/main.ts` is the bootstrap
 
 `main.ts` listens on `process.env.PORT` and nothing else — no fallback, so a missing value fails
 loudly instead of quietly binding some default port. In this monorepo **devtooie
-injects `PORT`** for the app's dev process from `devtooie.config.ts`, and loads the `.env` files —
-so read config from `process.env`, don't hardcode ports. The `/status/health` endpoint is what
+injects `PORT`** for the app's dev process — `TX_PAYEES_PORT` in the repo's committed
+`.env.development`, read by this package's `port` in `devtooie.config.ts` — and loads the `.env`
+files, so read config from `process.env`, don't hardcode ports. Outside a session, run it with
+`pnpm devtooie cmd -p tx-payees -c start`. The `/status/health` endpoint is what
 devtooie's `healthcheck` hits.
 
 ## Logging (`@rhyek/nestjs-utils`)

@@ -61,10 +61,14 @@ library's. Inside a library use relative imports or its own package name.
 `main.ts` listens on `process.env.PORT` with **no literal fallback** — a hardcoded default lets the
 app quietly bind an unallocated port when the env fails to load, which is the exact collision the
 port registry prevents. Fail loudly instead. In this monorepo **devtooie injects `PORT`** for the
-app's process from `devtooie.config.ts`: **22250**, the first port of bank-bots' block
-(22250–22299) in `~/Dev/reserved_port_ranges.txt`. Running the app outside a devtooie session means
-`pnpm devtooie cmd -p scrape-txs -c start`, which injects the same `PORT` and `.env` files. The
-`/status/health` endpoint is what devtooie's `healthcheck` hits.
+app's process: `SCRAPE_TXS_PORT` in the repo's committed `.env.development` (bank-bots' block of
+`~/Dev/reserved_port_ranges.txt`), read by this package's `port` in `devtooie.config.ts`. The app
+never reads `SCRAPE_TXS_PORT` itself. Under a session it is served at
+`https://scrape-txs.bank-bots-dev.workstation.rhyek.com` by devtooie's dev reverse proxy. Running the
+app outside a devtooie session means `pnpm devtooie cmd -p scrape-txs -c start`, which injects the
+same `PORT` and `.env` files; the hostname does not route to it then, so use
+`localhost:<port>` (`pnpm devtooie show-config` prints the port). The `/status/health` endpoint is
+what devtooie's `healthcheck` hits.
 
 ## Logging (`@rhyek/nestjs-utils`)
 

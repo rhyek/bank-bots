@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --port ${PORT:-3002}",
+    "dev": "vite dev",
     "generate-routes": "tsr generate",
     "build": "vite build",
     "start": "NODE_ENV=production node server.ts",

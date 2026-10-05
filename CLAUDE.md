@@ -42,11 +42,15 @@ endpoint (see "Running things"). On failure it emails an alert.
 | Path | What |
 | --- | --- |
 | `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs, tx-payees and web. |
-| `projects/scrape-txs/` | NestJS service around the Playwright scrapers: one daily cron that scrapes the three bank logins concurrently, a REST endpoint to scrape one on demand, and a `scrape_run` history. Port **22250**. Imports `@bank-bots/db`. See its own `CLAUDE.md`. |
+| `projects/scrape-txs/` | NestJS service around the Playwright scrapers: one daily cron that scrapes the three bank logins concurrently, a REST endpoint to scrape one on demand, and a `scrape_run` history. `https://scrape-txs.bank-bots-dev.workstation.rhyek.com`. Imports `@bank-bots/db`. See its own `CLAUDE.md`. |
 | `projects/tx-payees/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs its **`payee-resolver`** module, which matches unmapped transactions to a payee + category in three tiers: exact description, `matching_rule` regex, then an **agent** (Claude Agent SDK) that can research a merchant and create the payees/rules its answer needs. It also records **location**: where each payee is, and where the owner was when each transaction was bought. See its own `CLAUDE.md`. |
-| `projects/web/` | `@bank-bots/web` — TanStack Start (SSR) web app for browsing transactions: a YNAB-style transactions list with payee/category, time-window + search filters, and inline payee/category editing, plus a **Spending** page (per-month inflow/outflow/left-over + a category-group breakdown, drilling into a figure's transactions and on into the transactions list with that row highlighted). Reads/writes Postgres via server functions over `@bank-bots/db`. Port **3002**. See its own `CLAUDE.md`. |
+| `projects/web/` | `@bank-bots/web` — TanStack Start (SSR) web app for browsing transactions: a YNAB-style transactions list with payee/category, time-window + search filters, and inline payee/category editing, plus a **Spending** page (per-month inflow/outflow/left-over + a category-group breakdown, drilling into a figure's transactions and on into the transactions list with that row highlighted). Reads/writes Postgres via server functions over `@bank-bots/db`. `https://web.bank-bots-dev.workstation.rhyek.com`. See its own `CLAUDE.md`. |
 | `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
-| `.env.local` | Secrets (gitignored): `DATABASE_URL`, `MAILER_*`. The scraper's Bitwarden bot credentials are in `projects/scrape-txs/.env.local`. |
+| `docker-compose.yaml` | The repo's infrastructure, run by devtooie's `infra`: one service, `db` (Postgres 15). **Disabled in development mode**, which still uses Supabase; it is test mode's database. |
+| `.env.development` | Committed. The **port allocation** — bank-bots' block of `~/Dev/reserved_port_ranges.txt`, one `*_PORT` per service plus the dev reverse proxy's — and `ROOT_DOMAIN`. The only place a port number is written. |
+| `.env.test` | Committed. Test mode's twin of the above (every port + 25) plus the `DB_*` settings of the local `db` container, from which it builds `DATABASE_URL` and which the compose file interpolates. See "Test mode". |
+| `.env.development.local` | Secret (gitignored), **development mode only**: `DATABASE_URL` for the real database on Supabase. Kept out of `.env.local` on purpose, so test mode never loads it. |
+| `.env.local` | Secrets (gitignored) for every mode: `MAILER_*`. The scraper's Bitwarden bot credentials are in `projects/scrape-txs/.env.local`. |
 
 ## The banks
 
@@ -284,24 +288,30 @@ blob (which accounts to scrape). Shape:
 > password are the item's own login fields; Bi en Línea's "Código" is its `campoInstalacion` custom
 > field. A Bitwarden failure fails the run before any browser opens.
 >
-> `config.data` holds no secret anymore (the YNAB token it carried is removed). `.env.local` carries
-> `DATABASE_URL` and the mailer password: never print those.
+> `config.data` holds no secret anymore (the YNAB token it carried is removed). `.env.development.local`
+> carries `DATABASE_URL` and `.env.local` the mailer password: never print those.
 
 ## Running things
 
-Local runs go through **devtooie** (see the `devtooie` skill / `node_modules/devtooie/docs`). The
-scraper is a long-running package on port **22250**; it scrapes on its own schedule, and a scrape is
-started by hand over HTTP.
+Local runs go through **devtooie** (see the `devtooie` skill / `node_modules/devtooie/docs`). Each
+service has a port in the committed `.env.development` and a public dev hostname: devtooie's dev
+reverse proxy serves `https://<package>.bank-bots-dev.workstation.rhyek.com` (`scrape-txs`, `tx-payees`,
+`web`) for as long as a session is running, with a status page for a package that is stopped.
+`pnpm devtooie show-config` prints every resolved port and origin; nothing else should repeat a
+number. The scraper scrapes on its own schedule, and a scrape is started by hand over HTTP.
 
 ```bash
+S=https://scrape-txs.bank-bots-dev.workstation.rhyek.com
 # Scrape one bank. Answers 202 with the run; body fields are all optional.
-curl -s -X POST localhost:22250/scrape/<bankKey> -H 'content-type: application/json' \
+curl -s -X POST $S/scrape/<bankKey> -H 'content-type: application/json' \
   -d '{"months": ["2026-05", "2026-06"], "dryRun": true}'   # also: "account": "<number>"
-curl -s localhost:22250/scrape/runs/<runId>   # running | succeeded | failed (+ result / error)
-curl -s localhost:22250/scrape/runs           # the 50 most recent runs
+curl -s $S/scrape/runs/<runId>   # running | succeeded | failed (+ result / error)
+curl -s $S/scrape/runs           # the 50 most recent runs
 
-# The service alone, when no devtooie session is running it (PORT + .env injected):
+# The service alone, when no devtooie session is running it (PORT + .env injected). The hostname
+# only answers for a package the running session runs, so reach this one on its port:
 pnpm devtooie cmd -p scrape-txs -c start
+S=http://localhost:$(pnpm -s devtooie show-config | jq '.packages["scrape-txs"].port')
 
 # Typecheck
 pnpm -C projects/db run typecheck          # @bank-bots/db (source-only lib)
@@ -310,10 +320,11 @@ pnpm -C projects/scrape-txs test            # node --test
 pnpm -C projects/tx-payees run typecheck
 pnpm -C projects/tx-payees test             # node --test (TxMatcher unit tests)
 
-# DB migrations (Drizzle) — live in @bank-bots/db. Edit projects/db/src/schema.ts, then with
-# DATABASE_URL in env (`set -a; . .env.local; set +a` from the repo root):
-pnpm -C projects/db db:generate   # diff schema.ts → new drizzle/NNNN_*.sql migration
-pnpm -C projects/db db:migrate    # apply pending migrations (tracked in drizzle.__drizzle_migrations)
+# DB migrations (Drizzle) — live in @bank-bots/db. Edit projects/db/src/schema.ts, then, from the
+# repo root, through devtooie so DATABASE_URL is the development one (the REAL database):
+pnpm devtooie cmd -- pnpm -C projects/db db:generate   # diff schema.ts → new drizzle/NNNN_*.sql migration
+pnpm devtooie cmd -- pnpm -C projects/db db:migrate    # apply pending migrations (tracked in drizzle.__drizzle_migrations)
+# (The test database is migrated for you by `pnpm devtooie --mode test infra up`.)
 # pnpm -C projects/db db:pull      # (rarely) re-introspect the live DB back into schema.ts
 # The pre-existing tables were baselined into Drizzle's journal once via drizzle/stamp_baseline.sql,
 # so `migrate` skips the 0000 baseline and only applies later migrations.
@@ -324,18 +335,60 @@ pnpm -C projects/db db:migrate    # apply pending migrations (tracked in drizzle
 # hand-authored snapshot by re-running `db:generate` and expecting "No schema changes").
 
 # tx-payees app: replica + payee-resolver. Matches unmapped transactions on boot, then continuously.
-pnpm -C projects/tx-payees start
+pnpm devtooie cmd -p tx-payees -c start              # (it refuses to start without PORT)
 pnpm -C projects/tx-payees run seed-matching-rules   # one-shot, idempotent; seeds matching_rule
 
-# web app: the transactions list. Hot-reloading dev server on :3002 (devtooie injects DATABASE_URL).
+# web app: the transactions list. Hot-reloading dev server at https://web.bank-bots-dev.workstation.rhyek.com
+# (devtooie injects PORT, PUBLIC_ORIGIN and DATABASE_URL).
 pnpm devtooie                                # whole workspace
 pnpm devtooie cmd -p web -c dev              # just the web app
-pnpm -C projects/web test                    # vitest (queries hit the real DB; mutations restore)
+pnpm devtooie --mode test cmd -p web -c test # vitest, against the test database only (see "Test mode")
 pnpm -C projects/web run typecheck
 pnpm -C projects/web run build                # must pass: proves the ~/ alias + srvx bundle emit
 ```
 
-Inspect the DB directly with `psql "$DATABASE_URL"` (grab `DATABASE_URL` from `.env.local`).
+Inspect the DB directly with `pnpm devtooie cmd -- sh -c 'psql "$DATABASE_URL"'` (add `--mode test`
+for the test database).
+
+**devtooie is the only env loader.** There is no `.envrc` (the old one exported the secrets into
+every shell, where it outranked the env files). A shell here has none of these variables; a
+command gets a package's environment through `pnpm devtooie cmd -p <package> -- <command>`.
+
+### Test mode
+
+`--mode test` is a second copy of the stack that cannot reach the real database:
+
+- **Its own database**: the `db` service of `docker-compose.yaml` (Postgres 15, loopback only),
+  run by devtooie's `infra`. `.env.test` states its `DB_*` settings once and builds `DATABASE_URL`
+  from them. The Supabase URL is in `.env.development.local`, which test mode never loads. A
+  `DATABASE_URL` exported in the shell would still outrank the file: the seed and the web tests
+  each refuse a database that is not local, but the migration step applies to whatever it is
+  given, so don't run test-mode infra from a shell that exports the real one.
+- **Seeded when it is created**: every `infra up` applies pending migrations; the seed
+  (`projects/db/seed/test-data.ts`, an invented household ledger) is written only into a `fresh`
+  database — its first start, and after `infra destroy` or `infra up --reset db`. What a session
+  writes afterwards stays until then, so **`pnpm devtooie --mode test infra up --reset db` is how
+  to get the seed back**. The totals the web tests assert are the seed's `SEED_FACTS`, which the
+  seed re-derives from its own rows when it runs; change a row and its fact together, then reset.
+- **Its own ports and hostnames**: `.env.test` (the development ports + 25) and
+  `https://<package>.bank-bots-test.workstation.rhyek.com`.
+- **tx-payees** gets its own replica file and runs no agents (`projects/tx-payees/.env.test`).
+- **Do not run scrape-txs in test mode**: it has no off switch, so it would log in to the real
+  banks at 07:00 and, with an empty `config` table, email a failure alert.
+
+```bash
+pnpm devtooie --mode test infra up            # start the database, migrate (and seed it if new), exit
+pnpm devtooie --mode test infra up --reset db # wipe it and start again from the seed
+pnpm devtooie --mode test cmd -p web -c test  # the web tests (they refuse to run in any other mode)
+pnpm devtooie --mode test infra docker-compose exec db psql -U bank_bots
+pnpm devtooie --mode test infra down          # stop it; the data is kept
+# `infra destroy` and `infra up --reset` DELETE the test data (the seed comes back on the next
+# start). Never a bare `docker compose`.
+```
+
+The web tests (`projects/web`, vitest) write to the database, so they run only here:
+`src/test/require-test-database.ts` stops the suite unless the mode is `test` and the database is
+local. The tx-payees and scrape-txs specs use in-memory fakes and need no database.
 
 ## Conventions & gotchas
 

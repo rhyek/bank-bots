@@ -13,7 +13,8 @@
     "test": "node --import @swc-node/register/esm-register --test --test-isolation=none 'src/**/*.test.ts'",
     "db:pull": "drizzle-kit pull",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed:test": "node --import @swc-node/register/esm-register seed/seed-test.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

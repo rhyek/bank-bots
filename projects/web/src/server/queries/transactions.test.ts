@@ -61,9 +61,8 @@ describe('listTransactionsQuery', () => {
 
   it('pages the whole set exactly once, with no duplicates or gaps at page boundaries', async () => {
     // The real test of a keyset cursor: walk every page and prove the union is the full set.
-    // The expected size is read from the database rather than hardcoded, so a scrape landing new
-    // rows doesn't turn this into a false failure — the property under test is "every row exactly
-    // once", not any particular row count.
+    // The expected size is read from the database rather than hardcoded — the property under test
+    // is "every row exactly once", not any particular row count.
     const [{ total }] = await db.select({ total: count() }).from(bankTx);
     const seen = new Set<string>();
     let cursor: string | null = null;

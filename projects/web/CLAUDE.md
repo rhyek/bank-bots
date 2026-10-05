@@ -114,9 +114,53 @@ A server-fn failure must never be swallowed. Two complementary, **additive** sur
 Because the middleware re-throws, existing call-site handling still runs — so **don't hand-wire a
 per-call error banner** in new code; let the global surfaces do it.
 
+## Not found (`src/components/not-found.tsx`)
+
+`NotFound` renders for a URL no route matches and for any `notFound()` a loader throws; the response
+keeps its 404 status. **Keep it**: without one, each such request logs TanStack Router's
+`notFoundComponent option was not configured` warning, and a browser produces one unprompted by
+asking for `/favicon.ico`.
+
+**It always renders inside the app shell** (`AppShell`, `src/components/layout/app-shell.tsx` — the
+sidebar frame the `_app` layout route also renders). The router resolves a not-found at the deepest
+matched route that has children, so it is wired in two places:
+
+- **`defaultNotFoundComponent: NotFound`** (`src/router.tsx`), bare: a URL unmatched below `_app`
+  (`/payees/nope`) renders it in that layout's `<Outlet />`, already inside the shell.
+- **The root route's `notFoundComponent`** (`__root.tsx`), `<AppShell><NotFound /></AppShell>`: a URL
+  that matches nothing under `_app` (`/nope`) resolves at the root, outside the shell, as does a
+  `notFound()` thrown by a loader.
+
+`NotFound` is page content (`Header` + `Main`) and throws outside the shell, so don't give `_app`
+itself a `notFoundComponent`: a thrown `notFound()` would then replace that layout, shell included.
+After changing any of this, check one top-level and one nested unknown URL: both 404, each with the
+sidebar exactly once.
+
+## Tests (vitest) — test mode only
+
+```bash
+pnpm devtooie --mode test infra up            # start the test database, migrate (and seed it if new)
+pnpm devtooie --mode test cmd -p web -c test
+```
+
+The query tests (`src/server/queries/*.test.ts`) run real SQL, and some write. They run against the
+local test database and nothing else: `src/test/require-test-database.ts` (a vitest `setupFiles`
+entry) stops the whole suite unless the mode is `test` and `DATABASE_URL` is local, so a plain
+`pnpm test` or a development-mode run fails at once instead of touching the real database.
+
+The data is the seed in `projects/db/seed/test-data.ts`, written when the test database is created;
+`pnpm devtooie --mode test infra up --reset db` restores it if something changed it. Assertions
+are literal figures (January 2026's inflow, a group's net). The totals are the seed's `SEED_FACTS`,
+which it re-derives from its own rows on every run, so a new assertion about a total means a new
+row **and** a new fact there. A test that writes uses
+a fixture row of its own that it inserts and deletes, and never changes a seeded row: files run
+serially against one database, and the others assert on what the seed put there.
+
 ## Production server (`server.ts`, srvx)
 
-srvx runs the built `fetch` handler and serves `dist/client`. The `@ts-expect-error` on
+srvx runs the built `fetch` handler and serves `dist/client`. It binds `PORT` and nothing else —
+no fallback, so `pnpm start` without one fails instead of quietly taking an unallocated port. The
+`@ts-expect-error` on
 `import handler from './dist/server/server.js'` is expected — a build artifact with no types.
 
 ## Instrumentation — deliberately omitted
@@ -142,5 +186,6 @@ Run it locally:
 ```bash
 pnpm devtooie                       # whole workspace
 pnpm devtooie cmd -p web -c dev     # just this app
-pnpm -C projects/web run dev        # without devtooie (needs DATABASE_URL in env)
+# `pnpm -C projects/web run dev` alone refuses to start: the dev server binds PORT and nothing else
+# (vite.config.ts), and devtooie is what injects it, with PUBLIC_ORIGIN and DATABASE_URL.
 ```

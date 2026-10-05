@@ -34,7 +34,7 @@ can't decide or do (see [When to stop](#when-to-stop-and-ask)).
 | Batches, the per-bank lock, alerts | `src/scrape/scrape-runs.service.ts`, `src/scrape/scrape-alert.service.ts` |
 | Credentials (Bitwarden) | `src/credentials/` |
 | Bank keys | `bacGt`, `bacCr` (share the BAC code in `bac/scrape.ts`), `bancoIndustrialGt` |
-| Start a scrape | `POST http://localhost:22250/scrape/<bankKey>` (port from `devtooie.config.ts`) |
+| Start a scrape | `POST $S/scrape/<bankKey>`, where `S` is the service on its own port — see *Reproduce* (the number lives in `.env.development`, never in a command) |
 | Follow a run | `GET /scrape/runs/<runId>`; recent runs: `GET /scrape/runs` (the `scrape_run` table) |
 | A run's files | `projects/scrape-txs/storage/runs/<runId>/` — `trace.zip` (failure only), `scraped.json` (dry run only) |
 | Service log | the devtooie session's logfile (`devtooie logs`), JSON lines; every line of a run carries `run.runId` + `run.bankKey` |
@@ -83,7 +83,10 @@ Scrapes are started over HTTP. First make sure the service is up — **check, do
 session** (the `devtooie` skill explains why: a new session shuts the owner's running one down):
 
 ```bash
-curl -s localhost:22250/status/health          # {"status":"ok"} when it is up
+# The service on its own port. Works whether a session runs it or you started it alone; the public
+# hostname (https://scrape-txs.bank-bots-dev.workstation.rhyek.com) only answers in the first case.
+S=http://localhost:$(pnpm -s devtooie show-config | jq '.packages["scrape-txs"].port')
+curl -s $S/status/health                       # {"status":"ok"} when it is up
 ```
 
 If it is not up and the owner has a devtooie session running without it, run just this package next
@@ -96,9 +99,9 @@ pnpm devtooie cmd -p scrape-txs -c start       # PORT and the .env files are inj
 Then run the failing bank and follow it:
 
 ```bash
-curl -s -X POST localhost:22250/scrape/<bankKey> -H 'content-type: application/json' \
+curl -s -X POST $S/scrape/<bankKey> -H 'content-type: application/json' \
   -d '{"dryRun": true}'                        # -> 202 with the run; note its runId
-curl -s localhost:22250/scrape/runs/<runId>    # running | succeeded | failed (+ error, tracePath)
+curl -s $S/scrape/runs/<runId>                 # running | succeeded | failed (+ error, tracePath)
 ```
 
 Body fields, all optional: `months` (`["2026-09"]`; default: since the bank's last successful
@@ -284,6 +287,21 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
 - **Completeness check that works:** compare `bank_account.running_balance_cents` with
   `SUM(bank_tx.amount_cents)` for the account. It is only meaningful for an account whose balance
   was refreshed in that run (one with rows in the current month).
+
+### BAC blocked by its CDN (Akamai 403) — transient, not a DOM change — 2026-10-05
+- **Symptom:** both BAC keys fail together. The final error is the 30 s `[data-country]` timeout,
+  which reads like a renamed selector, but the trace is tiny (~33 KB) and its only resource is a
+  375-byte page titled `Access Denied` (`Server: AkamaiGHost`, status 403 in `trace.network`, a
+  `403 (Forbidden)` console error). Attempt 1 got further and died waiting for the `Usuario`
+  textbox after the "Banca en Línea" click; the immediate retry was refused at the home page.
+- **Cause:** Akamai's bot protection refused the machine, not a site change. Seen on the first
+  scheduled batch, the morning after six BAC logins in 20 minutes of manual testing. Running
+  `bacGt` and `bacCr` at the same moment is not enough on its own to trigger it: a concurrent batch
+  had succeeded the evening before.
+- **Resolve by** checking the trace for the 403 before touching a selector, then **one** `dryRun`
+  of **one** BAC key. If it passes, the block has lifted (it had after ~100 minutes): scrape the two
+  keys for real one after the other, not together. If it is refused again, stop — that is the
+  anti-bot case in [When to stop](#when-to-stop-and-ask), and more attempts can extend the block.
 
 ### Diagnosing tips that generalize
 - Trust **durations + the Playwright Call log + stdout error** to find the hung step. Don't rely

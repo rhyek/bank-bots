@@ -16,5 +16,5 @@
     "noFallthroughCasesInSwitch": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "seed/**/*.ts"]
 }

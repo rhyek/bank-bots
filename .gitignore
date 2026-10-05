@@ -1,5 +1,6 @@
 .DS_Store
 .env.local
+.env.*.local
 tmp/*
 .idea
 node_modules/

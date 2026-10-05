@@ -3,16 +3,17 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { updateTransactionQuery } from './transactions';
 
 /**
- * These tests exercise a real write against the real database — this project has no test database.
+ * These tests exercise a real write, against the test database (see src/test/require-test-database.ts).
  *
- * They operate on a dedicated fixture row this suite inserts and deletes, NEVER a live transaction.
- * An earlier version claimed "the newest transaction" and restored it afterwards; when the newest
- * happened to be a manual reconcile row and a run was interrupted before the restore, it left a
- * bogus payee stamped on real data. A disposable, clearly-labelled fixture removes that whole class
- * of hazard: the worst an interrupted run can leave behind is one row that the next run sweeps.
+ * They operate on a dedicated fixture row this suite inserts and deletes, never a seeded
+ * transaction, so the other suites' figures do not move. An earlier version, written when these ran
+ * against the real database, claimed "the newest transaction" and restored it afterwards; when the
+ * newest happened to be a manual reconcile row and a run was interrupted before the restore, it
+ * left a bogus payee stamped on real data. A disposable, clearly-labelled fixture removes that
+ * whole class of hazard: the worst an interrupted run can leave behind is one row that the next run
+ * sweeps.
  *
- * `reconcile: true` keeps a live scrape from ever deleting the fixture mid-run; the far-past date
- * and marker doc number keep it out of every default view and make it unmistakable.
+ * The far-past date and marker doc number keep it out of every month the other suites assert on.
  */
 const FIXTURE_DOC_NO = 'TEST-UPDATE-FIXTURE';
 
@@ -43,7 +44,7 @@ describe('updateTransactionQuery', () => {
     await db.delete(bankTx).where(eq(bankTx.docNo, FIXTURE_DOC_NO));
     fixtureId = await insertFixture();
 
-    // Any real payee id, so the FK on bank_tx.payee_id is satisfied by the write tests.
+    // Any seeded payee id, so the FK on bank_tx.payee_id is satisfied by the write tests.
     const [somePayee] = await db
       .select({ id: bankTx.payeeId })
       .from(bankTx)

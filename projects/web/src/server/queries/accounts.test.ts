@@ -16,8 +16,8 @@ describe('listAccountsQuery', () => {
   });
 
   it('sums amount_cents rather than reading running_balance_cents', async () => {
-    // Verified against the live data: SUM(amount_cents) equals the scraped running balance
-    // exactly on the accounts that carry one. bacGt 904201043 is 3567466 cents.
+    // The seed gives bacGt 904201043 rows summing to 3567466 cents and a running_balance_cents of
+    // 100, so only the sum can produce this number (projects/db/seed/test-data.ts, SEED_FACTS).
     const accounts = await listAccountsQuery();
     const bacGt = accounts.find((a) => a.accountNumber === '904201043');
 
@@ -26,10 +26,9 @@ describe('listAccountsQuery', () => {
   });
 });
 
-// This runs against the live personal-finance database (same as the suite above). It operates on a
-// dedicated fixture account it inserts and deletes — never a real one — so an interrupted run can't
-// leave a real account renamed "Test Rename". The marker bank_key/account_number keep the fixture
-// unmistakable and let the next run sweep one an interrupted run left behind.
+// It operates on a dedicated fixture account it inserts and deletes — never a seeded one — so the
+// suite above keeps seeing the seed's accounts untouched. The marker bank_key/account_number keep
+// the fixture unmistakable and let the next run sweep one an interrupted run left behind.
 const FIXTURE_BANK_KEY = 'test-fixture';
 
 describe('renameAccountQuery', () => {

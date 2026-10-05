@@ -1,0 +1,35 @@
+# bank-bots' infrastructure. devtooie runs it (`infra` in devtooie.config.ts): it brings the
+# services up before a session's packages start, and `devtooie infra up` does the same on its own.
+#
+# Never run a bare `docker compose …` here. devtooie names the Compose project
+# `bank-bots-<mode>`, so a bare command targets a different, empty project. Use
+#   devtooie [--mode test] infra docker-compose <args>
+#
+# Every ${VAR} comes from the mode's .env file, which devtooie hands to Compose: the DB_* block of
+# .env.test, which also builds DATABASE_URL from the same pieces.
+#
+# `db` is DISABLED in development mode (devtooie.config.ts): development still uses the real
+# database on Supabase. It runs in test mode, where it is the only database anything can reach.
+services:
+  db:
+    # 15, to match Supabase: the migrations are written for it (it has no uuidv7(), for one).
+    image: postgres:15
+    ports:
+      # Loopback only.
+      - '127.0.0.1:${DB_PORT}:5432'
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # `-h 127.0.0.1` on purpose: while the image initializes a fresh volume it runs a temporary
+      # server on the unix socket only, which a socket probe would report as ready too early.
+      test: ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', '${DB_USER}', '-d', '${DB_NAME}']
+      interval: 1s
+      timeout: 3s
+      retries: 60
+
+volumes:
+  db-data:

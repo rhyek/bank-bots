@@ -12,6 +12,13 @@ import { serveStatic } from 'srvx/static';
 // @ts-expect-error — a `vite build` artifact under dist/; it has no type declarations.
 import handler from './dist/server/server.js';
 
+// Binds `PORT` and nothing else — no fallback, so a missing value fails loudly instead of quietly
+// binding an unallocated port (see ~/Dev/CLAUDE.md).
+const port = Number(process.env.PORT);
+if (!Number.isInteger(port)) {
+  throw new Error('PORT is not set');
+}
+
 // srvx/static has no cache option; Vite's /assets are content-hashed, so mark them immutable.
 const immutableAssets: ServerMiddleware = async (req, next) => {
   const res = await next();
@@ -23,7 +30,7 @@ const immutableAssets: ServerMiddleware = async (req, next) => {
 
 // srvx logs its own "Listening on…" banner and installs graceful-shutdown handlers.
 serve({
-  port: Number(process.env.PORT) || 3000,
+  port,
   hostname: process.env.HOST || '0.0.0.0',
   middleware: [immutableAssets, serveStatic({ dir: 'dist/client' })],
   fetch: handler.fetch,

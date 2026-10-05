@@ -1,36 +1,52 @@
 import { defineConfig } from 'devtooie';
 
 export default defineConfig({
-  // Keyed by package name — the key is the name, so there's no `name` field.
+  infra: {
+    'docker-compose': {
+      services: {
+        db: {
+          enabled: ({ mode }) => mode === 'test',
+          afterReady: async ({ run, fresh }) => {
+            await run('pnpm', ['db:migrate'], { cwd: 'projects/db' });
+            if (fresh) {
+              await run('pnpm', ['db:seed:test'], { cwd: 'projects/db' });
+            }
+          },
+        },
+      },
+    },
+  },
+  // Caddy (~/Dev/personal/workstation) forwards https://*.<ROOT_DOMAIN> here; devtooie routes by
+  // subdomain, and answers with a status page for a package that is stopped or still starting.
+  // No `defaultPackage`: the web app only accepts its own hostname (Vite's `allowedHosts`), so the
+  // bare root domain stays a 404 that lists the hostnames that do exist.
+  devReverseProxy: {
+    rootDomain: ({ envs }) => envs.ROOT_DOMAIN,
+    port: ({ envs }) => Number(envs.DEV_REVERSE_PROXY_PORT),
+  },
+  packageRootDir: 'projects',
   packages: {
-    // @bank-bots/db (projects/db) is a source-only TS library (its `exports` point at src; no
-    // build/emit) — consumers transpile it (scrape-txs via swc-node, the web app via Vite). It has
-    // no dev process, so it isn't a devtooie package; the workspace link + package exports wire it.
-    // The first port of bank-bots' block (22250-22299) in ~/Dev/reserved_port_ranges.txt.
-    // `watches: false`: a reload in the middle of a scrape would kill it.
+    web: {
+      port: ({ envs }) => Number(envs.WEB_PORT),
+      subdomain: true,
+      // A longer probe deadline than the 1500 ms default: the first request makes Vite compile the
+      // SSR route, and an aborted probe shows up in the dev server as a dropped connection.
+      healthcheck: { url: '/api/health', timeout: 5000 },
+      urls: [{ label: 'home', url: '' }],
+    },
     'scrape-txs': {
-      relativeDir: 'projects/scrape-txs',
       command: ['start', { watches: false }],
-      port: 22250,
-      healthcheck: ({ port }) => `http://localhost:${port}/status/health`,
+      subdomain: true,
+      port: ({ envs }) => Number(envs.SCRAPE_TXS_PORT),
+      healthcheck: '/status/health',
+      urls: [{ label: 'runs', url: '/scrape/runs' }],
     },
     'tx-payees': {
-      relativeDir: 'projects/tx-payees',
       command: ['start', { watches: false }],
-      port: 3001,
-      // A callback over the resolved `port`, not `$port` — devtooie does no string
-      // interpolation, so the URL can't drift from the port the process was handed.
-      healthcheck: ({ port }) => `http://localhost:${port}/status/health`,
-    },
-    web: {
-      relativeDir: 'projects/web',
-      // Bare-string form — devtooie's tuple `command` form requires a 2-element
-      // `[name, options]` (a lone `['dev']` fails schema validation); `'dev'` resolves to the
-      // same defaults (`watches: true, builds: true, cleans: false`), matching `vite dev`'s own
-      // hot-reload/watch behavior.
-      command: 'dev',
-      port: 3002,
-      healthcheck: ({ port }) => `http://localhost:${port}/api/health`,
+      subdomain: true,
+      port: ({ envs }) => Number(envs.TX_PAYEES_PORT),
+      healthcheck: '/status/health',
+      urls: [{ label: 'replica', url: '/replica/status' }],
     },
   },
 });

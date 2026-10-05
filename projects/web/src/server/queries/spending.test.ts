@@ -30,9 +30,12 @@ describe('month arithmetic', () => {
 });
 
 /**
- * These run against the REAL database — this project has no test database. Every assertion here is
- * a read, so nothing is mutated. January 2026 is the fixture: its figures were verified by hand
- * against the raw table, and it is far enough in the past that a new scrape cannot change it.
+ * These read the test seed (projects/db/seed/test-data.ts). January 2026 is its spending fixture.
+ * The month and group totals asserted here are the seed's SEED_FACTS, which the seed re-derives
+ * from its own rows each time it runs; the single-row figures (Rent, the refund, the Eegsa bill)
+ * are those rows themselves. The numbers are the ones first verified by hand against the real
+ * January 2026, back when these ran against the real database; the seed was built to reproduce
+ * them, so no assertion changed when the suite moved.
  */
 describe('monthSummaryQuery', () => {
   const JANUARY = '2026-01';
@@ -137,8 +140,9 @@ describe('monthSummaryQuery', () => {
   });
 
   it('counts uncategorized transactions toward the totals', async () => {
-    // May 2026 is the opposite fixture: it carries the large self-transfers that are still
-    // uncategorized, so it proves the bucket exists AND that it reaches the header.
+    // May 2026 is the opposite fixture: it carries a large self-transfer whose two legs are
+    // neither categorized nor marked as a transfer (the state the real data is in), so it proves the
+    // bucket exists AND that it reaches the header.
     const summary = await monthSummaryQuery({ month: '2026-05' });
 
     expect(summary.uncategorized).not.toBeNull();
@@ -223,9 +227,9 @@ describe('listBucketTransactionsQuery', () => {
   });
 
   it('excludes transfers from every bucket', async () => {
-    // No row carries transfer_bank_account_id today, so this asserts the filter is wired rather
-    // than that it currently removes anything — it is what makes marking transfers later a
-    // data-only fix.
+    // The seed's January has one transfer marked as such (3000.00 out of the main account, into
+    // savings). Neither leg may appear here — and the inflow/outflow assertions above would each be
+    // off by 300000 if the filter stopped excluding them.
     const rows = await listBucketTransactionsQuery({ month: JANUARY, bucket: { kind: 'all' } });
     expect(rows.every((row) => row.transferAccountLabel === null)).toBe(true);
   });
