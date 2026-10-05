@@ -376,6 +376,7 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
         name: payee.name,
         locationKind: payee.locationKind,
         country: payee.country,
+        location: payee.location,
       })
       .from(payee)
       .where(eq(payee.id, payeeId))

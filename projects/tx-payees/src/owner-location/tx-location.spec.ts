@@ -138,6 +138,32 @@ test('locateTx: the description is ignored unless the payee is a physical busine
   assert.equal(out.rule, 'single-country');
 });
 
+test("locateTx: at a local payee the place is the payee's own, not the day's", () => {
+  const airport = 'Juan Santamaría airport, Alajuela';
+  const imperial = { locationKind: 'local', country: 'CR', location: airport };
+  // Around a trip, by the description's country...
+  assert.deepEqual(locateTx('2026-09-23', imperial, trip, 'CR'), {
+    purchaseDate: '2026-09-20',
+    rule: 'description-country',
+    country: 'CR',
+    location: airport,
+    final: true,
+  });
+  // ...and at home, where the day only says "Guatemala City".
+  const home = days(...stretch('2026-07-01', '2026-07-10', 'GT', 'Guatemala City'));
+  const cafe = { locationKind: 'local', country: 'GT', location: 'Zona 14, Guatemala City' };
+  assert.equal(locateTx('2026-07-10', cafe, home).location, 'Zona 14, Guatemala City');
+});
+
+test("locateTx: the payee's place is not used when the owner was in another country, or for a chain", () => {
+  // A local payee in Panama, paid while the owner was in Guatemala and Costa Rica: not in person.
+  const elsewhere = { locationKind: 'local', country: 'PA', location: 'Casco Viejo, Panama City' };
+  assert.equal(locateTx('2026-09-23', elsewhere, trip).location, 'Guatemala City');
+  // A chain has branches, not a place; a stray location on it is ignored.
+  const chain = { locationKind: 'chain', country: 'GT', location: 'Zona 10' };
+  assert.equal(locateTx('2026-09-23', chain, trip).location, 'Guatemala City');
+});
+
 test('locateTx rule 3: a remote payee, or none, goes by the posting lag', () => {
   for (const payee of [{ locationKind: 'remote', country: 'US' }, null]) {
     assert.deepEqual(locateTx('2026-09-23', payee, trip), {

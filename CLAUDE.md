@@ -171,7 +171,7 @@ replaced by the `bank_account_id` FK). Amounts are the bank's raw number (curren
 | `category_id` | text | nullable FK → `category.id`; backfilled from YNAB |
 | `transfer_bank_account_id` | uuid | nullable FK → `bank_account.id`; the *other* account for a transfer (payee/category stay null) |
 | `country` | text | nullable; ISO 3166-1 alpha-2 code of where **the owner was** when the purchase happened. Not where the payee is (that is `payee.country`): an Amazon order placed from home is `GT` here and `US` on the payee. Written by `tx-payees`, never by the scraper |
-| `location` | text | nullable; the place within `country` (city or area), from the same lookup |
+| `location` | text | nullable; the place within `country`, from the same lookup: the city or area the owner's day resolved to, or the payee's own place when the payee is `local` in that country |
 | `reconcile` | boolean | manual reconciliation row — not on any bank statement. Scrapes never delete these, and `tx-payees` never matches them. **Replaced the old `doc_no = 'RECONCILE'` sentinel**, so new rows can carry a real doc number |
 | `created_at` | timestamptz | `now()` on insert (not touched on conflict-update) |
 | `updated_at` | timestamptz | maintained by the `trg_set_updated_at` trigger; the replica's delta-sync watermark |

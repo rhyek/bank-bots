@@ -11,7 +11,7 @@ import {
   count as pgCount,
   db as pgDb,
   eq as pgEq,
-  gt as pgGt,
+  gte as pgGte,
 } from '@bank-bots/db';
 import { eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import {
@@ -137,15 +137,19 @@ export class ReplicaSync implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Pull rows changed since our watermark (minus a margin) and upsert them into SQLite. */
   private async syncUpserts(t: Descriptor): Promise<number> {
-    // Watermark = the newest updated_at we already hold. Strict `>` so a quiet boot pulls nothing
-    // (rows sharing the max — e.g. all of them right after the migration set them to the same now() —
-    // are already stored). Real-time NOTIFY covers changes; the boot delta only catches offline ones.
+    // Watermark = the newest updated_at we already hold. `>=`, not `>`: rows that share the max are
+    // NOT necessarily all stored. One UPDATE stamps every row it touches with the same now(), and
+    // their notifications are applied one at a time, so a process stopped partway through holds
+    // some of the batch — whose timestamp is then the watermark. A strict `>` skipped the rest for
+    // good: clearing 41 payees and restarting left 40 of them stale (2026-10-04). Re-pulling the
+    // rows tied at the max costs a few idempotent upserts per boot. Real-time NOTIFY covers
+    // changes; the boot delta only catches offline ones.
     const watermark = this.replica.db
       .select({ m: sql<string | null>`max(${t.lite.updatedAt})` })
       .from(t.lite)
       .get()?.m;
     const rows = watermark
-      ? await pgDb.select().from(t.pg).where(pgGt(t.pg.updatedAt, watermark))
+      ? await pgDb.select().from(t.pg).where(pgGte(t.pg.updatedAt, watermark))
       : await pgDb.select().from(t.pg);
     if (rows.length === 0) {
       return 0;

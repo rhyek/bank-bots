@@ -309,6 +309,11 @@ a Guatemalan chain because the owner's three charges were. The description is ig
 payee is a physical business — on an online charge the same field holds a billing office or the
 merchant's home town.
 
+**The place is the day's, except at a `local` payee.** Whichever rule picks the day, the lookup
+records that day's place — unless the payee is `local` and in the country the lookup settled on.
+A local payee is one physical place, so the owner was there, and its own place ("Juan Santamaría
+airport, Alajuela") is more exact than where the day as a whole resolved ("San José").
+
 The result is written to `bank_tx` and appended to `matcher_result` as a `location` row. It is
 `final` only when all ten days are resolved for good; a non-final lookup is redone by a later sweep,
 and a lookup that says nothing new writes nothing.
@@ -420,6 +425,13 @@ and matches if this ever needs re-diagnosing.
 accepts `X REGEXP Y` (which compiles to `regexp(Y, X)`, **pattern first**) but the statement fails at
 `prepare()` with "no such function". Registering it gives real JS regex semantics, which the rule
 patterns need for `\b` and negative lookahead.
+
+**The boot delta sync pulls `updated_at >= watermark`, not `>`.** One UPDATE stamps every row it
+touches with the same `now()`, and their notifications are applied one at a time, so a process
+stopped partway through a bulk update holds part of the batch — and that batch's timestamp becomes
+the watermark. With a strict `>` the rest were skipped for good: clearing 41 payees' `location_kind`
+and restarting left 40 of them stale in the replica. Re-pulling the rows tied at the max is a few
+idempotent upserts per boot.
 
 **Replica schema changes require bumping `EXPECTED_SCHEMA_VERSION`** in `replica-db.service.ts`.
 `CREATE TABLE IF NOT EXISTS` cannot evolve an existing file, so a mismatch drops and rebuilds the

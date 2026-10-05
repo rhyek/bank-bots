@@ -337,7 +337,9 @@ test('once a payee turns out to be a physical place abroad, its transactions are
   );
   assert.equal(payeeLocation.state.calls[0]!.trigger.ownerCountry, 'GT');
   assert.equal(txRow(id).country, 'CR');
-  assert.equal(txRow(id).location, 'Alajuela');
+  // A local payee is one place, so the purchase is recorded there rather than where the day
+  // as a whole resolved (Alajuela).
+  assert.equal(txRow(id).location, 'Juan Santamaría airport');
   // The payee's other transaction is redone too, without waiting for its own turn.
   assert.equal(txRow(earlier).country, 'CR');
 });

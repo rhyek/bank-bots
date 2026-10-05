@@ -26,6 +26,8 @@ export interface TxLocation {
 export interface PayeePlace {
   locationKind: string | null;
   country: string | null;
+  /** The one specific place of a `local` payee. */
+  location?: string | null;
 }
 
 /** The candidate nearest to `target`; a tie goes to the earlier day, since purchases precede posting. */
@@ -55,6 +57,11 @@ function nearest(days: ResolvedDay[], target: string): ResolvedDay | undefined {
  * 3. Otherwise: two days before posting, the typical lag, or the nearest resolved day to that.
  * 4. No day in the window places the owner anywhere: null.
  *
+ * Whichever rule picks the day, the place recorded is the day's — except at a `local` payee in the
+ * country the lookup settled on. A local payee is one physical place, so the owner was there, and
+ * its own place ("Juan Santamaría airport, Alajuela") is more exact than where the day as a whole
+ * resolved ("San José").
+ *
  * `describedCountry` is what the description's place field stands for, when it has one. It is
  * ignored unless the payee is a physical business: on an online charge the same field holds a
  * billing office or the merchant's home town.
@@ -78,7 +85,10 @@ export function locateTx(
     purchaseDate: day.date,
     rule,
     country: day.country,
-    location: day.location,
+    location:
+      payee?.locationKind === 'local' && payee.location && payee.country === day.country
+        ? payee.location
+        : day.location,
     final,
   });
 
