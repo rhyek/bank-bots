@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import appCss from '~/styles.css?url';
 import { Toaster } from '~/components/ui/sonner';
+import { AppShell } from '~/components/layout/app-shell';
+import { NotFound } from '~/components/not-found';
 import { ThemeProvider } from '~/context/theme-provider';
 import { getChromeCookies } from '~/server/chrome';
 
@@ -37,6 +39,10 @@ export const Route = createRootRoute({
     ],
   }),
   shellComponent: RootDocument,
+  // A URL that matches nothing under the `_app` layout (`/nope`) resolves here, outside the app
+  // shell, so this one brings the shell with it. Anything unmatched below `_app` (`/payees/nope`)
+  // renders the router's bare `defaultNotFoundComponent` in that layout's <Outlet /> instead.
+  notFoundComponent: RootNotFound,
   // Read/loader + render errors surface here; server-fn MUTATION errors are toasted globally in
   // src/start.ts. Swap this for your own shell-wrapped error UI.
   errorComponent: ({ error }) => (
@@ -48,6 +54,14 @@ export const Route = createRootRoute({
     </div>
   ),
 });
+
+function RootNotFound() {
+  return (
+    <AppShell>
+      <NotFound />
+    </AppShell>
+  );
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const { theme } = Route.useLoaderData();
