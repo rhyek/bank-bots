@@ -203,8 +203,10 @@ code path.
    gets the runs back at once; everything after this happens in the background.
 3. The `config` row is read and **credentials are fetched once, for all the batch's banks**
    (`BankCredentialsService.fetch(bankKeys, config)`: one Bitwarden session).
-4. The batch **forks**: one `ScrapeJobService.run` per bank, concurrently, each handed its
-   credentials. The job never talks to Bitwarden.
+4. The batch **forks**: one `ScrapeJobService.run` per bank, each handed its credentials. Banks of
+   different sites run concurrently; bank keys of the same site (`BANK_SITES` in
+   `bank-config/bank-keys.ts`: the two BAC keys) run one after the other, because BAC's CDN refused
+   two logins started in the same second. The job never talks to Bitwarden.
 5. Each run ends on its own — `succeeded` or `failed` — and its row is updated.
 
 ### Isolation: one bank failing must not affect another
@@ -212,7 +214,7 @@ code path.
 | | Shared between banks? |
 | --- | --- |
 | Chromium process | No. One per run, headless. |
-| Browser context | No. One per attempt (2 attempts), so a retry inherits no cookies. |
+| Browser context | No. One per attempt (2 attempts, 5 minutes apart: `withRetries` in `scrape/retry.ts`), so a retry inherits no cookies. |
 | Bitwarden session | Yes, per batch, and only before any browser opens. A broken item fails its own bank only (`scope: 'item'`); a session that cannot open fails the whole batch (`scope: 'session'`) with ONE alert. |
 | Database pool | Yes; each run persists in its own transaction. Nothing ever calls `pool.end()`. |
 | Errors | Caught inside the run. The fork waits with `Promise.allSettled`, and the un-awaited batch promise has a terminal `.catch` — an unhandled rejection would kill the process and every run in it. |
@@ -274,7 +276,8 @@ the DTO it declares with `@ZodSerializerDto` (`ZodSerializerInterceptor`, global
 - A **dry run** writes `storage/runs/<runId>/scraped.json` and nothing to `bank_tx`; its counts are
   what a real run would have upserted and deleted. It does not count as a successful scrape for the
   months rule.
-- A failed run's trace is `storage/runs/<runId>/trace.zip`. The directory is created only when
+- A failed run's trace is `storage/runs/<runId>/trace.zip`; an earlier failed attempt's is
+  `trace-attempt-<n>.zip` next to it. The directory is created only when
   something is written to it.
 
 **A `nestjs-zod` detail that matters.** It validates a parameter only when its *type* is a ZodDto,

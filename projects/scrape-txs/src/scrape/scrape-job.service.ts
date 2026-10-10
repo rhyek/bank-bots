@@ -11,6 +11,7 @@ import type { Config } from '~/bank-config/config-schema';
 import type { BankCredentials } from '~/credentials/bitwarden';
 import { bacScrape } from './banks/bac/scrape';
 import { bancoIndustrialScrape } from './banks/banco-industrial/scrape';
+import { withRetries } from './retry';
 import type { RunParams, RunResult, RunStage } from './scrape.dto';
 import { chromeUserAgent } from './user-agent';
 
@@ -45,6 +46,9 @@ type Scraped = {
 };
 
 const MAX_ATTEMPTS = 2;
+// Long enough that the retry is not part of the burst the bank just refused. Not known to outlast
+// a CDN block: BAC's has been seen to last anywhere up to 100 minutes.
+const RETRY_BACKOFF_MS = 5 * 60 * 1000;
 
 // From the package directory, not the working directory: `storage/` is gitignored there.
 const RUNS_DIR = path.resolve(import.meta.dirname, '../../storage/runs');
@@ -83,38 +87,51 @@ export class ScrapeJobService {
       channel: 'chromium',
     });
     try {
-      for (let attempt = 1; ; attempt++) {
-        this.logger.info({ attempt }, 'scrape attempt started');
-        // A fresh context per attempt so a retry doesn't inherit cookies/storage from the failed
-        // one. BAC, for example, sets a country-preference cookie on the first attempt that would
-        // otherwise redirect the retry's `goto` away from the home page its country-selector step
-        // expects, making the retry fail at a misleading step.
-        const context = await browser.newContext({
-          userAgent: chromeUserAgent(browser.version()),
-        });
-        try {
-          await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
-          return await this.scrapeBank(input, context);
-        } catch (error) {
-          // Only the last attempt's trace is kept. Earlier ones are discarded when their context
-          // closes below.
-          if (attempt >= MAX_ATTEMPTS) {
-            const tracePath = await this.saveTrace(context, input.runId);
+      return await withRetries(
+        {
+          attempts: MAX_ATTEMPTS,
+          backoffMs: RETRY_BACKOFF_MS,
+          onRetry: (attempt, error) => {
+            this.logger.warn(
+              { attempt, reason: (error as Error).message, backoffMs: RETRY_BACKOFF_MS },
+              'scrape attempt failed; retrying',
+            );
+          },
+        },
+        async (attempt, last) => {
+          this.logger.info({ attempt }, 'scrape attempt started');
+          // A fresh context per attempt so a retry doesn't inherit cookies/storage from the failed
+          // one. BAC, for example, sets a country-preference cookie on the first attempt that would
+          // otherwise redirect the retry's `goto` away from the home page its country-selector step
+          // expects, making the retry fail at a misleading step.
+          const context = await browser.newContext({
+            userAgent: chromeUserAgent(browser.version()),
+          });
+          try {
+            await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+            return await this.scrapeBank(input, context);
+          } catch (error) {
+            // Every failed attempt keeps its trace: the first failure is often the telling one, and
+            // the retry can fail earlier and differently. The run reports the last attempt's.
+            const tracePath = await this.saveTrace(
+              context,
+              input.runId,
+              last ? 'trace.zip' : `trace-attempt-${attempt}.zip`,
+            );
+            if (!last) {
+              throw error;
+            }
             throw new ScrapeFailure('scrape', (error as Error).message, {
               tracePath,
               cause: error,
             });
+          } finally {
+            await context.close().catch((error: unknown) => {
+              this.logger.warn({ reason: String(error) }, 'could not close the browser context');
+            });
           }
-          this.logger.warn(
-            { attempt, reason: (error as Error).message },
-            'scrape attempt failed; retrying',
-          );
-        } finally {
-          await context.close().catch((error: unknown) => {
-            this.logger.warn({ reason: String(error) }, 'could not close the browser context');
-          });
-        }
-      }
+        },
+      );
     } finally {
       await browser.close().catch((error: unknown) => {
         this.logger.warn({ reason: String(error) }, 'could not close the browser');
@@ -153,9 +170,13 @@ export class ScrapeJobService {
     });
   }
 
-  private async saveTrace(context: BrowserContext, runId: string): Promise<string | undefined> {
+  private async saveTrace(
+    context: BrowserContext,
+    runId: string,
+    fileName: string,
+  ): Promise<string | undefined> {
     try {
-      const tracePath = path.join(runDir(runId), 'trace.zip');
+      const tracePath = path.join(runDir(runId), fileName);
       await fs.mkdir(path.dirname(tracePath), { recursive: true });
       await context.tracing.stop({ path: tracePath });
       this.logger.info({ tracePath }, 'saved the Playwright trace');

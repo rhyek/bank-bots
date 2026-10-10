@@ -2,7 +2,7 @@ import { Injectable, type OnApplicationBootstrap } from '@nestjs/common';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { uuidv7 } from '@bank-bots/db';
 import { BankConfigService } from '~/bank-config/bank-config.service';
-import type { BankKey } from '~/bank-config/bank-keys';
+import { BANK_SITES, type BankKey } from '~/bank-config/bank-keys';
 import type { Config } from '~/bank-config/config-schema';
 import {
   BankCredentialsService,
@@ -33,7 +33,8 @@ const LIST_LIMIT = 50;
 /**
  * Starts scrapes, in batches: the scheduled tick is a batch of three, a manual call a batch of one.
  * A batch stores its runs, fetches the credentials of all its banks in one Bitwarden session, then
- * forks into one job per bank. Runs end independently — a failure never leaves its own run.
+ * forks into one job per bank: banks of different sites at once, banks of the same site in turn.
+ * Runs end independently — a failure never leaves its own run.
  */
 @Injectable()
 export class ScrapeRunsService implements OnApplicationBootstrap {
@@ -217,8 +218,18 @@ export class ScrapeRunsService implements OnApplicationBootstrap {
       return;
     }
 
+    // One queue per site: sites scrape concurrently, the bank keys of one site in turn.
+    const bySite = new Map<string, Run[]>();
+    for (const run of runnable) {
+      const site = BANK_SITES[run.bankKey];
+      bySite.set(site, [...(bySite.get(site) ?? []), run]);
+    }
     await Promise.allSettled(
-      runnable.map((run) => this.runOne(run, credentials.get(run.bankKey), config)),
+      [...bySite.values()].map(async (siteRuns) => {
+        for (const run of siteRuns) {
+          await this.runOne(run, credentials.get(run.bankKey), config);
+        }
+      }),
     );
   }
 

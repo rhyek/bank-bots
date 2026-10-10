@@ -42,7 +42,7 @@ endpoint (see "Running things"). On failure it emails an alert.
 | Path | What |
 | --- | --- |
 | `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs, tx-payees and web. |
-| `projects/scrape-txs/` | NestJS service around the Playwright scrapers: one daily cron that scrapes the three bank logins concurrently, a REST endpoint to scrape one on demand, and a `scrape_run` history. `https://scrape-txs.bank-bots-dev.workstation.rhyek.com`. Imports `@bank-bots/db`. See its own `CLAUDE.md`. |
+| `projects/scrape-txs/` | NestJS service around the Playwright scrapers: one daily cron that scrapes the three bank logins (the two BAC ones in turn, Banco Industrial alongside), a REST endpoint to scrape one on demand, and a `scrape_run` history. `https://scrape-txs.bank-bots-dev.workstation.rhyek.com`. Imports `@bank-bots/db`. See its own `CLAUDE.md`. |
 | `projects/tx-payees/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs its **`payee-resolver`** module, which matches unmapped transactions to a payee + category in three tiers: exact description, `matching_rule` regex, then an **agent** (Claude Agent SDK) that can research a merchant and create the payees/rules its answer needs. It also records **location**: where each payee is, and where the owner was when each transaction was bought. See its own `CLAUDE.md`. |
 | `projects/web/` | `@bank-bots/web` — TanStack Start (SSR) web app for browsing transactions: a YNAB-style transactions list with payee/category, time-window + search filters, and inline payee/category editing, plus a **Spending** page (per-month inflow/outflow/left-over + a category-group breakdown, drilling into a figure's transactions and on into the transactions list with that row highlighted). Reads/writes Postgres via server functions over `@bank-bots/db`. `https://web.bank-bots-dev.workstation.rhyek.com`. See its own `CLAUDE.md`. |
 | `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
@@ -55,7 +55,8 @@ endpoint (see "Running things"). On failure it emails an alert.
 ## The banks
 
 Three "bank keys", each = one bank login. A scrape **run** is one bank key; the daily schedule
-starts a run for each, concurrently.
+starts a run for each. Banks of different sites scrape concurrently, but the two BAC keys scrape one
+after the other: started in the same second, BAC's CDN refused both ("Access Denied").
 
 | Bank key | Bank / country | Login flow | Config accounts |
 | --- | --- | --- | --- |
@@ -95,9 +96,10 @@ contract. The short version:
   one job per bank. One bank per run at a time (a second request gets `409`). A failed run emails a
   `Scrape bank txs failed for <bank>` alert (to `MAILER_ME`).
 - `src/scrape/scrape-job.service.ts` — one bank: its **own headless Chromium**, **retries** (2
-  attempts, **fresh browser context per attempt** so a retry doesn't inherit cookies/session), then
-  upserts results. On the final failure it saves a Playwright **trace** to
-  `projects/scrape-txs/storage/runs/<runId>/trace.zip`.
+  attempts, 5 minutes apart, **fresh browser context per attempt** so a retry doesn't inherit
+  cookies/session), then upserts results. Each failed attempt saves a Playwright **trace** under
+  `projects/scrape-txs/storage/runs/<runId>/`: `trace.zip` for the final one, `trace-attempt-<n>.zip`
+  for an earlier one.
 - `src/scrape/banks/bac/scrape.ts`, `src/scrape/banks/banco-industrial/scrape.ts` — the per-bank
   Playwright flows.
 - `src/bank-config/config-schema.ts` — Zod schema validating `config.data` (its `banks` object).

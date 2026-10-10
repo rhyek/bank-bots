@@ -40,12 +40,13 @@ can't decide or do (see [When to stop](#when-to-stop-and-ask)).
 | Service log | the devtooie session's logfile (`devtooie logs`), JSON lines; every line of a run carries `run.runId` + `run.bankKey` |
 | DB | Supabase Postgres, tables `bank_tx` + `bank_account` + `scrape_run`; `DATABASE_URL` in repo-root `.env.local` |
 
-`scrape-job.service.ts` runs a bank with **retries** (currently 2 attempts), each in a **fresh
-browser context**, headless. On the final failure it saves a Playwright trace to
-`storage/runs/<runId>/trace.zip`; the run is stored as `failed` with the error, the stage it stopped
-at (`config`, `credentials`, `scrape`, `persist`) and the trace path, and a
-`Scrape bank txs failed for <bank>` alert is emailed. That trace + the run's log lines are your
-primary evidence — and `GET /scrape/runs/<runId>` hands you the error and the trace path directly.
+`scrape-job.service.ts` runs a bank with **retries** (currently 2 attempts, 5 minutes apart), each
+in a **fresh browser context**, headless. Each failed attempt saves a Playwright trace: the final
+one to `storage/runs/<runId>/trace.zip`, an earlier one to `trace-attempt-<n>.zip`; the run is
+stored as `failed` with the error, the stage it stopped at (`config`, `credentials`, `scrape`,
+`persist`) and the trace path, and a `Scrape bank txs failed for <bank>` alert is emailed. That
+trace + the run's log lines are your primary evidence — and `GET /scrape/runs/<runId>` hands you the
+error and the trace path directly.
 
 ## The loop
 
@@ -116,8 +117,8 @@ What happens:
   (prohibited).
 - A failing run **sends the failure alert email** (to the owner's own address) — expected, same as
   the scheduled runs. Not a new side effect to worry about.
-- A BAC failure can take ~3–4 min (two attempts, each with 30 s timeouts, plus a slow site on
-  retry). Poll the run; don't restart the service while it is running, that aborts it.
+- A BAC failure can take ~7–9 min (two attempts, each with 30 s timeouts, and a 5-minute pause
+  before the retry). Poll the run; don't restart the service while it is running, that aborts it.
 - Code changes need a **restart of the service** to take effect (it does not watch files):
   `POST /command/restart/scrape-txs` on the devtooie control API, or stop and start your own
   `devtooie cmd` process.
@@ -288,16 +289,23 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   `SUM(bank_tx.amount_cents)` for the account. It is only meaningful for an account whose balance
   was refreshed in that run (one with rows in the current month).
 
-### BAC blocked by its CDN (Akamai 403) — transient, not a DOM change — 2026-10-05
+### BAC blocked by its CDN (Akamai 403) — not a DOM change — 2026-10-05, 2026-10-06
 - **Symptom:** both BAC keys fail together. The final error is the 30 s `[data-country]` timeout,
   which reads like a renamed selector, but the trace is tiny (~33 KB) and its only resource is a
   375-byte page titled `Access Denied` (`Server: AkamaiGHost`, status 403 in `trace.network`, a
   `403 (Forbidden)` console error). Attempt 1 got further and died waiting for the `Usuario`
   textbox after the "Banca en Línea" click; the immediate retry was refused at the home page.
-- **Cause:** Akamai's bot protection refused the machine, not a site change. Seen on the first
-  scheduled batch, the morning after six BAC logins in 20 minutes of manual testing. Running
-  `bacGt` and `bacCr` at the same moment is not enough on its own to trigger it: a concurrent batch
-  had succeeded the evening before.
+- **Cause:** Akamai's bot protection refused the machine, not a site change. The evidence points at
+  the two BAC logins starting in the same second: both scheduled batches that did so failed
+  (2026-10-05 and 2026-10-06), while every BAC run that started alone, or ~10 s after the other,
+  succeeded. The hour is not it: the 07:00 tick of 2026-10-07, the first with the two keys in turn,
+  scraped all three banks on the first attempt.
+- **Fix applied 2026-10-06:** a batch runs the bank keys of one site in turn (`BANK_SITES`,
+  `runBatch` in `scrape-runs.service.ts`), and a retry waits 5 minutes (`withRetries`). Each failed
+  attempt now keeps its trace, so the first failure can be read.
+- **If it happens again:** `bacGt` now reaches BAC alone at 07:00. If it still gets the 403, the
+  simultaneous start was not the cause — read `trace-attempt-1.zip` for what replaced the login
+  form, and look at the schedule's hour before staggering anything further.
 - **Resolve by** checking the trace for the 403 before touching a selector, then **one** `dryRun`
   of **one** BAC key. If it passes, the block has lifted (it had after ~100 minutes): scrape the two
   keys for real one after the other, not together. If it is refused again, stop — that is the
@@ -307,13 +315,12 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
 - Trust **durations + the Playwright Call log + stdout error** to find the hung step. Don't rely
   only on extracting the structured `error` from trace `after` entries — its shape varies across
   Playwright versions and may read as "ok" even for the timed-out action.
-- **Only the *final* attempt's trace is saved.** The job discards earlier attempts' traces, so when
-  retries fail at *different* steps (e.g. attempt 1 fails deep in the account list, attempt 2 fails
-  at *login* because the bank throttled the rapid re-login), the saved trace shows the later,
-  less-informative failure — not the one you care about. The **service log keeps every attempt's
-  error** (`scrape attempt failed; retrying`, with `reason`) — read those first; if attempt 1 was the interesting
-  failure but its trace is gone, re-run to recapture it (narrowing to the one account with the
-  `account` body field, or accept that the retry may fail differently the second time).
+- **Every failed attempt keeps its trace** (since 2026-10-06): `trace.zip` is the final attempt's,
+  the one the run reports as `error.tracePath`; `trace-attempt-<n>.zip` next to it is an earlier
+  one's. Retries often fail at *different* steps (attempt 1 deep in the account list, attempt 2 at
+  the home page because the bank refused the re-login), so read the first attempt's trace first.
+  The **service log also keeps every attempt's error** (`scrape attempt failed; retrying`, with
+  `reason`). Runs from before that date have only the final trace.
 - Compare **`frame-snapshot` `frameUrl`s across attempts** to catch redirects / unexpected
   navigation (that's how the stale-context bug surfaced).
 - The fills succeeding but the *next* click hanging is the classic "one selector moved" signature.

@@ -194,6 +194,23 @@ test('one bank failing leaves the other two succeeded', async () => {
   assert.notEqual(byBank.bacGt!.finishedAt, null);
 });
 
+test('the two BAC logins scrape one after the other, with Banco Industrial alongside', async () => {
+  const bacGt = deferred<RunResult>();
+  const { service, seen, requests } = setup({ job: { bacGt: () => bacGt.promise } });
+  const { done } = await service.startBatch(requests(ALL), 'schedule');
+  const calledBanks = () => seen.jobCalls.map((c) => c.bankKey);
+
+  // Long enough for every job the batch is going to start right away to have been called.
+  for (let i = 0; i < 20; i++) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.deepEqual(calledBanks(), ['bancoIndustrialGt', 'bacGt']);
+
+  bacGt.resolve(okResult);
+  await done;
+  assert.deepEqual(calledBanks(), ['bancoIndustrialGt', 'bacGt', 'bacCr']);
+});
+
 test('a failed run sends one alert, for that run only', async () => {
   const { service, seen, requests } = setup({
     job: {
