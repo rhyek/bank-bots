@@ -3,7 +3,10 @@
 Every directory here is a package mirrored from the `synced-utils` repo
 (`packages/<name>/package/` there) by its daemon. The mirror is **two-way and live**: an edit
 made here reaches the shared repo and every other consumer within a second, and vice versa.
-There is no conflict detection — the side that changed last wins.
+Changes on both sides are merged file by file; when both sides changed the same file, the one
+changed last wins. A deleted file is deleted everywhere — but deleting most of a package, or the
+last of its `.claude` files, only counts when done in the shared repo: from here it is refused,
+and the files come back.
 
 Working rules:
 
