@@ -127,6 +127,13 @@
       "when": 1791150468337,
       "tag": "0017_scrape_run",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791907194670,
+      "tag": "0018_revoke_api_role_grants",
+      "breakpoints": true
     }
   ]
 }

@@ -21,6 +21,9 @@ import { v7 as uuidv7 } from 'uuid';
 // RLS: not used. Supabase enables row-level security by default, but this DB is reached only via a
 // direct Postgres connection (DATABASE_URL), which bypasses RLS anyway; tables are kept with RLS
 // disabled (the 0002 migration disabled it on the pre-existing bank_txs/config tables).
+// What keeps Supabase's Data API (REST + GraphQL) out is that its roles hold no privilege here:
+// migration 0018 revoked `anon`/`authenticated` from every table and from the default privileges,
+// so a new table needs nothing. Never grant to those roles.
 //
 // Note on migration 0003: `drizzle-kit generate` can't resolve the `bank_txs -> bank_tx` rename
 // without a TTY, so 0003 (rename + drop cols + NOT NULL + index swap + constraint/sequence renames,

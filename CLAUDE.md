@@ -131,7 +131,9 @@ the bank site) and removes them — so a scrape reconciles a month, it doesn't j
 ## Database schema (Supabase Postgres)
 
 Twelve tables, all **singular**. **RLS is disabled** (the DB is reached only via a direct Postgres
-connection, which bypasses RLS).
+connection, which bypasses RLS). Supabase's Data API (REST + GraphQL) cannot reach them: its
+`anon`/`authenticated` roles hold no privilege on any table, nor on tables created later (migration
+0018 revoked both). Never grant to those roles — with RLS off, a grant publishes the table.
 
 > **Id convention — every new table gets a uuidv7 primary key**, generated app-side via
 > `uuid().primaryKey().$defaultFn(uuidv7)` (PG 15 has no `uuidv7()`, so generation is always in
