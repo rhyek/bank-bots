@@ -65,10 +65,9 @@ export type MonthSummary = {
  * Transactions that count toward a month's spending.
  *
  * Transfers are excluded everywhere: moving money between the owner's own accounts is neither
- * income nor spending, and counting it inflates both sides of the ledger. No row carries
- * `transfer_bank_account_id` today, so this is currently a no-op — but the large uncategorized
- * amounts in this data ARE self-transfers, and marking them is the intended fix. Shipping the
- * filter now means that fix needs no code change.
+ * income nor spending, and counting it inflates both sides of the ledger. `tx-payees` sets
+ * `transfer_bank_account_id` on the transfers it can recognise from the bank's own rows; one it
+ * cannot recognise still counts here, as uncategorized.
  */
 function monthConditions(month: string) {
   const range = monthRange(month);

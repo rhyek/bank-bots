@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { AgentModule } from '~/agent/agent.module';
 import { OwnerLocationModule } from '~/owner-location/owner-location.module';
 import { PayeeLocationModule } from '~/payee-location/payee-location.module';
+import { BankAccounts } from '~/payee-resolver/bank-accounts.service';
 import { TxAiResolver } from '~/payee-resolver/match-outcome';
 import { MatchWriter } from '~/payee-resolver/match-writer.service';
 import { PayeeResolver } from '~/payee-resolver/payee-resolver.service';
+import { TransferMatcher } from '~/payee-resolver/transfer-matcher.service';
 import { TxAiMatcher } from '~/payee-resolver/tx-ai-matcher.service';
 import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
 import { ReplicaDbModule } from '~/replica-db/replica-db.module';
@@ -22,6 +24,8 @@ import { ReplicaDbModule } from '~/replica-db/replica-db.module';
 @Module({
   imports: [AgentModule, ReplicaDbModule, OwnerLocationModule, PayeeLocationModule],
   providers: [
+    BankAccounts,
+    TransferMatcher,
     TxMatcher,
     MatchWriter,
     PayeeResolver,

@@ -63,8 +63,7 @@ export function TransactionRow({
 }
 
 function PayeeCell({ row }: { row: TxRow }) {
-  // Read-only in v1: nothing writes `transfer_bank_account_id` yet, so this branch is correct but
-  // unexercised — every row in the database has a null transfer account today.
+  // Read-only: `tx-payees` marks a transfer between two tracked accounts; nothing here sets one.
   if (row.transferAccountLabel) {
     return (
       <div
@@ -86,6 +85,11 @@ function PayeeCell({ row }: { row: TxRow }) {
 }
 
 function CategoryCell({ row }: { row: TxRow }) {
+  // Money moved between the owner's own accounts is neither income nor spending: it has no
+  // category, and is not waiting for one.
+  if (row.transferAccountLabel) {
+    return <div />;
+  }
   if (!row.categoryId) {
     // YNAB's amber "needs a category" pill. Not `destructive` — an uncategorized transaction is a
     // to-do, not an error.

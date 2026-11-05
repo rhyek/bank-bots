@@ -1,4 +1,5 @@
-import { bankTx, count, db, desc, eq, isNull, payee, sql } from '@bank-bots/db';
+import { bankTx, count, db, desc, eq, payee, sql } from '@bank-bots/db';
+import { needsPayee } from './tx-row';
 
 export type PayeeSummary = {
   id: string;
@@ -32,6 +33,6 @@ export async function listPayeeSummariesQuery(): Promise<PayeeSummary[]> {
 
 /** Drives the badge on the sidebar's Unmatched item. */
 export async function unmatchedCountQuery(): Promise<number> {
-  const [row] = await db.select({ total: count() }).from(bankTx).where(isNull(bankTx.payeeId));
+  const [row] = await db.select({ total: count() }).from(bankTx).where(needsPayee());
   return row?.total ?? 0;
 }

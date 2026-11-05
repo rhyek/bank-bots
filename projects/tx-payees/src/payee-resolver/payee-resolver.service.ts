@@ -10,6 +10,8 @@ import { PayeeLocationService } from '~/payee-location/payee-location.service';
 import { hasNoneVerdict, lastLocation, selectBacklog } from '~/payee-resolver/backlog';
 import { TxAiResolver, isResolved, type MatchOutcome } from '~/payee-resolver/match-outcome';
 import { MatchWriter } from '~/payee-resolver/match-writer.service';
+import { TransferMatcher } from '~/payee-resolver/transfer-matcher.service';
+import type { TransferTx } from '~/payee-resolver/transfer-rules';
 import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
 import { bankTx, category, matchingRule, payee } from '~/replica-db/replica-schema';
@@ -28,8 +30,11 @@ const RESWEEP_MS = 24 * 60 * 60 * 1000;
 /** What process() needs of a transaction. */
 interface TxRow {
   id: string;
+  bankAccountId: string;
   date: string;
+  docNo: string;
   description: string;
+  amountCents: number;
   payeeId: string | null;
   transferBankAccountId: string | null;
   reconcile: boolean;
@@ -40,6 +45,8 @@ interface TxRow {
 // Gives every bank_tx row since FROM_DATE a payee + category, and a location: where the owner was
 // when it was bought. Per transaction, in this order:
 //
+//   0. if it is one side of a transfer between two tracked accounts, mark both sides and stop:
+//      a transfer has no payee and is not located              (transfer-rules.ts; no agent)
 //   1. make sure the days of its ten-day window are resolved   (owner-location; may run an agent)
 //   2. match a payee: exact, rule, then the AI tier            (skipped when it already has one)
 //   3. look up its location among those days, and record it     (no agent)
@@ -69,9 +76,17 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
    * supermarket — would run the same failing agent call again in the same sweep.
    */
   private readonly payeesAsked = new Set<string>();
+  /**
+   * Transactions marked as a transfer since the queue last drained. The mark is written to
+   * Postgres, and the other side of the same transfer is usually the very next job: until the
+   * write has come back through replication it still reads as unmarked, and would be written a
+   * second time or handed to the payee tiers.
+   */
+  private readonly transferred = new Set<string>();
 
   constructor(
     private readonly replica: ReplicaDb,
+    private readonly transfers: TransferMatcher,
     private readonly matcher: TxMatcher,
     private readonly writer: MatchWriter,
     private readonly ai: TxAiResolver,
@@ -93,7 +108,9 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
       this.reportLocated();
       this.ai.resetBudget();
       this.payeesAsked.clear();
+      this.transferred.clear();
       this.ownerLocation.resetFailures();
+      this.transfers.reset();
     });
     this.unsubscribes.push(
       this.events.on('replica-sync.startup-sync-finished', () => {
@@ -129,12 +146,20 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
    * was *created* or merely resolved matters even more — a new payee affects every future
    * transaction that matches it, so it should be visible as it happens rather than discovered later
    * in matcher_result.
+   *
+   * The amount is in the account's currency units, not cents: on a transfer to a bare account
+   * number it is the one thing on the line that says which payment this was.
    */
   private logOutcome(tx: TxRow, outcome: MatchOutcome) {
     if (outcome.type === 'skipped') {
       return;
     }
-    const about = { txId: tx.id, description: tx.description, type: outcome.type };
+    const about = {
+      txId: tx.id,
+      description: tx.description,
+      amount: tx.amountCents / 100,
+      type: outcome.type,
+    };
     if (outcome.type === 'none') {
       this.logger.info({ ...about, summary: outcome.data?.summary || undefined }, 'payee decision');
       return;
@@ -242,6 +267,11 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
    * left to do is no longer selected.
    */
   sweep() {
+    // Transfers first, and over every transaction rather than the backlog: one side of a transfer
+    // can have been given a payee before the side that identifies it was scraped, and a row with a
+    // payee and a final location is no longer in the backlog.
+    void this.queue.add(() => this.markTransfers());
+
     const withLocation = this.ownerLocation.enabled;
     const rows = selectBacklog(this.replica, FROM_DATE, withLocation);
     const unmapped = rows.filter((r) => r.payeeId === null).length;
@@ -283,8 +313,11 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
     return this.replica.db
       .select({
         id: bankTx.id,
+        bankAccountId: bankTx.bankAccountId,
         date: bankTx.date,
+        docNo: bankTx.docNo,
         description: bankTx.description,
+        amountCents: bankTx.amountCents,
         payeeId: bankTx.payeeId,
         transferBankAccountId: bankTx.transferBankAccountId,
         reconcile: bankTx.reconcile,
@@ -305,6 +338,11 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
         return;
       }
       if (tx.transferBankAccountId != null || tx.reconcile || tx.date < FROM_DATE) {
+        return;
+      }
+      // 0. Never fails the steps below: a transfer that could not be checked for is matched like
+      //    any other row, and the next sweep's pass over every transaction marks it then.
+      if (await this.isTransfer(tx)) {
         return;
       }
       const withLocation = this.ownerLocation.enabled;
@@ -333,6 +371,49 @@ export class PayeeResolver implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.pending.delete(txId);
     }
+  }
+
+  private async isTransfer(tx: TransferTx): Promise<boolean> {
+    try {
+      return await this.markTransfer(tx);
+    } catch (err) {
+      this.logger.warn({ error: err as Error, txId: tx.id }, 'could not check for a transfer');
+      return false;
+    }
+  }
+
+  /** The sweep's pass over every transaction not yet marked. One failure ends the pass. */
+  private async markTransfers() {
+    try {
+      for (const tx of this.transfers.unmarkedSince(FROM_DATE)) {
+        await this.markTransfer(tx);
+      }
+    } catch (err) {
+      this.logger.warn({ error: err as Error }, 'could not check transactions for transfers');
+    }
+  }
+
+  /**
+   * Step 0. Marks the transaction, and the other side when its row is known, as a transfer to the
+   * other account, clearing any payee and category. Resolves to whether it is one.
+   */
+  private async markTransfer(tx: TransferTx): Promise<boolean> {
+    if (this.transferred.has(tx.id)) {
+      return true;
+    }
+    const transfer = await this.transfers.find(tx);
+    if (!transfer) {
+      return false;
+    }
+    await this.writer.applyTransfer(transfer.legs, transfer.rule);
+    for (const leg of transfer.legs) {
+      this.transferred.add(leg.txId);
+    }
+    this.logger.info(
+      { txId: tx.id, description: tx.description, rule: transfer.rule, legs: transfer.legs },
+      'transfer',
+    );
+    return true;
   }
 
   /** Step 2. Resolves to the payee the transaction now has, or null when it still has none. */

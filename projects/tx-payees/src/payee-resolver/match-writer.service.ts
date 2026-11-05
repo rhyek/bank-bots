@@ -9,6 +9,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { ReplicaSettled } from '~/events/replica-settled.service';
 import type { TxLocation } from '~/owner-location/tx-location';
 import type { MatchOutcome } from '~/payee-resolver/match-outcome';
+import type { TransferLeg } from '~/payee-resolver/transfer-matcher.service';
 
 /**
  * Every write payee-resolver makes, in one place.
@@ -32,6 +33,38 @@ export class MatchWriter {
     await this.settle.around('bank_tx', txId, async () => {
       await pgDb.update(pgBankTx).set({ payeeId, categoryId }).where(pgEq(pgBankTx.id, txId));
     });
+  }
+
+  /**
+   * Mark each leg as a transfer to the other account, clear whatever payee and category it had,
+   * and append a `transfer` row to the audit log, all in one Postgres transaction: a transfer with
+   * one side marked and the other still counted as spending is worse than neither.
+   *
+   * Barriered on every leg. The other side of a transfer is usually next in the queue, and it has
+   * to read itself back as a transfer rather than be matched to a payee.
+   */
+  async applyTransfer(legs: TransferLeg[], rule: string): Promise<void> {
+    const write = () =>
+      pgDb.transaction(async (tx) => {
+        for (const leg of legs) {
+          await tx
+            .update(pgBankTx)
+            .set({ transferBankAccountId: leg.otherAccountId, payeeId: null, categoryId: null })
+            .where(pgEq(pgBankTx.id, leg.txId));
+          await tx.insert(pgMatcherResult).values({
+            id: uuidv7(),
+            bankTxId: leg.txId,
+            type: 'transfer',
+            data: { rule, partnerTxId: leg.partnerTxId },
+          });
+        }
+      });
+    // One barrier per leg, each wrapped around the last, with the write innermost.
+    const barriered = legs.reduce<() => Promise<void>>(
+      (inner, leg) => () => this.settle.around('bank_tx', leg.txId, inner),
+      write,
+    );
+    await barriered();
   }
 
   /**

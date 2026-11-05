@@ -155,6 +155,8 @@ sync that succeeds.
 and sweeps transactions since 2026-01-01, then again every 24 hours; `row-persisted` queues a single
 freshly scraped row. Both funnel through `enqueue(txId)`. Per transaction, in this order:
 
+0. if it is one side of a transfer between two tracked accounts, mark both sides and stop (see
+   "Transfers" below; no agent)
 1. make sure the days of its ten-day window are resolved (`owner-location`; may run an agent)
 2. match a payee, unless it has one or the AI tier already gave up on it
 3. look up where the owner was when it was bought, and record it (no agent)
@@ -164,6 +166,35 @@ freshly scraped row. Both funnel through `enqueue(txId)`. Per transaction, in th
 Steps 1, 3 and 4 are the location steps; see "Location" below. A sweep (`selectBacklog`) picks a
 transaction up for any of three reasons: it has no payee and no terminal `none` verdict, it has no
 **final** `location` row, or its payee's `location_kind` is NULL.
+
+**Transfers (`transfer-rules.ts`, `TransferMatcher`).** Money moved between two of the owner's own
+tracked accounts has no payee and no category: each side gets `transfer_bank_account_id` = the other
+account, any payee and category it had are cleared, and a `transfer` row goes to `matcher_result`
+(`MatchWriter.applyTransfer`, one Postgres transaction for both sides). It runs before the payee
+tiers, and every sweep first checks **every** unmarked transaction since 2026-01-01, not just the
+backlog: the side that identifies a transfer can be scraped after the other side was already given
+a payee and a final location, and that row is no longer in the backlog.
+
+- **A transfer is never paired on amount and date alone.** That linked two unrelated third-party
+  movements of the same amount a day apart. Each rule in `TRANSFER_RULES` rests on evidence in the
+  bank's own rows and says which.
+- **The one rule today, `banco-industrial-named-account`:** a Banco Industrial description that
+  carries the number of another tracked Banco Industrial account (`BI-APP TRANSF DE CTA GT 3388707`;
+  `BELWEB TRANSF. PROPIA A 3388707000`, which pads it with `000`). The other side says only
+  `BANCA MOVIL`: it is the row on the named account with the same date, the same `doc_no` and the
+  opposite amount, found from either side. If no row or more than one fits, only the side that
+  names the account is marked.
+- **BAC transfers are not recognised.** No BAC description names a tracked account, and BAC's
+  document numbers are generic, so there is nothing to pair on. Each side is matched like any
+  other row: a payee copied from history if its description is mapped there, otherwise a `none`.
+- **To cover another bank or wording**, add a rule to `TRANSFER_RULES` and a spec built from the
+  real rows. A rule gets the transaction, the tracked accounts (`BankAccounts`, read from Postgres
+  once per batch: `bank_account` is not replicated) and `rowsOn(account, date)`.
+- **`transferred`** in `PayeeResolver` remembers what was marked since the queue last drained. The
+  other side is usually the next job, and until the write is back through replication it still
+  reads as unmarked.
+- To undo one: `UPDATE bank_tx SET transfer_bank_account_id = NULL WHERE id = '<uuid>';` It is
+  marked again on the next sweep unless the rule is changed.
 
 Payee matching is **three tiers**:
 

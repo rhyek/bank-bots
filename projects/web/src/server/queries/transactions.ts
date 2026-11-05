@@ -6,7 +6,6 @@ import {
   eq,
   gte,
   ilike,
-  isNull,
   keysetBefore,
   lte,
   or,
@@ -14,7 +13,7 @@ import {
   type TxCursor,
 } from '@bank-bots/db';
 import { resolveWindow, type TxFilters } from '~/lib/filters';
-import { mapTxRow, txRowQuery, type TxRow } from './tx-row';
+import { mapTxRow, needsPayee, txRowQuery, type TxRow } from './tx-row';
 
 export type { TxRow };
 
@@ -48,7 +47,7 @@ export async function listTransactionsQuery(input: {
     range && gte(bankTx.date, range.from),
     range && lte(bankTx.date, range.to),
     filters.accountId && eq(bankTx.bankAccountId, filters.accountId),
-    filters.unmatchedOnly && isNull(bankTx.payeeId),
+    filters.unmatchedOnly && needsPayee(),
     search && or(ilike(bankTx.description, `%${search}%`), ilike(payee.name, `%${search}%`)),
   ].filter((condition) => !!condition);
 

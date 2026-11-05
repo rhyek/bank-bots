@@ -11,9 +11,11 @@ import type {
   PayeeLocationService,
   PayeeLocationTrigger,
 } from '~/payee-location/payee-location.service';
+import type { BankAccounts } from '~/payee-resolver/bank-accounts.service';
 import { TxAiResolver, type MatchOutcome, type MatchableTx } from '~/payee-resolver/match-outcome';
 import type { MatchWriter } from '~/payee-resolver/match-writer.service';
 import { PayeeResolver } from '~/payee-resolver/payee-resolver.service';
+import { TransferMatcher, type TransferLeg } from '~/payee-resolver/transfer-matcher.service';
 import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
 import type { ReplicaDb } from '~/replica-db/replica-db.service';
 import { bankTx, matcherResult, payee } from '~/replica-db/replica-schema';
@@ -31,6 +33,9 @@ class StubAi extends TxAiResolver {
     return Promise.resolve(this.answer(tx));
   }
 }
+
+/** Set by a test to hold transfer writes back, as when replication is behind. */
+const transferWrites = { lagging: false, calls: [] as TransferLeg[][] };
 
 /** MatchWriter with Postgres and replication collapsed: each write lands in the replica at once. */
 function fakeWriter(replica: ReplicaDb) {
@@ -51,7 +56,41 @@ function fakeWriter(replica: ReplicaDb) {
       }
       addResult(replica, txId, 'location', location);
     },
+    async applyTransfer(legs: TransferLeg[], rule: string) {
+      transferWrites.calls.push(legs);
+      if (transferWrites.lagging) {
+        return;
+      }
+      for (const leg of legs) {
+        replica.db
+          .update(bankTx)
+          .set({ transferBankAccountId: leg.otherAccountId, payeeId: null, categoryId: null })
+          .where(eq(bankTx.id, leg.txId))
+          .run();
+        addResult(replica, leg.txId, 'transfer', { rule, partnerTxId: leg.partnerTxId });
+      }
+    },
   } as unknown as MatchWriter;
+}
+
+// `acct-1` is the account addTx files a transaction under unless told otherwise.
+const CHECKING = { id: 'acct-1', bankKey: 'bancoIndustrialGt', accountNumber: '3250000001' };
+const SAVINGS = { id: 'acct-2', bankKey: 'bancoIndustrialGt', accountNumber: '3300007' };
+const FROM_SAVINGS = 'BI-APP TRANSF DE CTA GT 3300007';
+
+/** The account registry, which lives in Postgres only. */
+function fakeAccounts() {
+  const state = { fail: false };
+  const service = {
+    async all() {
+      if (state.fail) {
+        throw new Error('postgres is down');
+      }
+      return [CHECKING, SAVINGS];
+    },
+    reset() {},
+  } as unknown as BankAccounts;
+  return { service, state };
 }
 
 /** Resolved days, in memory. Every day is Guatemala City unless a test says otherwise. */
@@ -136,6 +175,7 @@ let replica: ReplicaDb;
 let ai: StubAi;
 let owner: ReturnType<typeof fakeOwnerLocation>;
 let payeeLocation: ReturnType<typeof fakePayeeLocation>;
+let accounts: ReturnType<typeof fakeAccounts>;
 let resolver: PayeeResolver;
 
 beforeEach(() => {
@@ -143,8 +183,12 @@ beforeEach(() => {
   ai = new StubAi();
   owner = fakeOwnerLocation();
   payeeLocation = fakePayeeLocation(replica);
+  accounts = fakeAccounts();
+  transferWrites.lagging = false;
+  transferWrites.calls = [];
   resolver = new PayeeResolver(
     replica,
+    new TransferMatcher(replica, accounts.service),
     new TxMatcher(replica, ai, new StructuredLoggerService()),
     fakeWriter(replica),
     ai,
@@ -481,4 +525,115 @@ test('sweep: resolves every day the batch needs in one pass before any transacti
   resolver.sweep();
   await resolver.queue.onIdle();
   assert.equal(owner.state.ensured.length, 0);
+});
+
+/** Both sides of one transfer from savings to checking, as the bank lists them. */
+function transfer(outbound: Parameters<typeof addTx>[2] = {}) {
+  const shared = { date: '2026-10-04', docNo: '4230119' };
+  return {
+    inbound: addTx(replica, FROM_SAVINGS, { ...shared, amountCents: 826267 }),
+    outbound: addTx(replica, 'BANCA MOVIL', {
+      ...shared,
+      bankAccountId: SAVINGS.id,
+      amountCents: -826267,
+      ...outbound,
+    }),
+  };
+}
+
+test('transfer: both sides are marked with the other account, whichever arrives first', async () => {
+  const { inbound, outbound } = transfer();
+
+  await run(outbound, inbound);
+
+  assert.equal(txRow(outbound).transferBankAccountId, CHECKING.id);
+  assert.equal(txRow(inbound).transferBankAccountId, SAVINGS.id);
+  assert.deepEqual(results(outbound, 'transfer')[0]!.data, {
+    rule: 'banco-industrial-named-account',
+    partnerTxId: inbound,
+  });
+  assert.equal(results(inbound, 'transfer').length, 1, 'marked once, not again on its own turn');
+});
+
+test('transfer: neither side is given a payee or a location', async () => {
+  const housekeeper = addPayee(replica, 'Housekeeper', { locationKind: 'unknown' });
+  addTx(replica, 'BANCA MOVIL', { payeeId: housekeeper, categoryId: 'c', date: '2026-06-14' });
+  const { inbound, outbound } = transfer();
+
+  await run(outbound, inbound);
+
+  assert.equal(txRow(outbound).payeeId, null, 'not copied from the last BANCA MOVIL');
+  assert.equal(ai.calls, 0);
+  assert.equal(results(outbound, 'exact').length, 0);
+  assert.equal(results(inbound, 'location').length, 0);
+});
+
+test('transfer: a payee the other side was already given is cleared', async () => {
+  const housekeeper = addPayee(replica, 'Housekeeper', { locationKind: 'unknown' });
+  const { inbound, outbound } = transfer({ payeeId: housekeeper, categoryId: 'c' });
+
+  await run(inbound);
+
+  assert.equal(txRow(outbound).payeeId, null);
+  assert.equal(txRow(outbound).categoryId, null);
+  assert.equal(txRow(outbound).transferBankAccountId, CHECKING.id);
+});
+
+test('transfer: a side already marked on its own is not marked again when the other arrives', async () => {
+  const inbound = addTx(replica, FROM_SAVINGS, {
+    date: '2026-10-04',
+    docNo: '4230119',
+    amountCents: 826267,
+  });
+  await run(inbound);
+  assert.equal(txRow(inbound).transferBankAccountId, SAVINGS.id);
+
+  const outbound = addTx(replica, 'BANCA MOVIL', {
+    date: '2026-10-04',
+    docNo: '4230119',
+    bankAccountId: SAVINGS.id,
+    amountCents: -826267,
+  });
+  await run(outbound);
+
+  assert.equal(txRow(outbound).transferBankAccountId, CHECKING.id);
+  assert.equal(results(inbound, 'transfer').length, 1);
+});
+
+test('transfer: the sweep finds one among transactions with nothing else left to do', async () => {
+  const housekeeper = addPayee(replica, 'Housekeeper', { locationKind: 'unknown' });
+  const { inbound, outbound } = transfer({ payeeId: housekeeper, categoryId: 'c' });
+  const final = { purchaseDate: '2026-10-02', rule: 'single-country', country: 'GT', final: true };
+  addResult(replica, inbound, 'none');
+  addResult(replica, inbound, 'location', { ...final, location: 'Guatemala City' });
+  addResult(replica, outbound, 'location', { ...final, location: 'Guatemala City' });
+
+  resolver.sweep();
+  await resolver.queue.onIdle();
+
+  assert.equal(txRow(inbound).transferBankAccountId, SAVINGS.id);
+  assert.equal(txRow(outbound).transferBankAccountId, CHECKING.id);
+  assert.equal(txRow(outbound).payeeId, null);
+  assert.equal(transferWrites.calls.length, 1, 'one write, though both rows were read as unmarked');
+});
+
+test('transfer: a side whose mark has not reached the replica yet is not written again', async () => {
+  const { inbound, outbound } = transfer();
+  transferWrites.lagging = true;
+
+  await run(outbound, inbound);
+
+  assert.equal(transferWrites.calls.length, 1);
+  assert.equal(ai.calls, 0, 'nor is it matched to a payee in the meantime');
+});
+
+test('transfer: when the accounts cannot be read, the transaction is still matched', async () => {
+  const known = addPayee(replica, 'La Torre', { locationKind: 'chain', country: 'GT' });
+  addTx(replica, LA_TORRE, { payeeId: known, categoryId: 'groceries', date: '2026-06-01' });
+  const id = addTx(replica, LA_TORRE, { date: '2026-07-10' });
+  accounts.state.fail = true;
+
+  await run(id);
+
+  assert.equal(txRow(id).payeeId, known);
 });

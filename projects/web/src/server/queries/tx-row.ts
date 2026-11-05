@@ -1,4 +1,15 @@
-import { alias, bankAccount, bankTx, category, categoryGroup, db, eq, payee } from '@bank-bots/db';
+import {
+  alias,
+  and,
+  bankAccount,
+  bankTx,
+  category,
+  categoryGroup,
+  db,
+  eq,
+  isNull,
+  payee,
+} from '@bank-bots/db';
 
 /**
  * One transaction, with every foreign key already resolved to something displayable.
@@ -24,6 +35,16 @@ export type TxRow = {
 };
 
 const transferAccount = alias(bankAccount, 'transfer_account');
+
+/**
+ * A transaction still waiting for a payee: what the Unmatched page lists and its badge counts.
+ *
+ * Not a transfer between two of the owner's accounts. That has no payee and never will, so
+ * counting it would leave work on the list that cannot be done.
+ */
+export function needsPayee() {
+  return and(isNull(bankTx.payeeId), isNull(bankTx.transferBankAccountId));
+}
 
 /**
  * The joined base query. Callers add their own `where` / `orderBy` / `limit`.
