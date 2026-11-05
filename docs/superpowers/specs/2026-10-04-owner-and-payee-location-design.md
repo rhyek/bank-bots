@@ -20,11 +20,11 @@ transaction — including the ones the exact and rule tiers resolve without the 
 
 ## Decisions taken with the owner
 
-| Question | Decision |
-| --- | --- |
-| What does a transaction's location mean? | Where the owner was, from their own location history. Never "where the card was used". |
-| How far back? | Transactions dated from 2026-01-01 and the payees they use. Same boundary as the payee sweep. |
-| Where is the AI? | It resolves **days**, once per day. Transactions look their day up without AI. |
+| Question                                                          | Decision                                                                                             |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| What does a transaction's location mean?                          | Where the owner was, from their own location history. Never "where the card was used".               |
+| How far back?                                                     | Transactions dated from 2026-01-01 and the payees they use. Same boundary as the payee sweep.        |
+| Where is the AI?                                                  | It resolves **days**, once per day. Transactions look their day up without AI.                       |
 | Brands that bill through several countries (Uber via NL, GT, CR)? | One payee per brand. Split only for a genuinely separate local account (Claro / Claro CR), as today. |
 
 The last row reverses the July spec, which split such payees per billing country. The transaction's
@@ -55,43 +55,43 @@ Migration `0015` in `projects/db`.
 
 ### `payee` — three nullable columns
 
-| Column | Type | Meaning |
-| --- | --- | --- |
-| `country` | text | ISO 3166-1 alpha-2 code of where the business is |
-| `location` | text | The specific place, free text, when there is exactly one |
+| Column          | Type | Meaning                                                                 |
+| --------------- | ---- | ----------------------------------------------------------------------- |
+| `country`       | text | ISO 3166-1 alpha-2 code of where the business is                        |
+| `location`      | text | The specific place, free text, when there is exactly one                |
 | `location_kind` | text | `local` \| `chain` \| `remote` \| `unknown`; `NULL` = not looked up yet |
 
-| Kind | Meaning | `country` | `location` |
-| --- | --- | --- | --- |
-| `local` | one physical place | set | set, e.g. `Las Catalinas, Guanacaste` |
-| `chain` | several branches in one country | set | null |
-| `remote` | online or global | head-office country | null |
-| `unknown` | looked up, not determinable | null | null |
+| Kind      | Meaning                         | `country`           | `location`                            |
+| --------- | ------------------------------- | ------------------- | ------------------------------------- |
+| `local`   | one physical place              | set                 | set, e.g. `Las Catalinas, Guanacaste` |
+| `chain`   | several branches in one country | set                 | null                                  |
+| `remote`  | online or global                | head-office country | null                                  |
+| `unknown` | looked up, not determinable     | null                | null                                  |
 
 `location_kind` is the terminal marker: the payee location matcher runs only for `NULL`. To re-ask,
 set it back to `NULL` by hand.
 
 ### `bank_tx` — two nullable columns
 
-| Column | Type | Meaning |
-| --- | --- | --- |
-| `country` | text | ISO alpha-2 code of where the owner was at the time of purchase |
-| `location` | text | The place within it, as resolved for that day |
+| Column     | Type | Meaning                                                         |
+| ---------- | ---- | --------------------------------------------------------------- |
+| `country`  | text | ISO alpha-2 code of where the owner was at the time of purchase |
+| `location` | text | The place within it, as resolved for that day                   |
 
 Neither is part of `bank_tx_unique_cols`, and the scraper never writes them.
 
 ### `owner_day_location` — new table, one row per calendar day (UTC-6)
 
-| Column | Type | Meaning |
-| --- | --- | --- |
-| `date` | date, PK | the day |
-| `country` | text, null | ISO alpha-2 |
-| `location` | text, null | city or area |
-| `basis` | text | `observed` (tracker), `inferred` (from charges, or overriding an assumed tracker day), `unknown` |
-| `confidence` | text | `high` \| `medium` \| `low` |
-| `provisional` | boolean | true until the day is 10 days old (see below) |
-| `data` | jsonb | the evidence shown to the resolver and its one-line reason |
-| `created_at`, `updated_at` | timestamptz | |
+| Column                     | Type        | Meaning                                                                                          |
+| -------------------------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| `date`                     | date, PK    | the day                                                                                          |
+| `country`                  | text, null  | ISO alpha-2                                                                                      |
+| `location`                 | text, null  | city or area                                                                                     |
+| `basis`                    | text        | `observed` (tracker), `inferred` (from charges, or overriding an assumed tracker day), `unknown` |
+| `confidence`               | text        | `high` \| `medium` \| `low`                                                                      |
+| `provisional`              | boolean     | true until the day is 10 days old (see below)                                                    |
+| `data`                     | jsonb       | the evidence shown to the resolver and its one-line reason                                       |
+| `created_at`, `updated_at` | timestamptz |                                                                                                  |
 
 Not replicated to SQLite: only the owner-location module reads or writes it, directly in Postgres.
 
@@ -212,11 +212,11 @@ AI for the 1,335 transaction lookups.
 
 ## Configuration
 
-| Env var | Default | Purpose |
-| --- | --- | --- |
-| `TX_LOCATION_ENABLED` | `true` | existing switch; `false` disables every location step |
-| `TX_LOCATION_MODEL` | value of `TX_AI_MODEL` | model for the two new agents |
-| `TX_LOCATION_EFFORT` | `medium` | effort for the two new agents |
+| Env var               | Default                | Purpose                                               |
+| --------------------- | ---------------------- | ----------------------------------------------------- |
+| `TX_LOCATION_ENABLED` | `true`                 | existing switch; `false` disables every location step |
+| `TX_LOCATION_MODEL`   | value of `TX_AI_MODEL` | model for the two new agents                          |
+| `TX_LOCATION_EFFORT`  | `medium`               | effort for the two new agents                         |
 
 ## Testing
 
@@ -234,12 +234,12 @@ Unit tests (`*.spec.ts`, `test(...)`), with every agent stubbed:
 
 Acceptance checks against real 2026 data, run once after the backfill:
 
-| Days | Expected | Why it is a test |
-| --- | --- | --- |
-| 2026-01-08 .. 2026-01-28 | Guatemala | tracker says San José (assumed); card says Guatemala City |
-| 2026-05-05 .. 2026-05-07 | Guatemala | same |
-| 2026-09-11 .. 2026-09-19 | Costa Rica | live tracker, observed |
-| IMPERIAL STORE, 2026-09-23 | transaction in `CR` | rule 2 |
+| Days                       | Expected            | Why it is a test                                          |
+| -------------------------- | ------------------- | --------------------------------------------------------- |
+| 2026-01-08 .. 2026-01-28   | Guatemala           | tracker says San José (assumed); card says Guatemala City |
+| 2026-05-05 .. 2026-05-07   | Guatemala           | same                                                      |
+| 2026-09-11 .. 2026-09-19   | Costa Rica          | live tracker, observed                                    |
+| IMPERIAL STORE, 2026-09-23 | transaction in `CR` | rule 2                                                    |
 
 ## Out of scope
 

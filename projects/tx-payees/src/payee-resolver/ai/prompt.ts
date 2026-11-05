@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { category, categoryGroup } from '~/replica-db/replica-schema';
 import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import { category, categoryGroup } from '~/replica-db/replica-schema';
 
 /**
  * The agent's instructions.

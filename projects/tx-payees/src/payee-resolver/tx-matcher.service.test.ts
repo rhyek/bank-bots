@@ -3,9 +3,9 @@ import { after, before, describe, it } from 'node:test';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from '~/replica-db/replica-schema';
-import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
 import { TxAiResolver, isResolved, type MatchOutcome } from '~/payee-resolver/match-outcome';
+import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
+import * as schema from '~/replica-db/replica-schema';
 
 // The AI tier, stubbed out. Every test here is about tiers 1 and 2, so the stub answers 'none' and
 // records whether it was reached — which doubles as an assertion that the earlier tiers really did

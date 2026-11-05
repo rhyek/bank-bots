@@ -1,15 +1,14 @@
-import { useState } from 'react';
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router';
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { TanStackDevtools } from '@tanstack/react-devtools';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-import appCss from '~/styles.css?url';
-import { Toaster } from '~/components/ui/sonner';
+import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router';
+import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
+import { useState } from 'react';
 import { AppShell } from '~/components/layout/app-shell';
 import { NotFound } from '~/components/not-found';
+import { Toaster } from '~/components/ui/sonner';
 import { ThemeProvider } from '~/context/theme-provider';
 import { getChromeCookies } from '~/server/chrome';
+import appCss from '~/styles.css?url';
 
 export const Route = createRootRoute({
   // The one loader in the app that fetches — it's layout state (theme + sidebar width), read

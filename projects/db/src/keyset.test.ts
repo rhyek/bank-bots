@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { db } from './index';
-import { bankTx } from './schema';
 import { keysetBefore } from './keyset';
+import { bankTx } from './schema';
 
 test('keysetBefore returns undefined when there is no cursor', () => {
   assert.equal(keysetBefore(undefined), undefined);

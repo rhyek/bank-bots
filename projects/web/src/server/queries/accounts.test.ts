@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bankAccount, db, eq } from '@bank-bots/db';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listAccountsQuery, renameAccountQuery } from './accounts';
 
 describe('listAccountsQuery', () => {

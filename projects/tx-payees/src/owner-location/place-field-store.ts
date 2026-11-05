@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import { placeField, db as pgDb } from '@bank-bots/db';
+import { Injectable } from '@nestjs/common';
 import type { PlaceEntry } from '~/owner-location/place-resolver';
 
 /** `place_field`, read and written directly in Postgres. Like owner_day_location, not replicated. */

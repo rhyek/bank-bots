@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 import { devtools } from '@tanstack/devtools-vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
 
 // No Nitro. TanStack Start (v1.132+) builds to a Web `fetch` handler: `vite build` emits
 // `dist/client` (static assets) + `dist/server/server.js` (the `{ fetch }` handler), which

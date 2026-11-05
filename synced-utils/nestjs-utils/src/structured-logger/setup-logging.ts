@@ -142,7 +142,7 @@ function isCapturableBody(body: unknown): boolean {
     return false;
   }
   // The JSON body parser yields `{}` when there's no body — skip that empty case.
-  return Object.keys(body as Record<string, unknown>).length > 0;
+  return Object.keys(body).length > 0;
 }
 
 /**

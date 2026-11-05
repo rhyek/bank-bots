@@ -1,5 +1,5 @@
-import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { query, type ModelInfo } from '@anthropic-ai/claude-agent-sdk';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 
 /**

@@ -43,12 +43,14 @@ better-sqlite3, `p-queue`, `uuid@14`.
 ### Task 1: Migration 0008 — convert `bank_tx.id` to uuidv7
 
 **Files:**
+
 - Modify: `projects/db/src/schema.ts:1-12` (imports), `:77` (id column)
 - Create: `projects/db/drizzle/0008_bank_tx_uuidv7_pk.sql`
 - Create: `projects/db/drizzle/meta/0008_snapshot.json` (transformed from `0007_snapshot.json`)
 - Modify: `projects/db/drizzle/meta/_journal.json`
 
 **Interfaces:**
+
 - Produces: `bankTx.id` typed `string` throughout `@bank-bots/db` consumers.
 
 - [ ] **Step 1: Back up the table before touching it**
@@ -150,6 +152,7 @@ with:
 - [ ] **Step 5: Create the snapshot and journal entry**
 
 Copy `projects/db/drizzle/meta/0007_snapshot.json` to `0008_snapshot.json`, then inside it:
+
 - change the top-level `"id"` to a fresh uuid and `"prevId"` to `0007_snapshot.json`'s `"id"`
 - in `public.bank_tx.columns.id`, set `"type": "uuid"`, remove `"identity"`, keep
   `"primaryKey": true` and `"notNull": true`
@@ -157,13 +160,13 @@ Copy `projects/db/drizzle/meta/0007_snapshot.json` to `0008_snapshot.json`, then
 Append to `projects/db/drizzle/meta/_journal.json`'s `entries` array:
 
 ```json
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1784500000000,
-      "tag": "0008_bank_tx_uuidv7_pk",
-      "breakpoints": true
-    }
+{
+  "idx": 8,
+  "version": "7",
+  "when": 1784500000000,
+  "tag": "0008_bank_tx_uuidv7_pk",
+  "breakpoints": true
+}
 ```
 
 - [ ] **Step 6: Apply the migration**
@@ -213,12 +216,14 @@ git commit -m "feat(db): bank_tx uuidv7 primary key"
 ### Task 2: Propagate string ids through replica and scripts
 
 **Files:**
+
 - Modify: `projects/tx-payees/src/db-replica/replica-schema.ts:26` (bankTx.id), `:58` (DDL)
 - Modify: `projects/tx-payees/src/db-replica/replica-sync.service.ts:29-32,53`
 - Modify: `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts`
 - Modify: `projects/scrape-txs/src/scripts/backfill-ynab-mappings.ts:25` and its `VALUES` casts
 
 **Interfaces:**
+
 - Consumes: `bankTx.id: string` from Task 1.
 - Produces: replica `bankTx.id` typed `text`; `castId` identity for all three tables.
 
@@ -260,7 +265,7 @@ and drop `castId` from all three entries:
 At line ~211, replace `const id = t.castId(evt.id);` with:
 
 ```ts
-    const id = evt.id;
+const id = evt.id;
 ```
 
 - [ ] **Step 3: Update the description backfill script**
@@ -317,12 +322,14 @@ git commit -m "refactor: string bank_tx ids across replica and backfill scripts"
 ### Task 3: Split `db-replica/` into `replica-db/` + `replica-sync/`
 
 **Files:**
+
 - Create: `projects/tx-payees/src/replica-db/{replica-db.module.ts,replica-db.service.ts,replica-schema.ts}`
 - Create: `projects/tx-payees/src/replica-sync/{replica-sync.module.ts,replica-sync.service.ts,replica-status.controller.ts}`
 - Delete: `projects/tx-payees/src/db-replica/`
 - Modify: `projects/tx-payees/src/app.module.ts`
 
 **Interfaces:**
+
 - Produces: `ReplicaDbModule` exporting `ReplicaDb`; `ReplicaSyncModule` importing it.
 
 - [ ] **Step 1: Move the files with git**
@@ -416,6 +423,7 @@ git commit -m "refactor(ai-agent): split db-replica into replica-db + replica-sy
 ### Task 4: Migration 0009 — `reconcile` flag + `matching_rule`
 
 **Files:**
+
 - Modify: `projects/db/src/schema.ts` (bank_tx `reconcile`, new `matchingRule` table)
 - Create: `projects/db/drizzle/0009_reconcile_and_matching_rule.sql`
 - Create: `projects/db/drizzle/meta/0009_snapshot.json`, modify `meta/_journal.json`
@@ -424,6 +432,7 @@ git commit -m "refactor(ai-agent): split db-replica into replica-db + replica-sy
   `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts`
 
 **Interfaces:**
+
 - Produces: `bankTx.reconcile: boolean`; `matchingRule` table with
   `{ id: string; label: string; pattern: string; priority: number; enabled: boolean }`.
 
@@ -509,7 +518,7 @@ Expected: `reconciled = 1`; `matching_rule` exists with the seven columns.
 `if (currentTx.docNo === 'RECONCILE') return false;` with:
 
 ```ts
-            if (currentTx.reconcile) return false;
+if (currentTx.reconcile) return false;
 ```
 
 `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts` — in `interface Row` replace
@@ -543,11 +552,13 @@ git commit -m "feat(db): bank_tx.reconcile flag + matching_rule table"
 ### Task 5: Replica schema — `reconcile`, `matching_rule`, versioning, `regexp()`
 
 **Files:**
+
 - Modify: `projects/tx-payees/src/replica-db/replica-schema.ts`
 - Modify: `projects/tx-payees/src/replica-db/replica-db.service.ts`
 - Modify: `projects/tx-payees/src/replica-sync/replica-sync.service.ts` (tables list)
 
 **Interfaces:**
+
 - Produces: `matchingRule` SQLite table; `ReplicaDb` with a working `regexp()` SQL function and
   `user_version`-gated schema rebuild.
 
@@ -617,20 +628,20 @@ and replace the body of `onModuleInit` between `this.sqlite.pragma('journal_mode
 `this.db = drizzle(...)` with:
 
 ```ts
-    const version = this.sqlite.pragma('user_version', { simple: true }) as number;
-    if (version !== EXPECTED_SCHEMA_VERSION) {
-      this.logger.log(`replica schema v${version} != v${EXPECTED_SCHEMA_VERSION}; rebuilding`);
-      this.sqlite.exec(schema.DROP_SCHEMA_SQL);
-    }
-    this.sqlite.exec(schema.CREATE_SCHEMA_SQL);
-    this.sqlite.pragma(`user_version = ${EXPECTED_SCHEMA_VERSION}`);
-    // SQLite ships no REGEXP implementation — `X REGEXP Y` compiles to regexp(Y, X) and fails at
-    // prepare() with "no such function". Supplying it here gives JS regex semantics (the rule
-    // patterns use \b and negative lookahead, which Postgres's POSIX `~*` cannot express).
-    // Note the argument order: the operator passes the PATTERN first.
-    this.sqlite.function('regexp', (pattern: string, value: string) =>
-      value != null && new RegExp(pattern, 'i').test(value) ? 1 : 0,
-    );
+const version = this.sqlite.pragma('user_version', { simple: true }) as number;
+if (version !== EXPECTED_SCHEMA_VERSION) {
+  this.logger.log(`replica schema v${version} != v${EXPECTED_SCHEMA_VERSION}; rebuilding`);
+  this.sqlite.exec(schema.DROP_SCHEMA_SQL);
+}
+this.sqlite.exec(schema.CREATE_SCHEMA_SQL);
+this.sqlite.pragma(`user_version = ${EXPECTED_SCHEMA_VERSION}`);
+// SQLite ships no REGEXP implementation — `X REGEXP Y` compiles to regexp(Y, X) and fails at
+// prepare() with "no such function". Supplying it here gives JS regex semantics (the rule
+// patterns use \b and negative lookahead, which Postgres's POSIX `~*` cannot express).
+// Note the argument order: the operator passes the PATTERN first.
+this.sqlite.function('regexp', (pattern: string, value: string) =>
+  value != null && new RegExp(pattern, 'i').test(value) ? 1 : 0,
+);
 ```
 
 - [ ] **Step 3: Replicate `matching_rule`**
@@ -664,11 +675,13 @@ git commit -m "feat(ai-agent): replicate matching_rule; replica schema versionin
 ### Task 6: `TxMatcher` — the two-tier resolution
 
 **Files:**
+
 - Create: `projects/tx-payees/src/tx-payees/tx-matcher.service.ts`
 - Create: `projects/tx-payees/src/tx-payees/tx-matcher.service.test.ts`
 - Modify: `projects/tx-payees/package.json` (add `test` script)
 
 **Interfaces:**
+
 - Consumes: `ReplicaDb` from Task 3; `matchingRule` + `bankTx` replica tables from Task 5.
 - Produces: `TxMatcher.match(tx: MatchableTx): MatchResult | null` where
   `MatchableTx = { id: string; description: string }` and
@@ -782,12 +795,19 @@ describe('TxMatcher', () => {
   it('routes sub-brands via negative lookahead', () => {
     addRule('pedidosya propina', String.raw`\bpedidos\s*ya\s+propina`, 30);
     addRule('pedidosya', String.raw`\bpedidos\s*ya\b(?!\s+propina)`, 40);
-    addTx('PEDIDOSYA PROPINA X', { payeeId: 'p-propina', categoryId: 'c-misc', date: '2026-04-01' });
+    addTx('PEDIDOSYA PROPINA X', {
+      payeeId: 'p-propina',
+      categoryId: 'c-misc',
+      date: '2026-04-01',
+    });
     addTx('PEDIDOSYA FOOD X', { payeeId: 'p-food', categoryId: 'c-rest', date: '2026-04-01' });
 
     const propina = addTx('PEDIDOSYA PROPINA ZZZ');
     const food = addTx('PEDIDOSYA FOOD ZZZ');
-    assert.equal(matcher.match({ id: propina, description: 'PEDIDOSYA PROPINA ZZZ' })?.payeeId, 'p-propina');
+    assert.equal(
+      matcher.match({ id: propina, description: 'PEDIDOSYA PROPINA ZZZ' })?.payeeId,
+      'p-propina',
+    );
     assert.equal(matcher.match({ id: food, description: 'PEDIDOSYA FOOD ZZZ' })?.payeeId, 'p-food');
   });
 
@@ -825,8 +845,8 @@ Create `projects/tx-payees/src/tx-payees/tx-matcher.service.ts`:
 ```ts
 import { Injectable, Logger } from '@nestjs/common';
 import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
-import { bankTx, matchingRule } from '~/replica-db/replica-schema';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, matchingRule } from '~/replica-db/replica-schema';
 
 export interface MatchableTx {
   id: string;
@@ -850,7 +870,10 @@ export class TxMatcher {
   constructor(private readonly replica: ReplicaDb) {}
 
   match(tx: MatchableTx): MatchResult | null {
-    const exact = this.mostRecentMapped(ne(bankTx.id, tx.id), eq(bankTx.description, tx.description));
+    const exact = this.mostRecentMapped(
+      ne(bankTx.id, tx.id),
+      eq(bankTx.description, tx.description),
+    );
     if (exact) return { ...exact, via: 'exact' };
 
     for (const rule of this.rules()) {
@@ -920,11 +943,13 @@ git commit -m "feat(ai-agent): TxMatcher two-tier payee/category resolution"
 ### Task 7: `TxPayees` — queue, backlog sweep, worker
 
 **Files:**
+
 - Create: `projects/tx-payees/src/tx-payees/tx-payees.service.ts`
 - Create: `projects/tx-payees/src/tx-payees/tx-payees.module.ts`
 - Modify: `projects/tx-payees/package.json` (add `p-queue`)
 
 **Interfaces:**
+
 - Consumes: `TxMatcher.match()` from Task 6; `ReplicaDb` from Task 3.
 - Produces: `TxPayees` with `readonly queue: PQueue`, `start(): void`, `enqueue(txId: string): void`.
 
@@ -939,12 +964,12 @@ pnpm -C projects/tx-payees add p-queue
 Create `projects/tx-payees/src/tx-payees/tx-payees.service.ts`:
 
 ```ts
-import { Injectable, Logger } from '@nestjs/common';
-import PQueue from 'p-queue';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { bankTx as pgBankTx, db as pgDb, eq as pgEq } from '@bank-bots/db';
-import { bankTx } from '~/replica-db/replica-schema';
+import { Injectable, Logger } from '@nestjs/common';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import PQueue from 'p-queue';
 import { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx } from '~/replica-db/replica-schema';
 import { TxMatcher } from '~/tx-payees/tx-matcher.service';
 
 // Only transactions on or after this date are matched; earlier history is left as-is.
@@ -1072,10 +1097,12 @@ git commit -m "feat(ai-agent): TxPayees queue + backlog sweep + worker"
 ### Task 8: Wire `ReplicaSync` → `TxPayees`
 
 **Files:**
+
 - Modify: `projects/tx-payees/src/replica-sync/replica-sync.service.ts`
 - Modify: `projects/tx-payees/src/replica-sync/replica-sync.module.ts`
 
 **Interfaces:**
+
 - Consumes: `TxPayees.start()` and `TxPayees.enqueue()` from Task 7.
 
 - [ ] **Step 1: Import the module**
@@ -1110,12 +1137,12 @@ Add a field beside the other private flags:
 At the end of `deltaSync()`'s `try` block (after the `for` loop over tables, before `finally`):
 
 ```ts
-      // Only after a full successful sync — matching against a half-populated replica would copy
-      // from incomplete history. start() is idempotent, but the flag keeps reconnect syncs quiet.
-      if (!this.txPayeesStarted) {
-        this.txPayeesStarted = true;
-        this.txPayees.start();
-      }
+// Only after a full successful sync — matching against a half-populated replica would copy
+// from incomplete history. start() is idempotent, but the flag keeps reconnect syncs quiet.
+if (!this.txPayeesStarted) {
+  this.txPayeesStarted = true;
+  this.txPayees.start();
+}
 ```
 
 - [ ] **Step 3: Enqueue newly-unmapped rows from the notify path**
@@ -1123,11 +1150,11 @@ At the end of `deltaSync()`'s `try` block (after the `for` loop over tables, bef
 In `onNotification`, inside the non-delete branch after the SQLite upsert:
 
 ```ts
-        // A new or changed transaction with no payee is work for tx-payees. Matched rows come back
-        // through this same path with payee_id set, so this cannot loop.
-        if (evt.table === 'bank_tx' && (row as { payeeId: string | null }).payeeId == null) {
-          this.txPayees.enqueue(evt.id);
-        }
+// A new or changed transaction with no payee is work for tx-payees. Matched rows come back
+// through this same path with payee_id set, so this cannot loop.
+if (evt.table === 'bank_tx' && (row as { payeeId: string | null }).payeeId == null) {
+  this.txPayees.enqueue(evt.id);
+}
 ```
 
 - [ ] **Step 4: Typecheck and run**
@@ -1164,6 +1191,7 @@ git commit -m "feat(ai-agent): start tx-payees after first sync; enqueue on noti
 ### Task 9: Seed the 21 matching rules
 
 **Files:**
+
 - Create: `projects/tx-payees/src/tx-payees/seed-matching-rules.ts`
 - Modify: `projects/tx-payees/package.json` (add the script)
 
@@ -1283,6 +1311,7 @@ git commit -m "feat(ai-agent): seed matching rules from the legacy matcher list"
 ### Task 10: Documentation
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 - Modify: `projects/tx-payees/CLAUDE.md`
 

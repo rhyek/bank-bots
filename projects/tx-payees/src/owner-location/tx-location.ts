@@ -9,7 +9,11 @@ export const POSTING_LAG_DAYS = 2;
 
 /** Which lookup rule decided a transaction's location. */
 export type LocationRule =
-  'single-country' | 'description-country' | 'payee-country' | 'posting-lag' | 'none';
+  | 'single-country'
+  | 'description-country'
+  | 'payee-country'
+  | 'posting-lag'
+  | 'none';
 
 /** Where the owner was when a purchase happened: `matcher_result.data` of a `location` row. */
 export interface TxLocation {

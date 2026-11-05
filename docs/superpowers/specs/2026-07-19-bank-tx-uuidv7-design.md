@@ -45,7 +45,7 @@ This convention goes into `CLAUDE.md` under the schema section, which already do
 ## Backfill strategy — option C
 
 Existing ids are regenerated at migration time, **in old-id order**. The v7 timestamp component
-therefore encodes *when the migration ran*, not when the row was created; only the relative ordering
+therefore encodes _when the migration ran_, not when the row was created; only the relative ordering
 of existing rows is meaningful. Rows inserted after the migration carry real creation timestamps.
 
 Options B (timestamp from `date`) and A (timestamp from `created_at`) were considered and rejected in
@@ -113,15 +113,15 @@ more moving parts; same result.
 
 ## Code changes
 
-| File | Change |
-| --- | --- |
-| `projects/db/src/schema.ts:77` | `bigint({mode:'number'}).primaryKey().generatedByDefaultAsIdentity()` → `uuid().primaryKey().$defaultFn(uuidv7)` |
-| `projects/tx-payees/src/replica-db/replica-schema.ts` | `bankTx.id`: `integer('id')` → `text('id')`; same in `CREATE_SCHEMA_SQL`; bump `EXPECTED_SCHEMA_VERSION` |
-| `projects/tx-payees/src/replica-sync/replica-sync.service.ts:53` | `castId: (id) => Number(id)` → `(id) => id`; update the comment at line 30 |
-| `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts` | `Row.id: number` → `string`; `${u.id}::bigint` → `::uuid` in the `VALUES` upsert |
-| `projects/scrape-txs/src/scripts/backfill-ynab-mappings.ts:25` | `id: number` → `string`; the two `VALUES` casts likewise |
-| `projects/tx-payees/src/payee-resolver/*` | `Set<number>` → `Set<string>`; `enqueue(txId: string)` |
-| `CLAUDE.md` | Record the uuidv7 PK convention; update the `bank_tx.id` row in the schema table |
+| File                                                                  | Change                                                                                                           |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `projects/db/src/schema.ts:77`                                        | `bigint({mode:'number'}).primaryKey().generatedByDefaultAsIdentity()` → `uuid().primaryKey().$defaultFn(uuidv7)` |
+| `projects/tx-payees/src/replica-db/replica-schema.ts`                 | `bankTx.id`: `integer('id')` → `text('id')`; same in `CREATE_SCHEMA_SQL`; bump `EXPECTED_SCHEMA_VERSION`         |
+| `projects/tx-payees/src/replica-sync/replica-sync.service.ts:53`      | `castId: (id) => Number(id)` → `(id) => id`; update the comment at line 30                                       |
+| `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts` | `Row.id: number` → `string`; `${u.id}::bigint` → `::uuid` in the `VALUES` upsert                                 |
+| `projects/scrape-txs/src/scripts/backfill-ynab-mappings.ts:25`        | `id: number` → `string`; the two `VALUES` casts likewise                                                         |
+| `projects/tx-payees/src/payee-resolver/*`                             | `Set<number>` → `Set<string>`; `enqueue(txId: string)`                                                           |
+| `CLAUDE.md`                                                           | Record the uuidv7 PK convention; update the `bank_tx.id` row in the schema table                                 |
 
 The scrapers need three one-line changes: `deleteTxIds` is explicitly annotated `number[]` in
 `lib/run.ts:32`, `lib/bac/scrape.ts:30`, and `lib/banco-industrial/scrape.ts:48`. The ids are
@@ -134,7 +134,7 @@ Both matcher tiers order by `date DESC, id DESC` as a tiebreaker. uuidv7 is lexi
 ordered by its timestamp prefix, so text comparison preserves the intended "most recent first"
 semantics. The backlog sweep's `created_at ASC, id ASC` holds for the same reason.
 
-One nuance: within the migration block all ids sort by *old id*, which was insertion order — the same
+One nuance: within the migration block all ids sort by _old id_, which was insertion order — the same
 ordering the tiebreaker previously had. No behavioral change.
 
 ## Replica impact

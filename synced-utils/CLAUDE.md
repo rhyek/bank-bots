@@ -24,6 +24,9 @@ Working rules:
 - This `CLAUDE.md` is itself mirrored (from `packages/CLAUDE.md` in the shared repo), as are the
   files a package contributes to this repo's `.claude/` (from `packages/<name>/.claude/`). Files in
   `.claude/` that no package owns are never touched.
-- `.synced-utils.json` here records this repo's path so the daemon can follow it if the repo moves.
+- The daemon follows this repo if it is moved or renamed under `~/Dev`. It knows the repo by its
+  directory, recorded outside the repo, so there is nothing here to commit or ignore.
 - To add a package, or wire it into another workspace package:
-  `synced-utils add <package> -t <workspace-package-name-or-dir>`.
+  `synced-utils add <package> -t <workspace-package-name-or-dir>`; `-t .` wires it into the
+  repo's root `package.json`, for a repo-wide tool's config (`synced-utils add oxc-config -t .`).
+- To stop syncing this repo: `synced-utils remove`. What is here stays, as the repo's own files.

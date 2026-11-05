@@ -26,19 +26,19 @@ can't decide or do (see [When to stop](#when-to-stop-and-ask)).
 
 ## Orientation — where things are
 
-| Thing | Path / value |
-| --- | --- |
-| Scraper service (NestJS) | `projects/scrape-txs` — see its `CLAUDE.md` |
-| Per-bank Playwright code | `projects/scrape-txs/src/scrape/banks/<bank>/scrape.ts` (`bac/`, `banco-industrial/`) |
-| One bank's run (browser, retries, tracing, persistence) | `projects/scrape-txs/src/scrape/scrape-job.service.ts` |
-| Batches, the per-bank lock, alerts | `src/scrape/scrape-runs.service.ts`, `src/scrape/scrape-alert.service.ts` |
-| Credentials (Bitwarden) | `src/credentials/` |
-| Bank keys | `bacGt`, `bacCr` (share the BAC code in `bac/scrape.ts`), `bancoIndustrialGt` |
-| Start a scrape | `POST $S/scrape/<bankKey>`, where `S` is the service on its own port — see *Reproduce* (the number lives in `.env.development`, never in a command) |
-| Follow a run | `GET /scrape/runs/<runId>`; recent runs: `GET /scrape/runs` (the `scrape_run` table) |
-| A run's files | `projects/scrape-txs/storage/runs/<runId>/` — `trace.zip` (failure only), `scraped.json` (dry run only) |
-| Service log | the devtooie session's logfile (`devtooie logs`), JSON lines; every line of a run carries `run.runId` + `run.bankKey` |
-| DB | Supabase Postgres, tables `bank_tx` + `bank_account` + `scrape_run`; `DATABASE_URL` in repo-root `.env.local` |
+| Thing                                                   | Path / value                                                                                                                                        |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scraper service (NestJS)                                | `projects/scrape-txs` — see its `CLAUDE.md`                                                                                                         |
+| Per-bank Playwright code                                | `projects/scrape-txs/src/scrape/banks/<bank>/scrape.ts` (`bac/`, `banco-industrial/`)                                                               |
+| One bank's run (browser, retries, tracing, persistence) | `projects/scrape-txs/src/scrape/scrape-job.service.ts`                                                                                              |
+| Batches, the per-bank lock, alerts                      | `src/scrape/scrape-runs.service.ts`, `src/scrape/scrape-alert.service.ts`                                                                           |
+| Credentials (Bitwarden)                                 | `src/credentials/`                                                                                                                                  |
+| Bank keys                                               | `bacGt`, `bacCr` (share the BAC code in `bac/scrape.ts`), `bancoIndustrialGt`                                                                       |
+| Start a scrape                                          | `POST $S/scrape/<bankKey>`, where `S` is the service on its own port — see _Reproduce_ (the number lives in `.env.development`, never in a command) |
+| Follow a run                                            | `GET /scrape/runs/<runId>`; recent runs: `GET /scrape/runs` (the `scrape_run` table)                                                                |
+| A run's files                                           | `projects/scrape-txs/storage/runs/<runId>/` — `trace.zip` (failure only), `scraped.json` (dry run only)                                             |
+| Service log                                             | the devtooie session's logfile (`devtooie logs`), JSON lines; every line of a run carries `run.runId` + `run.bankKey`                               |
+| DB                                                      | Supabase Postgres, tables `bank_tx` + `bank_account` + `scrape_run`; `DATABASE_URL` in repo-root `.env.local`                                       |
 
 `scrape-job.service.ts` runs a bank with **retries** (currently 2 attempts, 5 minutes apart), each
 in a **fresh browser context**, headless. Each failed attempt saves a Playwright trace: the final
@@ -52,8 +52,8 @@ error and the trace path directly.
 
 1. **Gather evidence** — get the trace file and the log for the failing run.
 2. **Diagnose from the trace** — find the exact action that hung and the selector/URL involved.
-3. **Reproduce** — run the scrape yourself and confirm you get the *same* failure.
-4. **Confirm from your own trace** — inspect the trace *your* run produced; verify the failing
+3. **Reproduce** — run the scrape yourself and confirm you get the _same_ failure.
+4. **Confirm from your own trace** — inspect the trace _your_ run produced; verify the failing
    step and DOM match the original. Now you're debugging a live, current failure, not a stale one.
 5. **Find the fix** — inspect the current DOM (live page for public pages, trace snapshots for
    authenticated ones) to learn what the selector/flow should be now.
@@ -76,7 +76,7 @@ its recipes; don't reinvent them.
 
 Key diagnostic signal: **an action whose duration ≈ the Playwright timeout (30000 ms) and whose
 Call log shows only `waiting for locator(...)` never resolved** — that locator is the break. The
-actions *before* it succeeded (fast durations), so the DOM changed at exactly that step.
+actions _before_ it succeeded (fast durations), so the DOM changed at exactly that step.
 
 ### 3 — Reproduce
 
@@ -112,6 +112,7 @@ unless you specifically need the write: the login and the scrape are identical, 
 is written (`bank_tx` is untouched; the run itself is still recorded in `scrape_run`). A `409` means that bank already has a run in progress — follow that run instead.
 
 What happens:
+
 - The service fetches the bank's credentials from Bitwarden and logs in with them in a headless
   Chromium — that's the scraper doing it, which is fine. **You never type credentials yourself**
   (prohibited).
@@ -136,7 +137,7 @@ live DOM."
 
 ### 5 — Find the fix
 
-Figure out what the step *should* be now:
+Figure out what the step _should_ be now:
 
 - **Public / pre-login pages** (home page, country selector, login form): inspect the **live
   page** with the Claude-in-Chrome browser tools. Navigate to the URL, and use `javascript_tool`
@@ -185,7 +186,7 @@ FROM scrape_run WHERE bank_key = '<bankKey>' ORDER BY started_at DESC LIMIT 5;"
 ```
 
 Note the scraper **upserts** and only re-sets `amount_cents` on conflict, so re-scraping
-already-present transactions won't bump `created_at` — to prove a *fresh* insert you need a
+already-present transactions won't bump `created_at` — to prove a _fresh_ insert you need a
 transaction that isn't in the DB yet; otherwise trust the run's `succeeded` + its counts + the
 absence of a trace.
 
@@ -214,6 +215,7 @@ Drive autonomously, but stop and check with the human when:
 Concrete breakages seen on these scrapers — check here first when a symptom looks familiar.
 
 ### BAC (`bacGt` / `bacCr`) — login submit button renamed — FIXED 2026-07-11
+
 - **Symptom:** attempt fills Usuario + Contraseña fine, then `locator.click` on
   `.login-form__submit-btn` hangs 30 s (`waiting for locator('.login-form__submit-btn')`).
 - **Cause:** BAC redesigned the online-banking login page
@@ -222,7 +224,7 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   runs `initializeDigitalSignature(); copyTempPass(); saveUserCache()`, so it must be **clicked**
   (not `form.submit()`ed). Fix applied in `bac/scrape.ts`:
   `page.locator('.login-form__submit-btn')` → `page.locator('#confirm')`.
-- **Key learning:** this was the *only* broken step. The **post-login flow was completely
+- **Key learning:** this was the _only_ broken step. The **post-login flow was completely
   unaffected** — account navigation (`.bel-card`, the account-row form button), the month picker
   (`#selectMonthLabel` / `#selectMonthList`), and the transaction table (`#transactionTable1`) all
   still worked. The redesign hit only the marketing/login site, not the online-banking app (the
@@ -230,7 +232,8 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   changed — the authenticated area is a separate, more stable system.
 
 ### BAC retries — stale context redirects the country step — FIXED 2026-07-11
-- **Symptom:** attempt 1 fails at login; attempt 2 fails *earlier and differently* —
+
+- **Symptom:** attempt 1 fails at login; attempt 2 fails _earlier and differently_ —
   `locator.click` on `[data-country]` filtered to the country times out 30 s.
 - **Cause:** the run loop (then `run.ts`) reused **one browser context** across retries, so the country-preference
   **cookie** from attempt 1 persisted. On retry, `goto('https://www.baccredomatic.com/')`
@@ -239,11 +242,12 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
 - **Fix applied:** the run loop (now `scrape-job.service.ts`) creates a **fresh `browser.newContext()` inside the retry loop**
   (one per attempt, closed in the loop's `finally`), and starts tracing per-context, saving the
   trace only on the final attempt. Each retry therefore starts with no cookies/storage.
-- **Watch for the general pattern:** whenever attempt 2 fails at a step attempt 1 *passed*, suspect
+- **Watch for the general pattern:** whenever attempt 2 fails at a step attempt 1 _passed_, suspect
   leaked session state — compare the `goto` landing URLs across attempts in the trace.
 
 ### An account times out in the account list — may be a credentials/config mismatch, not a DOM change
-- **Symptom:** login and the *first* account scrape succeed, then `locator.click` on another
+
+- **Symptom:** login and the _first_ account scrape succeed, then `locator.click` on another
   account's row (`getByRole('cell', { name: '<accountNumber>' })` inside the `Cuentas bancarias`
   card) times out 30 s.
 - **Not necessarily a DOM change.** It often just means the configured account **isn't listed in
@@ -257,6 +261,7 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   credentials) — credentials are owner-only (see [When to stop](#when-to-stop-and-ask)).
 
 ### Login rejected — check Bitwarden before the scraper — 2026-10-01
+
 - **Symptom:** the bank refuses the login on the first attempt, with no selector timeout before it.
 - **Cause seen:** the stored Banco Industrial password was stale. Credentials now come from Bitwarden
   per batch (`src/credentials/`; see CLAUDE.md → `config`), so the fix is the owner updating the
@@ -267,6 +272,7 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   every bank of the batch fails together and ONE alert names them all.
 
 ### BAC month picker read too early → an empty month — FIXED 2026-10-01
+
 - **Symptom:** a run scrapes **zero** rows for a month that has plenty (seen: July for `904201043`,
   127 rows on the next run two minutes later). The scrape treats "not scraped" as "the bank deleted
   it", so this would have wiped the stored month; it only didn't because the same run crashed on
@@ -278,6 +284,7 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   and a month that scrapes empty while the DB has rows for it now throws instead of deleting.
 
 ### Upsert aborts: "ON CONFLICT DO UPDATE command cannot affect row a second time" — FIXED 2026-10-01
+
 - **Cause:** the bank lists two transactions identical on account, date, doc no, description and
   amount (BAC doc numbers are generic; seen with two same-day PedidosYa tips). The batched upsert
   cannot hold both, and the whole transaction rolls back — nothing is written for that bank.
@@ -290,6 +297,7 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   was refreshed in that run (one with rows in the current month).
 
 ### BAC blocked by its CDN (Akamai 403) — not a DOM change — 2026-10-05, 2026-10-06
+
 - **Symptom:** both BAC keys fail together. The final error is the 30 s `[data-country]` timeout,
   which reads like a renamed selector, but the trace is tiny (~33 KB) and its only resource is a
   375-byte page titled `Access Denied` (`Server: AkamaiGHost`, status 403 in `trace.network`, a
@@ -312,15 +320,16 @@ Concrete breakages seen on these scrapers — check here first when a symptom lo
   anti-bot case in [When to stop](#when-to-stop-and-ask), and more attempts can extend the block.
 
 ### Diagnosing tips that generalize
+
 - Trust **durations + the Playwright Call log + stdout error** to find the hung step. Don't rely
   only on extracting the structured `error` from trace `after` entries — its shape varies across
   Playwright versions and may read as "ok" even for the timed-out action.
 - **Every failed attempt keeps its trace** (since 2026-10-06): `trace.zip` is the final attempt's,
   the one the run reports as `error.tracePath`; `trace-attempt-<n>.zip` next to it is an earlier
-  one's. Retries often fail at *different* steps (attempt 1 deep in the account list, attempt 2 at
+  one's. Retries often fail at _different_ steps (attempt 1 deep in the account list, attempt 2 at
   the home page because the bank refused the re-login), so read the first attempt's trace first.
   The **service log also keeps every attempt's error** (`scrape attempt failed; retrying`, with
   `reason`). Runs from before that date have only the final trace.
 - Compare **`frame-snapshot` `frameUrl`s across attempts** to catch redirects / unexpected
   navigation (that's how the stale-context bug surfaced).
-- The fills succeeding but the *next* click hanging is the classic "one selector moved" signature.
+- The fills succeeding but the _next_ click hanging is the classic "one selector moved" signature.

@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import { ownerDayLocation, db as pgDb, inArray as pgInArray } from '@bank-bots/db';
+import { Injectable } from '@nestjs/common';
 import type {
   Basis,
   Confidence,

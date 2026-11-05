@@ -1,3 +1,4 @@
+import { db, type bankTx } from '@bank-bots/db';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat.js';
 import type { Page } from 'playwright';
@@ -5,7 +6,6 @@ import { isMatching } from 'ts-pattern';
 import type { z } from 'zod';
 import type { bacSchema } from '~/bank-config/config-schema';
 import type { BankCredentials } from '~/credentials/bitwarden';
-import { db, type bankTx } from '@bank-bots/db';
 import { ensureBankAccount } from '../bank-accounts';
 import { numberOccurrences } from '../occurrences';
 import { type ScrapeLog, waitRandomMs } from '../utils';

@@ -1,11 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { bankAccount, bankTx, db, eq, inArray, sql } from '@bank-bots/db';
 import { Injectable } from '@nestjs/common';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import dayjs from 'dayjs';
 import { type BrowserContext, chromium } from 'playwright';
 import { z } from 'zod';
-import { bankAccount, bankTx, db, eq, inArray, sql } from '@bank-bots/db';
 import type { BankKey } from '~/bank-config/bank-keys';
 import type { Config } from '~/bank-config/config-schema';
 import type { BankCredentials } from '~/credentials/bitwarden';
@@ -149,7 +149,7 @@ export class ScrapeJobService {
       params.account ? accounts.filter((a) => a.number === params.account) : accounts;
 
     if (bankKey === 'bancoIndustrialGt') {
-      return await bancoIndustrialScrape({
+      return bancoIndustrialScrape({
         bankKey,
         biConfig: {
           auth: { ...credentials, code: z.string().parse(credentials.code) },
@@ -161,7 +161,7 @@ export class ScrapeJobService {
       });
     }
     const bank = config.banks[bankKey];
-    return await bacScrape({
+    return bacScrape({
       bankKey,
       config: { ...bank, accounts: only(bank.accounts), auth: credentials },
       months,

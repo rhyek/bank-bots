@@ -1,10 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { formatCents, formatDate } from '~/lib/format';
-import { monthRange } from '~/lib/filters';
-import { bucketTransactionsQueryOptions } from '~/lib/queries';
-import { cn } from '~/lib/utils';
+import { useNavigate } from '@tanstack/react-router';
+import { useState } from 'react';
+import { Checkbox } from '~/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -12,8 +9,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog';
-import { Checkbox } from '~/components/ui/checkbox';
 import { Skeleton } from '~/components/ui/skeleton';
+import { monthRange } from '~/lib/filters';
+import { formatCents, formatDate } from '~/lib/format';
+import { bucketTransactionsQueryOptions } from '~/lib/queries';
+import { cn } from '~/lib/utils';
 import type { SpendingBucket } from '~/server/queries/spending';
 import type { TxRow } from '~/server/queries/tx-row';
 

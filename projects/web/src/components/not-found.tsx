@@ -1,8 +1,8 @@
 import { Link } from '@tanstack/react-router';
-import { Button } from '~/components/ui/button';
 import { Header } from '~/components/layout/header';
 import { Main } from '~/components/layout/main';
 import { ThemeSwitch } from '~/components/theme-switch';
+import { Button } from '~/components/ui/button';
 
 // The not-found page, for a URL no route matches and for any `notFound()` a loader throws. The
 // response keeps its 404 status. It is page content, so it must render inside <AppShell>: as the

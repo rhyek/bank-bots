@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { renameAccount } from '~/server/accounts';
-import type { AccountSummary } from '~/server/queries/accounts';
+import { useEffect, useState } from 'react';
+import { Button } from '~/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +10,8 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog';
 import { Input } from '~/components/ui/input';
-import { Button } from '~/components/ui/button';
+import { renameAccount } from '~/server/accounts';
+import type { AccountSummary } from '~/server/queries/accounts';
 
 type RenameAccountDialogProps = {
   account: AccountSummary | null;
@@ -41,7 +41,7 @@ export function RenameAccountDialog({ account, open, onOpenChange }: RenameAccou
     },
   });
 
-  function handleSubmit(event: React.FormEvent) {
+  function handleSubmit(event: React.SubmitEvent) {
     event.preventDefault();
     if (!account) {
       return;

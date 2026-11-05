@@ -1,6 +1,6 @@
+import { uuidv7 } from '@bank-bots/db';
 import { Injectable, type OnApplicationBootstrap } from '@nestjs/common';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
-import { uuidv7 } from '@bank-bots/db';
 import { BankConfigService } from '~/bank-config/bank-config.service';
 import { BANK_SITES, type BankKey } from '~/bank-config/bank-keys';
 import type { Config } from '~/bank-config/config-schema';

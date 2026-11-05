@@ -108,7 +108,7 @@ test('fetch: one item failing fails only its bank, and the vault is still locked
 
   const gt = result.get('bacGt')!;
   assert.equal(gt.ok, false);
-  assert.equal(gt.ok === false && gt.scope, 'item');
+  assert.equal(!gt.ok && gt.scope, 'item');
   assert.equal(result.get('bacCr')!.ok, true);
   assert.equal(calls.at(-1), 'lock');
 });
@@ -120,8 +120,8 @@ test('fetch: a session failure fails every requested bank with the same error', 
   for (const bankKey of ['bacGt', 'bacCr'] as const) {
     const r = result.get(bankKey)!;
     assert.equal(r.ok, false);
-    assert.equal(r.ok === false && r.scope, 'session');
-    assert.match(r.ok === false ? r.error.message : '', /bw unlock/);
+    assert.equal(!r.ok && r.scope, 'session');
+    assert.match(!r.ok ? r.error.message : '', /bw unlock/);
   }
 });
 
@@ -131,8 +131,8 @@ test('fetch: a missing BW_* variable is a session failure, before any bw command
   const result = await new BankCredentialsService(cli).fetch(['bacGt'], config);
 
   const r = result.get('bacGt')!;
-  assert.equal(r.ok === false && r.scope, 'session');
-  assert.match(r.ok === false ? r.error.message : '', /BW_PASSWORD is not set/);
+  assert.equal(!r.ok && r.scope, 'session');
+  assert.match(!r.ok ? r.error.message : '', /BW_PASSWORD is not set/);
   assert.deepEqual(calls, []);
 });
 

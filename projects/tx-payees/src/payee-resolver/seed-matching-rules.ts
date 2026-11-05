@@ -48,6 +48,8 @@ async function main() {
   // skipped at match time with only a warning, which is easy to miss.
   for (const [label, pattern] of PATTERNS) {
     try {
+      // Built only to see whether it throws.
+      // oxlint-disable-next-line eslint/no-new
       new RegExp(pattern, 'i');
     } catch (err) {
       throw new Error(`rule '${label}' has an invalid pattern`, { cause: err });
@@ -68,7 +70,7 @@ async function main() {
 
 main()
   .then(() => pool.end())
-  .catch(async (err) => {
+  .catch(async (err: unknown) => {
     logger.error({ error: err as Error }, 'seeding matching rules failed');
     await pool.end();
     process.exit(1);

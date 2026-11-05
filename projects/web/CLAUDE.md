@@ -25,9 +25,9 @@ iOS Safari auto-zooming into <16px inputs).
   violation. Keep the page + its route-local helpers together below the `Route` export.
 - **`src/components/` is for shared/reusable UI only** — used by more than one route or composed
   inside pages (a shared shell, cross-route `errorComponent`/`notFoundComponent`). A component goes
-  there because it's genuinely shared, *never* just because it's "the page for a route."
+  there because it's genuinely shared, _never_ just because it's "the page for a route."
 - **Nest into a folder only when a path segment actually branches** — multiple child leaves, or an
-  index page *plus* subroutes. A single leaf stays a flat file (`restore.$tenant.tsx` →
+  index page _plus_ subroutes. A single leaf stays a flat file (`restore.$tenant.tsx` →
   `/restore/$tenant`); dotted names map dots to slashes. A branching segment gets a segment-named
   layout file next to a same-named folder (`foo.tsx` + `foo/…`) — **no `route.tsx`**. `index.tsx`
   (or dotted `*.index.tsx`) is a segment's index.
@@ -59,7 +59,7 @@ Compose **shadcn primitives + Tailwind directly** (thin components); theme **cen
 variables in `src/styles.css` — never fork a component to restyle it.
 
 - **`src/components/ui/` is vendored shadcn CLI output — keep it pristine.** It's **excluded from
-  ESLint** so `shadcn diff`/`--overwrite` updates stay clean. To change behavior, **wrap** the
+  lint and format** so `shadcn diff`/`--overwrite` updates stay clean. To change behavior, **wrap** the
   primitive in a new component under `src/components/ui-kit/` (or a feature folder) — don't edit the
   `ui/` file. (Sanctioned exception: adapting a generated wrapper that hard-codes an integration you
   don't use — e.g. `ui/sonner.tsx` drops the `next-themes` hook for a single-theme app.)

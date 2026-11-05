@@ -24,11 +24,11 @@ export default defineConfig({
     rootDomain: ({ envs }) => envs.ROOT_DOMAIN,
     port: ({ envs }) => Number(envs.DEV_REVERSE_PROXY_PORT),
   },
-  packageRootDir: 'projects',
-  packages: {
+  serviceRootDir: 'projects',
+  services: {
     web: {
       port: ({ envs }) => Number(envs.WEB_PORT),
-      subdomain: true,
+      proxy: { subdomain: true },
       // A longer probe deadline than the 1500 ms default: the first request makes Vite compile the
       // SSR route, and an aborted probe shows up in the dev server as a dropped connection.
       healthcheck: { url: '/api/health', timeout: 5000 },
@@ -36,14 +36,14 @@ export default defineConfig({
     },
     'scrape-txs': {
       command: ['start', { watches: false }],
-      subdomain: true,
+      proxy: { subdomain: true },
       port: ({ envs }) => Number(envs.SCRAPE_TXS_PORT),
       healthcheck: '/status/health',
       urls: [{ label: 'runs', url: '/scrape/runs' }],
     },
     'tx-payees': {
       command: ['start', { watches: false }],
-      subdomain: true,
+      proxy: { subdomain: true },
       port: ({ envs }) => Number(envs.TX_PAYEES_PORT),
       healthcheck: '/status/health',
       urls: [{ label: 'replica', url: '/replica/status' }],

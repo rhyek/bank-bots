@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import { and, db, desc, eq, isNull, scrapeRun } from '@bank-bots/db';
+import { Injectable } from '@nestjs/common';
 import type { BankKey } from '~/bank-config/bank-keys';
 import type { Run, RunError, RunResult } from './scrape.dto';
 

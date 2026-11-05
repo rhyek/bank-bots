@@ -9,16 +9,16 @@
 The two-tier matcher (exact description, then `matching_rule` regex) resolves ~82% of
 transactions. Measured on 2026-07-19 against 874 transactions dated on/after 2026-01-01:
 
-| Bucket | Count | Why the current matcher fails |
-| --- | --- | --- |
-| Merchant, history already has it | 68 | description drifted (`AVIANCA  PA` vs the mapped `AVIANCA        PANAM`) |
-| Merchant, no history at all | 65 | nothing to copy from (`PLAYSTATION`, `1PASSWORD`, `CLOUDFLARE`) |
-| Transfers | 17 | not payee work — belongs in `transfer_bank_account_id` |
-| Bank fees / interest | 4 | no mapped precedent |
-| **Total unmapped** | **154** | |
+| Bucket                           | Count   | Why the current matcher fails                                            |
+| -------------------------------- | ------- | ------------------------------------------------------------------------ |
+| Merchant, history already has it | 68      | description drifted (`AVIANCA  PA` vs the mapped `AVIANCA        PANAM`) |
+| Merchant, no history at all      | 65      | nothing to copy from (`PLAYSTATION`, `1PASSWORD`, `CLOUDFLARE`)          |
+| Transfers                        | 17      | not payee work — belongs in `transfer_bank_account_id`                   |
+| Bank fees / interest             | 4       | no mapped precedent                                                      |
+| **Total unmapped**               | **154** |                                                                          |
 
 Both merchant buckets need judgment the two existing tiers cannot express: recognizing that a
-description drifted, that a suffix is a random identifier, that a country code means a *different*
+description drifted, that a suffix is a random identifier, that a country code means a _different_
 payee, or that an unknown string is a real business with an obvious category.
 
 ## Goal
@@ -32,7 +32,7 @@ new `matcher_result` table.
 
 - **Transfers.** Populating `transfer_bank_account_id` is out of scope. The agent returns "no match"
   for transfer-shaped rows; the `none` verdict stops them being retried. A future spec can add a
-  transfer tier that runs *before* the AI tier.
+  transfer tier that runs _before_ the AI tier.
 - **Re-mapping already-mapped transactions.** The agent only ever sees rows with `payee_id IS NULL`.
 - **Backfilling `matcher_result` for historical matches.** The table starts empty and accumulates
   going forward.
@@ -105,7 +105,7 @@ the point at which the replica provably reflects the row:
 ```
 
 **This replaces `replica-sync.new-tx`, which is removed.** `new-tx` was a strict subset of
-`row-persisted` (`bank_tx` + `insert`), and it encoded a *consumer's* interpretation — "there is
+`row-persisted` (`bank_tx` + `insert`), and it encoded a _consumer's_ interpretation — "there is
 fresh work" — inside a module that is supposed to know nothing about payee-resolver. `row-persisted`
 is a pure replication fact; each consumer decides what it means. That is the layering the
 event-decoupling was for.
@@ -142,11 +142,11 @@ before the write.
 
 Applied at each write site, not batched at the end of the job:
 
-| Write | Awaits |
-| --- | --- |
-| `bank_tx.payee_id` / `category_id` | `('bank_tx', txId)` |
-| `create_payee` | `('payee', id)` |
-| `create_category` | `('category', id)` |
+| Write                                           | Awaits                  |
+| ----------------------------------------------- | ----------------------- |
+| `bank_tx.payee_id` / `category_id`              | `('bank_tx', txId)`     |
+| `create_payee`                                  | `('payee', id)`         |
+| `create_category`                               | `('category', id)`      |
 | `create_matching_rule` / `update_matching_rule` | `('matching_rule', id)` |
 
 Per-site rather than per-job because it also fixes intra-run staleness: if `create_payee` does not
@@ -166,14 +166,14 @@ them. The added latency it saves is a few milliseconds against a 20–60 s agent
 
 ### New files
 
-| Path | Responsibility |
-| --- | --- |
-| `payee-resolver/tx-ai-matcher.service.ts` | owns the Agent SDK `query()` call and its lifecycle |
-| `payee-resolver/ai/read-tools.ts` | the four read tools (SQLite) |
-| `payee-resolver/ai/write-tools.ts` | the four write tools (Postgres) + side-effect recording |
-| `payee-resolver/ai/prompt.ts` | system prompt, domain heuristics, category list builder |
-| `payee-resolver/ai/output-schema.ts` | Zod schema → JSON Schema for `outputFormat` |
-| `payee-resolver/matcher-result.service.ts` | persists `matcher_result` rows |
+| Path                                       | Responsibility                                          |
+| ------------------------------------------ | ------------------------------------------------------- |
+| `payee-resolver/tx-ai-matcher.service.ts`  | owns the Agent SDK `query()` call and its lifecycle     |
+| `payee-resolver/ai/read-tools.ts`          | the four read tools (SQLite)                            |
+| `payee-resolver/ai/write-tools.ts`         | the four write tools (Postgres) + side-effect recording |
+| `payee-resolver/ai/prompt.ts`              | system prompt, domain heuristics, category list builder |
+| `payee-resolver/ai/output-schema.ts`       | Zod schema → JSON Schema for `outputFormat`             |
+| `payee-resolver/matcher-result.service.ts` | persists `matcher_result` rows                          |
 
 Also new: `events/replica-settled.service.ts` — the `settle.around(table, id, write)` helper.
 
@@ -204,9 +204,9 @@ const result = query({
   options: {
     model: 'claude-sonnet-5',
     effort: 'medium',
-    systemPrompt: SYSTEM_PROMPT,          // custom; NOT the claude_code preset
-    settingSources: [],                    // do not inherit ~/.claude or repo CLAUDE.md
-    tools: ['WebSearch'],                  // the ONLY built-in left in context
+    systemPrompt: SYSTEM_PROMPT, // custom; NOT the claude_code preset
+    settingSources: [], // do not inherit ~/.claude or repo CLAUDE.md
+    tools: ['WebSearch'], // the ONLY built-in left in context
     mcpServers: { txp: txpServer },
     allowedTools: ['WebSearch', 'mcp__txp__*'],
     outputFormat: { type: 'json_schema', schema: z.toJSONSchema(Answer, { target: 'draft-7' }) },
@@ -241,7 +241,7 @@ for await (const msg of result) {
 ```
 
 A result with `subtype: 'success'` but no `structured_output` is a failure, as is
-`error_max_structured_output_retries`. A single-shot `query()` also throws *after* yielding an error
+`error_max_structured_output_retries`. A single-shot `query()` also throws _after_ yielding an error
 result, so the loop is wrapped in `try/catch`.
 
 ## Tools
@@ -250,12 +250,12 @@ Names are `mcp__txp__<tool>` once registered under the server key `txp`.
 
 ### Read tools (SQLite replica, `readOnlyHint: true`)
 
-| Tool | Input | Returns |
-| --- | --- | --- |
-| `find_similar_transactions` | `{ query, limit? }` | mapped history matching a token/substring: description, payee name, category name, most recent date, occurrence count |
-| `search_payees` | `{ query, limit? }` | payee id + name, transaction count, and **the distinct trailing country tokens seen in its transactions** (667 payees — too many to inline) |
-| `list_matching_rules` | `{}` | id, label, pattern, priority, enabled for all rules |
-| `test_regex` | `{ pattern }` | see below |
+| Tool                        | Input               | Returns                                                                                                                                     |
+| --------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `find_similar_transactions` | `{ query, limit? }` | mapped history matching a token/substring: description, payee name, category name, most recent date, occurrence count                       |
+| `search_payees`             | `{ query, limit? }` | payee id + name, transaction count, and **the distinct trailing country tokens seen in its transactions** (667 payees — too many to inline) |
+| `list_matching_rules`       | `{}`                | id, label, pattern, priority, enabled for all rules                                                                                         |
+| `test_regex`                | `{ pattern }`       | see below                                                                                                                                   |
 
 `readOnlyHint: true` lets the SDK run these in parallel.
 
@@ -278,12 +278,12 @@ merchant prefix" from "this suffix is a random identifier" using evidence rather
 
 ### Write tools (Postgres)
 
-| Tool | Input | Returns |
-| --- | --- | --- |
-| `create_payee` | `{ name }` | `{ id }` — uuidv7, minted by us |
-| `create_category` | `{ name, groupId }` | `{ id }` — uuidv7; `groupId` must exist |
-| `create_matching_rule` | `{ label, pattern, priority }` | `{ id }` — uuidv7 |
-| `update_matching_rule` | `{ id, pattern?, priority?, enabled? }` | `{ id }` |
+| Tool                   | Input                                   | Returns                                 |
+| ---------------------- | --------------------------------------- | --------------------------------------- |
+| `create_payee`         | `{ name }`                              | `{ id }` — uuidv7, minted by us         |
+| `create_category`      | `{ name, groupId }`                     | `{ id }` — uuidv7; `groupId` must exist |
+| `create_matching_rule` | `{ label, pattern, priority }`          | `{ id }` — uuidv7                       |
+| `update_matching_rule` | `{ id, pattern?, priority?, enabled? }` | `{ id }`                                |
 
 Each write tool records its side effect into a per-run context object. That record — not the
 model's self-report — is what lands in `matcher_result.data.created` / `.updated`.
@@ -324,7 +324,7 @@ the findings that shaped it are recorded in "Evidence behind the prompt" at the 
 
 ### System prompt
 
-````text
+```text
 You classify a single bank transaction from a personal finance database. You decide which payee it
 belongs to and which budget category it falls under, using the transaction history as evidence.
 
@@ -512,7 +512,7 @@ unless history already maps that exact fee.
 Do not guess to avoid returning nothing. A wrong payee propagates: the next matching transaction
 copies it, and so does the one after that. An honest "no match" costs one manual assignment; a
 confident wrong answer costs a cleanup.
-````
+```
 
 The transaction is supplied in the user prompt: description (verbatim, with padding preserved),
 length, date, `amount_cents`, currency, bank key, and account number. The active category list —
@@ -521,19 +521,19 @@ than hard-coded.
 
 ### Evidence behind the prompt
 
-| Finding | Evidence |
-| --- | --- |
-| Fixed-width fields: 22+country at len 25, 25+city at len 30 | 1290 rows at len 25 (` GT` ×979, ` US` ×155, ` NL` ×58, ` CR` ×10); 1736 at len 30 (`GUATE` ×579, `SAN J` ×39) |
-| Trailing country is a payment rail, not a place | Uber's NL (n=92, 2022-02→2023-10), GT (n=64, 2023-03→2024-02) and CR (n=7) rows are **all on the same `bancoIndustrialGt` card with overlapping date ranges** — NL is Uber B.V. Amsterdam, so those rides happened in Guatemala |
-| Embedded country is identity | All 43 mapped Claro rows are GT; `CLARO MCE MPC CR` has CR inside the merchant field, city San José, and no mapped precedent |
-| Country-splitting is the norm | 278 of 290 payees are single-country; existing names already use the `<Name> <CC>` convention (`Boni Gourmet CR`, `La Estancia GT`) |
-| "Payee spans countries" alone is not a safe test | It classifies Uber wrongly. Used only to corroborate the positional signal |
-| Random identifiers dominate drift | Amazon 162 variants, Spotify 47, Parqueo 40, El Roble 39, Namecheap 17 |
-| Rules go stale as counters roll | `\bI\/T-\d+ I000\d+\b` misses `I/T-042926 I001012017` and `I/T-060524 I59665` — 3 unmapped rows |
-| Payee does not determine category | 75 multi-category payees over 3,763 txs vs 424 single-category over 2,165 |
-| Sub-brand ordering convention | The four PedidosYa rules at priority 160–190 with a negative lookahead on the general one |
-| Miscellaneous is over-used | 793 transactions since 2025-01-01, the single largest category |
-| Events is manual | 17 date-scoped categories (`Semana Santa 2023`, `Mudanza 2024`); only 41 txs among multi-category payees |
+| Finding                                                     | Evidence                                                                                                                                                                                                                        |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fixed-width fields: 22+country at len 25, 25+city at len 30 | 1290 rows at len 25 (` GT` ×979, ` US` ×155, ` NL` ×58, ` CR` ×10); 1736 at len 30 (`GUATE` ×579, `SAN J` ×39)                                                                                                                  |
+| Trailing country is a payment rail, not a place             | Uber's NL (n=92, 2022-02→2023-10), GT (n=64, 2023-03→2024-02) and CR (n=7) rows are **all on the same `bancoIndustrialGt` card with overlapping date ranges** — NL is Uber B.V. Amsterdam, so those rides happened in Guatemala |
+| Embedded country is identity                                | All 43 mapped Claro rows are GT; `CLARO MCE MPC CR` has CR inside the merchant field, city San José, and no mapped precedent                                                                                                    |
+| Country-splitting is the norm                               | 278 of 290 payees are single-country; existing names already use the `<Name> <CC>` convention (`Boni Gourmet CR`, `La Estancia GT`)                                                                                             |
+| "Payee spans countries" alone is not a safe test            | It classifies Uber wrongly. Used only to corroborate the positional signal                                                                                                                                                      |
+| Random identifiers dominate drift                           | Amazon 162 variants, Spotify 47, Parqueo 40, El Roble 39, Namecheap 17                                                                                                                                                          |
+| Rules go stale as counters roll                             | `\bI\/T-\d+ I000\d+\b` misses `I/T-042926 I001012017` and `I/T-060524 I59665` — 3 unmapped rows                                                                                                                                 |
+| Payee does not determine category                           | 75 multi-category payees over 3,763 txs vs 424 single-category over 2,165                                                                                                                                                       |
+| Sub-brand ordering convention                               | The four PedidosYa rules at priority 160–190 with a negative lookahead on the general one                                                                                                                                       |
+| Miscellaneous is over-used                                  | 793 transactions since 2025-01-01, the single largest category                                                                                                                                                                  |
+| Events is manual                                            | 17 date-scoped categories (`Semana Santa 2023`, `Mudanza 2024`); only 41 txs among multi-category payees                                                                                                                        |
 
 ## Structured output
 
@@ -543,12 +543,12 @@ const Answer = z.object({
   payeeId: z.string().nullable(),
   categoryId: z.string().nullable(),
   confidence: z.enum(['high', 'medium', 'low']),
-  summary: z.string(),          // how it reached the answer, for the audit trail
+  summary: z.string(), // how it reached the answer, for the audit trail
 });
 ```
 
 Kept deliberately shallow — the docs warn that deeply nested schemas with many required fields are
-harder to satisfy and drive retry failures. Created/updated ids are *not* in the schema: they are
+harder to satisfy and drive retry failures. Created/updated ids are _not_ in the schema: they are
 recorded by the write tools as ground truth.
 
 `matched: true` requires both ids non-null and both to resolve to real rows. The service validates
@@ -580,7 +580,7 @@ Index on `bank_tx_id`. No unique constraint — this is an append-only audit log
   "summary": "…",
   "confidence": "high",
   "created": { "payee_id": "…|null", "category_id": "…|null", "matching_rule_id": "…|null" },
-  "updated": { "matching_rule_id": "…|null" }
+  "updated": { "matching_rule_id": "…|null" },
 }
 ```
 
@@ -625,28 +625,28 @@ been observed behaving well on a few real transactions.
 
 Controls:
 
-| Env var | Default | Purpose |
-| --- | --- | --- |
-| `TX_AI_ENABLED` | `true` | kill switch — when false, tier 3 is skipped and `match()` returns `none` with no agent call |
-| `TX_AI_MODEL` | `claude-sonnet-5` | model override |
-| `TX_AI_EFFORT` | `medium` | effort override |
-| `TX_AI_MAX_PER_SWEEP` | `25` | cap on agent calls per backlog sweep; beyond it, remaining rows are left unmapped **without** a `none` verdict so the next boot resumes |
-| `TX_AI_TIMEOUT_MS` | `180000` | per-run wall clock; on expiry `query.close()` and treat as failure |
-| `TX_AI_SETTLE_TIMEOUT_MS` | `2000` | how long a write waits for `row-persisted` before proceeding with a warning |
+| Env var                   | Default           | Purpose                                                                                                                                 |
+| ------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `TX_AI_ENABLED`           | `true`            | kill switch — when false, tier 3 is skipped and `match()` returns `none` with no agent call                                             |
+| `TX_AI_MODEL`             | `claude-sonnet-5` | model override                                                                                                                          |
+| `TX_AI_EFFORT`            | `medium`          | effort override                                                                                                                         |
+| `TX_AI_MAX_PER_SWEEP`     | `25`              | cap on agent calls per backlog sweep; beyond it, remaining rows are left unmapped **without** a `none` verdict so the next boot resumes |
+| `TX_AI_TIMEOUT_MS`        | `180000`          | per-run wall clock; on expiry `query.close()` and treat as failure                                                                      |
+| `TX_AI_SETTLE_TIMEOUT_MS` | `2000`            | how long a write waits for `row-persisted` before proceeding with a warning                                                             |
 
 `CLAUDE_CODE_OAUTH_TOKEN` is required when `TX_AI_ENABLED` is true; its absence is a startup error,
 not a per-transaction failure.
 
 ## Error handling
 
-| Failure | Behavior |
-| --- | --- |
-| Agent throws / times out / no structured output | logged; **no** `matcher_result` row; the tx stays unmapped and is retried next boot |
-| Agent returns `matched: false` | `none` row persisted; never retried automatically |
-| Agent returns `matched: true` with a null or unknown id | failed run — logged with the offending ids; **no** row, so the tx stays retryable |
-| Write tool rejects a pattern | `isError: true` returned to the agent, which may revise; the run continues |
-| Postgres write fails | propagates to `PayeeResolver.process`, which already logs and drops so one bad row cannot stall the queue |
-| `TX_AI_MAX_PER_SWEEP` reached | remaining rows skipped silently; no rows written |
+| Failure                                                 | Behavior                                                                                                  |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Agent throws / times out / no structured output         | logged; **no** `matcher_result` row; the tx stays unmapped and is retried next boot                       |
+| Agent returns `matched: false`                          | `none` row persisted; never retried automatically                                                         |
+| Agent returns `matched: true` with a null or unknown id | failed run — logged with the offending ids; **no** row, so the tx stays retryable                         |
+| Write tool rejects a pattern                            | `isError: true` returned to the agent, which may revise; the run continues                                |
+| Postgres write fails                                    | propagates to `PayeeResolver.process`, which already logs and drops so one bad row cannot stall the queue |
+| `TX_AI_MAX_PER_SWEEP` reached                           | remaining rows skipped silently; no rows written                                                          |
 
 The existing invariant holds: a single transaction can never stall the backlog.
 

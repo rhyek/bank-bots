@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { AgentModule } from '~/agent/agent.module';
 import { LocationModule } from '~/location/location.module';
-import { ReplicaDbModule } from '~/replica-db/replica-db.module';
 import { AgentDayLocationResolver } from '~/owner-location/agent-day-location-resolver';
+import { AgentPlaceFieldResolver } from '~/owner-location/agent-place-field-resolver';
 import { DayLocationResolver } from '~/owner-location/day-location-resolver';
 import { OwnerDayStore } from '~/owner-location/owner-day-store';
 import { OwnerLocationService } from '~/owner-location/owner-location.service';
-import { AgentPlaceFieldResolver } from '~/owner-location/agent-place-field-resolver';
 import { PlaceFieldStore } from '~/owner-location/place-field-store';
 import { PlaceFieldResolver } from '~/owner-location/place-resolver';
+import { ReplicaDbModule } from '~/replica-db/replica-db.module';
 
 // Where the owner was: per day (resolved by an agent, stored in owner_day_location) and per
 // transaction (looked up from those days, no agent). It reads the tracker through `location` and

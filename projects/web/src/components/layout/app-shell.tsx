@@ -1,7 +1,7 @@
 import { rootRouteId, useLoaderData } from '@tanstack/react-router';
+import { AppSidebar } from '~/components/app-sidebar';
 import { SidebarProvider, SidebarInset } from '~/components/ui/sidebar';
 import { LayoutProvider } from '~/context/layout-provider';
-import { AppSidebar } from '~/components/app-sidebar';
 
 // The sidebar + content frame every page sits in. The `_app` layout route renders it around its
 // <Outlet />; the root route's not-found page renders it too, because a URL that matches nothing

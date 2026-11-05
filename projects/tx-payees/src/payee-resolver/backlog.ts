@@ -1,7 +1,7 @@
 import { and, asc, eq, exists, isNull, notExists, or, sql } from 'drizzle-orm';
-import { bankTx, matcherResult, payee } from '~/replica-db/replica-schema';
-import type { ReplicaDb } from '~/replica-db/replica-db.service';
 import type { TxLocation } from '~/owner-location/tx-location';
+import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, matcherResult, payee } from '~/replica-db/replica-schema';
 
 /** Has the AI tier already looked at this transaction and found no payee? Terminal: see start(). */
 export function hasNoneVerdict(replica: ReplicaDb, txId: string): boolean {

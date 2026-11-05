@@ -1,10 +1,10 @@
 // Value import (not `import type`): the savings statement below has to compare the requested month
 // against the real clock, because Bi en Línea only exposes "current" and "previous" month.
+import { db, type bankTx } from '@bank-bots/db';
 import dayjs from 'dayjs';
 import type { Page } from 'playwright';
 import { isMatching } from 'ts-pattern';
 import { AccountType } from '~/bank-config/types';
-import { db, type bankTx } from '@bank-bots/db';
 import { ensureBankAccount } from '../bank-accounts';
 import { numberOccurrences } from '../occurrences';
 import { type ScrapeLog, waitRandomMs } from '../utils';

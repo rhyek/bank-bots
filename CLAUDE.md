@@ -39,18 +39,18 @@ endpoint (see "Running things"). On failure it emails an alert.
 
 ## Repository layout (pnpm monorepo)
 
-| Path | What |
-| --- | --- |
-| `projects/db/` | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs, tx-payees and web. |
-| `projects/scrape-txs/` | NestJS service around the Playwright scrapers: one daily cron that scrapes the three bank logins (the two BAC ones in turn, Banco Industrial alongside), a REST endpoint to scrape one on demand, and a `scrape_run` history. `https://scrape-txs.bank-bots-dev.workstation.rhyek.com`. Imports `@bank-bots/db`. See its own `CLAUDE.md`. |
-| `projects/tx-payees/` | NestJS service. Keeps a local SQLite **replica** of Postgres and runs its **`payee-resolver`** module, which matches unmapped transactions to a payee + category in three tiers: exact description, `matching_rule` regex, then an **agent** (Claude Agent SDK) that can research a merchant and create the payees/rules its answer needs. It also records **location**: where each payee is, and where the owner was when each transaction was bought. See its own `CLAUDE.md`. |
-| `projects/web/` | `@bank-bots/web` — TanStack Start (SSR) web app for browsing transactions: a YNAB-style transactions list with payee/category, time-window + search filters, and inline payee/category editing, plus a **Spending** page (per-month inflow/outflow/left-over + a category-group breakdown, drilling into a figure's transactions and on into the transactions list with that row highlighted). Reads/writes Postgres via server functions over `@bank-bots/db`. `https://web.bank-bots-dev.workstation.rhyek.com`. See its own `CLAUDE.md`. |
-| `devtooie.config.ts` | Local dev orchestration (see "Running" below). |
-| `docker-compose.yaml` | The repo's infrastructure, run by devtooie's `infra`: one service, `db` (Postgres 15). **Disabled in development mode**, which still uses Supabase; it is test mode's database. |
-| `.env.development` | Committed. The **port allocation** — bank-bots' block of `~/Dev/reserved_port_ranges.txt`, one `*_PORT` per service plus the dev reverse proxy's — and `ROOT_DOMAIN`. The only place a port number is written. |
-| `.env.test` | Committed. Test mode's twin of the above (every port + 25) plus the `DB_*` settings of the local `db` container, from which it builds `DATABASE_URL` and which the compose file interpolates. See "Test mode". |
-| `.env.development.local` | Secret (gitignored), **development mode only**: `DATABASE_URL` for the real database on Supabase. Kept out of `.env.local` on purpose, so test mode never loads it. |
-| `.env.local` | Secrets (gitignored) for every mode: `MAILER_*`. The scraper's Bitwarden bot credentials are in `projects/scrape-txs/.env.local`. |
+| Path                     | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projects/db/`           | `@bank-bots/db` — shared Drizzle schema + client library. Owns the DB schema, migrations, and drizzle-kit. Consumed as **TypeScript source** (its `exports` point at `src/`; no build/emit) via the workspace link, by scrape-txs, tx-payees and web.                                                                                                                                                                                                                                                                                       |
+| `projects/scrape-txs/`   | NestJS service around the Playwright scrapers: one daily cron that scrapes the three bank logins (the two BAC ones in turn, Banco Industrial alongside), a REST endpoint to scrape one on demand, and a `scrape_run` history. `https://scrape-txs.bank-bots-dev.workstation.rhyek.com`. Imports `@bank-bots/db`. See its own `CLAUDE.md`.                                                                                                                                                                                                   |
+| `projects/tx-payees/`    | NestJS service. Keeps a local SQLite **replica** of Postgres and runs its **`payee-resolver`** module, which matches unmapped transactions to a payee + category in three tiers: exact description, `matching_rule` regex, then an **agent** (Claude Agent SDK) that can research a merchant and create the payees/rules its answer needs. It also records **location**: where each payee is, and where the owner was when each transaction was bought. See its own `CLAUDE.md`.                                                            |
+| `projects/web/`          | `@bank-bots/web` — TanStack Start (SSR) web app for browsing transactions: a YNAB-style transactions list with payee/category, time-window + search filters, and inline payee/category editing, plus a **Spending** page (per-month inflow/outflow/left-over + a category-group breakdown, drilling into a figure's transactions and on into the transactions list with that row highlighted). Reads/writes Postgres via server functions over `@bank-bots/db`. `https://web.bank-bots-dev.workstation.rhyek.com`. See its own `CLAUDE.md`. |
+| `devtooie.config.ts`     | Local dev orchestration (see "Running" below).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `docker-compose.yaml`    | The repo's infrastructure, run by devtooie's `infra`: one service, `db` (Postgres 15). **Disabled in development mode**, which still uses Supabase; it is test mode's database.                                                                                                                                                                                                                                                                                                                                                             |
+| `.env.development`       | Committed. The **port allocation** — bank-bots' block of `~/Dev/reserved_port_ranges.txt`, one `*_PORT` per service plus the dev reverse proxy's — and `ROOT_DOMAIN`. The only place a port number is written.                                                                                                                                                                                                                                                                                                                              |
+| `.env.test`              | Committed. Test mode's twin of the above (every port + 25) plus the `DB_*` settings of the local `db` container, from which it builds `DATABASE_URL` and which the compose file interpolates. See "Test mode".                                                                                                                                                                                                                                                                                                                              |
+| `.env.development.local` | Secret (gitignored), **development mode only**: `DATABASE_URL` for the real database on Supabase. Kept out of `.env.local` on purpose, so test mode never loads it.                                                                                                                                                                                                                                                                                                                                                                         |
+| `.env.local`             | Secrets (gitignored) for every mode: `MAILER_*`. The scraper's Bitwarden bot credentials are in `projects/scrape-txs/.env.local`.                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## The banks
 
@@ -58,19 +58,19 @@ Three "bank keys", each = one bank login. A scrape **run** is one bank key; the 
 starts a run for each. Banks of different sites scrape concurrently, but the two BAC keys scrape one
 after the other: started in the same second, BAC's CDN refused both ("Access Denied").
 
-| Bank key | Bank / country | Login flow | Config accounts |
-| --- | --- | --- | --- |
-| `bancoIndustrialGt` | Banco Industrial, Guatemala | `bienlinea.bi.com.gt` (código + usuario + contraseña) | `3250099185` (checking), `3388707` (savings) |
-| `bacGt` | BAC Credomatic, Guatemala | `baccredomatic.com` → pick country → "Banca en Línea" → `sucursalelectronica.com` login | `904201043` (USD checking), `CR07010200009697902868` (USD checking) |
-| `bacCr` | BAC Credomatic, Costa Rica | same code as bacGt, `country: 'Costa Rica'` | `CR93010200009615666272` (USD checking) |
+| Bank key            | Bank / country              | Login flow                                                                              | Config accounts                                                     |
+| ------------------- | --------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `bancoIndustrialGt` | Banco Industrial, Guatemala | `bienlinea.bi.com.gt` (código + usuario + contraseña)                                   | `3250099185` (checking), `3388707` (savings)                        |
+| `bacGt`             | BAC Credomatic, Guatemala   | `baccredomatic.com` → pick country → "Banca en Línea" → `sucursalelectronica.com` login | `904201043` (USD checking), `CR07010200009697902868` (USD checking) |
+| `bacCr`             | BAC Credomatic, Costa Rica  | same code as bacGt, `country: 'Costa Rica'`                                             | `CR93010200009615666272` (USD checking)                             |
 
 **Account types.** `config.banks.<key>.accounts[].type` selects the scrape path, and for
-`bancoIndustrialGt` it is `checking` (Bi en Línea's *Monetarias*) or `savings` (*Ahorros*) — two
+`bancoIndustrialGt` it is `checking` (Bi en Línea's _Monetarias_) or `savings` (_Ahorros_) — two
 different sections of the site with different navigation, so the type is load-bearing, not a label.
 An unknown type is now a build error rather than a silent skip.
 
 > **Savings accounts reach back only two months.** Bi en Línea publishes savings statements as
-> ACTUAL (current month) and ANTERIOR (previous) only. Its *Personalizado* form looks like a free
+> ACTUAL (current month) and ANTERIOR (previous) only. Its _Personalizado_ form looks like a free
 > date range, but the month selector offers exactly those two values and the date inputs only narrow
 > within them — an older range returns "La cuenta no posee movimientos" rather than an error. So
 > **`3388707` has no reachable history before the previous month**, and asking for an older month
@@ -150,37 +150,37 @@ accounts get scraped + their credentials; this table gives each `(bank_key, acco
 id that `bank_tx` references. Unique index `bank_account_unique_cols` on `(bank_key, account_number)`.
 The scraper upserts rows here at scrape time via `ensureBankAccount()`.
 
-| column | type | notes |
-| --- | --- | --- |
-| `id` | uuid | primary key (uuidv7, app-generated) |
-| `bank_key` | text | e.g. `bacGt` |
-| `account_number` | text | e.g. `904201043`, `CR93…` |
-| `type` | text | `checking` (from config) |
-| `currency` | text | `'USD'` for all rows (every tracked account is USD) |
-| `name` | text | nullable; human label set from the web app. Null → UI falls back to `account_number` |
-| `created_at` | timestamptz | `now()` |
+| column           | type        | notes                                                                                |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------ |
+| `id`             | uuid        | primary key (uuidv7, app-generated)                                                  |
+| `bank_key`       | text        | e.g. `bacGt`                                                                         |
+| `account_number` | text        | e.g. `904201043`, `CR93…`                                                            |
+| `type`           | text        | `checking` (from config)                                                             |
+| `currency`       | text        | `'USD'` for all rows (every tracked account is USD)                                  |
+| `name`           | text        | nullable; human label set from the web app. Null → UI falls back to `account_number` |
+| `created_at`     | timestamptz | `now()`                                                                              |
 
 **`bank_tx`** — one row per bank transaction (renamed from `bank_txs`; `bank_key`/`account_number`
 replaced by the `bank_account_id` FK). Amounts are the bank's raw number (currency lives on `bank_account`).
 
-| column | type | notes |
-| --- | --- | --- |
-| `id` | uuid | primary key (uuidv7, app-generated) |
-| `bank_account_id` | uuid | **NOT NULL** FK → `bank_account.id` |
-| `month` | text | `YYYY-MM` (the statement month scraped) |
-| `date` | date | transaction date |
-| `doc_no` | text | bank's document number (often non-unique / generic) |
-| `description` | text | bank's description |
-| `amount_cents` | bigint | integer cents; negative = debit, positive = credit |
-| `occurrence` | smallint | default 1. Tells apart bank rows identical on account, date, doc no, description and amount (BAC doc numbers are generic): 1 for the first such row on the statement, 2 for the next. Set by the scraper (`numberOccurrences`) |
-| `payee_id` | text | nullable FK → `payee.id`; backfilled from YNAB |
-| `category_id` | text | nullable FK → `category.id`; backfilled from YNAB |
-| `transfer_bank_account_id` | uuid | nullable FK → `bank_account.id`; the *other* account for a transfer (payee/category stay null) |
-| `country` | text | nullable; ISO 3166-1 alpha-2 code of where **the owner was** when the purchase happened. Not where the payee is (that is `payee.country`): an Amazon order placed from home is `GT` here and `US` on the payee. Written by `tx-payees`, never by the scraper |
-| `location` | text | nullable; the place within `country`, from the same lookup: the city or area the owner's day resolved to, or the payee's own place when the payee is `local` in that country |
-| `reconcile` | boolean | manual reconciliation row — not on any bank statement. Scrapes never delete these, and `tx-payees` never matches them. **Replaced the old `doc_no = 'RECONCILE'` sentinel**, so new rows can carry a real doc number |
-| `created_at` | timestamptz | `now()` on insert (not touched on conflict-update) |
-| `updated_at` | timestamptz | maintained by the `trg_set_updated_at` trigger; the replica's delta-sync watermark |
+| column                     | type        | notes                                                                                                                                                                                                                                                        |
+| -------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                       | uuid        | primary key (uuidv7, app-generated)                                                                                                                                                                                                                          |
+| `bank_account_id`          | uuid        | **NOT NULL** FK → `bank_account.id`                                                                                                                                                                                                                          |
+| `month`                    | text        | `YYYY-MM` (the statement month scraped)                                                                                                                                                                                                                      |
+| `date`                     | date        | transaction date                                                                                                                                                                                                                                             |
+| `doc_no`                   | text        | bank's document number (often non-unique / generic)                                                                                                                                                                                                          |
+| `description`              | text        | bank's description                                                                                                                                                                                                                                           |
+| `amount_cents`             | bigint      | integer cents; negative = debit, positive = credit                                                                                                                                                                                                           |
+| `occurrence`               | smallint    | default 1. Tells apart bank rows identical on account, date, doc no, description and amount (BAC doc numbers are generic): 1 for the first such row on the statement, 2 for the next. Set by the scraper (`numberOccurrences`)                               |
+| `payee_id`                 | text        | nullable FK → `payee.id`; backfilled from YNAB                                                                                                                                                                                                               |
+| `category_id`              | text        | nullable FK → `category.id`; backfilled from YNAB                                                                                                                                                                                                            |
+| `transfer_bank_account_id` | uuid        | nullable FK → `bank_account.id`; the _other_ account for a transfer (payee/category stay null)                                                                                                                                                               |
+| `country`                  | text        | nullable; ISO 3166-1 alpha-2 code of where **the owner was** when the purchase happened. Not where the payee is (that is `payee.country`): an Amazon order placed from home is `GT` here and `US` on the payee. Written by `tx-payees`, never by the scraper |
+| `location`                 | text        | nullable; the place within `country`, from the same lookup: the city or area the owner's day resolved to, or the payee's own place when the payee is `local` in that country                                                                                 |
+| `reconcile`                | boolean     | manual reconciliation row — not on any bank statement. Scrapes never delete these, and `tx-payees` never matches them. **Replaced the old `doc_no = 'RECONCILE'` sentinel**, so new rows can carry a real doc number                                         |
+| `created_at`               | timestamptz | `now()` on insert (not touched on conflict-update)                                                                                                                                                                                                           |
+| `updated_at`               | timestamptz | maintained by the `trg_set_updated_at` trigger; the replica's delta-sync watermark                                                                                                                                                                           |
 
 Unique index `bank_tx_unique_cols` on `(bank_account_id, date, doc_no, description, amount_cents,
 occurrence)` — the upsert conflict target and effective natural key. Without `occurrence` a bank
@@ -246,20 +246,20 @@ budget had **no** native YNAB transfers, so the import set no `transfer_bank_acc
 `payee.country` / `location` / `location_kind` say where **the business** is, and are set by
 `tx-payees`' payee location matcher (an agent with web search), once per payee:
 
-| `location_kind` | Meaning | `country` | `location` |
-| --- | --- | --- | --- |
-| `local` | one physical place | set | set, e.g. `Las Catalinas, Guanacaste` |
-| `chain` | several branches, paid in person (supermarket, petrol, pharmacy, fast food) | the country when all its branches are in one (La Torre: `GT`); **null for a brand found in many** (Subway, Starbucks) | null |
-| `remote` | paid without going anywhere: online services, and bills (phone, insurance, memberships) | where the company is based; null if that could not be found | null |
-| `unknown` | looked up, not determinable (or not a business) | null | null |
-| *NULL* | not looked up yet | null | null |
+| `location_kind` | Meaning                                                                                 | `country`                                                                                                             | `location`                            |
+| --------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `local`         | one physical place                                                                      | set                                                                                                                   | set, e.g. `Las Catalinas, Guanacaste` |
+| `chain`         | several branches, paid in person (supermarket, petrol, pharmacy, fast food)             | the country when all its branches are in one (La Torre: `GT`); **null for a brand found in many** (Subway, Starbucks) | null                                  |
+| `remote`        | paid without going anywhere: online services, and bills (phone, insurance, memberships) | where the company is based; null if that could not be found                                                           | null                                  |
+| `unknown`       | looked up, not determinable (or not a business)                                         | null                                                                                                                  | null                                  |
+| _NULL_          | not looked up yet                                                                       | null                                                                                                                  | null                                  |
 
 `location_kind` is the terminal marker: the matcher runs only while it is NULL. To re-ask, set it
 back to NULL: `UPDATE payee SET location_kind = NULL WHERE id = '<id>';`
 
 **`matching_rule`** — merchant patterns used by the tx-payees app's `payee-resolver` module (`id` uuidv7, `label`,
 `pattern`, `priority`, `enabled`, `created_at`, `updated_at`; unique index on `label`). A rule holds
-**no payee/category**: it only decides *where to look*. The answer always comes from the most recent
+**no payee/category**: it only decides _where to look_. The answer always comes from the most recent
 already-mapped transaction whose description matches — a rule that pinned an answer would reintroduce
 the `forcePayee` behavior that was deliberately removed. `pattern` is a **JS regex source** (no
 delimiters, no flags) evaluated in SQLite against the replica, because Postgres `~*` is POSIX and

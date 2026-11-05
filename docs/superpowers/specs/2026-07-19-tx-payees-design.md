@@ -23,8 +23,8 @@ This is the first step. A later phase adds rule-based matching beyond the two ti
 `projects/scrape-txs/src/scripts/backfill-mappings-by-description.ts` is a manual, dry-run-by-default
 script that matches unmapped transactions in two tiers: exact description, then a hard-coded list of
 21 merchant regexes. Both tiers answer from history — they locate the most recent already-mapped
-transaction that matches, and copy its `payee_id` + `category_id`. The regexes only decide *where to
-look*; history decides the answer.
+transaction that matches, and copy its `payee_id` + `category_id`. The regexes only decide _where to
+look_; history decides the answer.
 
 A third tier (`forcePayee`, which pinned one matcher to a fixed payee and overrode exact matching)
 was removed on 2026-07-19, along with the data drift that motivated it. The design below preserves
@@ -36,22 +36,22 @@ the history lookups have no lookback limit (the Go original capped at one year).
 
 ## Decisions
 
-| Decision | Choice | Why |
-| --- | --- | --- |
-| Where matches are written | Directly to Postgres `bank_tx` | Source of truth; the write's trigger emits NOTIFY, which flows back into SQLite on its own. No staging table. |
-| Rule storage | New `matching_rule` table in Postgres, replicated to SQLite | Rules become editable without a deploy. Live-replicated, so edits apply without restarting the agent. |
-| Rule semantics | **Selectors only** — no `payee_id`/`category_id` on the row | A rule with a fixed payee/category is `forcePayee` generalized. Rejected; history stays authoritative. |
-| Exact-match tier | Intrinsic, not rule-backed | It is description equality against history. Expressing it as rows would mean one row per distinct description, stale on any bank formatting change. |
-| Regex evaluation | SQLite, via a registered `regexp()` function | Patterns are JS regexes (`\b`, negative lookahead). Postgres `~*` is POSIX and rejects lookahead outright. |
-| Reconciliation rows | New `bank_tx.reconcile` boolean | Replaces the `doc_no = 'RECONCILE'` sentinel, so manual rows no longer have to fake a document number. |
-| Backlog cutoff | `date >= '2026-01-01'` (transaction date) | `created_at` is a new column: 3145 rows share a 2026-07-16 timestamp from the YNAB history ingest, spanning transaction dates back to 2022. A `created_at` cutoff selects 4020 rows vs 875 by `date`. |
-| Queue ordering | `created_at ASC, id ASC` | `created_at` as requested; `id` breaks ties (154 in-scope rows share only 38 distinct `created_at` values). |
-| Replica ↔ tx-payees coupling | `ReplicaSync` calls `txPayees.start()` and `txPayees.enqueue(id)` | Requested shape. Made acyclic by splitting the SQLite client out of the sync module (below). |
+| Decision                     | Choice                                                            | Why                                                                                                                                                                                                   |
+| ---------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where matches are written    | Directly to Postgres `bank_tx`                                    | Source of truth; the write's trigger emits NOTIFY, which flows back into SQLite on its own. No staging table.                                                                                         |
+| Rule storage                 | New `matching_rule` table in Postgres, replicated to SQLite       | Rules become editable without a deploy. Live-replicated, so edits apply without restarting the agent.                                                                                                 |
+| Rule semantics               | **Selectors only** — no `payee_id`/`category_id` on the row       | A rule with a fixed payee/category is `forcePayee` generalized. Rejected; history stays authoritative.                                                                                                |
+| Exact-match tier             | Intrinsic, not rule-backed                                        | It is description equality against history. Expressing it as rows would mean one row per distinct description, stale on any bank formatting change.                                                   |
+| Regex evaluation             | SQLite, via a registered `regexp()` function                      | Patterns are JS regexes (`\b`, negative lookahead). Postgres `~*` is POSIX and rejects lookahead outright.                                                                                            |
+| Reconciliation rows          | New `bank_tx.reconcile` boolean                                   | Replaces the `doc_no = 'RECONCILE'` sentinel, so manual rows no longer have to fake a document number.                                                                                                |
+| Backlog cutoff               | `date >= '2026-01-01'` (transaction date)                         | `created_at` is a new column: 3145 rows share a 2026-07-16 timestamp from the YNAB history ingest, spanning transaction dates back to 2022. A `created_at` cutoff selects 4020 rows vs 875 by `date`. |
+| Queue ordering               | `created_at ASC, id ASC`                                          | `created_at` as requested; `id` breaks ties (154 in-scope rows share only 38 distinct `created_at` values).                                                                                           |
+| Replica ↔ tx-payees coupling | `ReplicaSync` calls `txPayees.start()` and `txPayees.enqueue(id)` | Requested shape. Made acyclic by splitting the SQLite client out of the sync module (below).                                                                                                          |
 
 ## Module structure
 
 The existing `db-replica/` module is split in two. This is what keeps the dependency graph acyclic:
-`tx-payees` needs the SQLite *client*, and `replica-sync` needs `tx-payees`. If both lived in one
+`tx-payees` needs the SQLite _client_, and `replica-sync` needs `tx-payees`. If both lived in one
 module, that would be a cycle requiring `forwardRef`.
 
 ```
@@ -107,8 +107,8 @@ Both changes are additive, so `db:generate` should not prompt for rename resolut
 statements are hand-appended, following the pattern already used in `0007`.
 
 **Seed:** the 21 patterns from `backfill-mappings-by-description.ts` `MATCHERS`, in their current
-array order, with `priority` 10, 20, 30… preserving first-match-wins. Ported as regex *source
-strings* (`\bspotify\b`). The `i` flag is applied by the registered `regexp()` function rather than
+array order, with `priority` 10, 20, 30… preserving first-match-wins. Ported as regex _source
+strings_ (`\bspotify\b`). The `i` flag is applied by the registered `regexp()` function rather than
 stored per row — all 21 are case-insensitive today. Per-rule flags are a future column if needed.
 
 ### SQLite replica — `replica-schema.ts`
@@ -126,7 +126,7 @@ shape and every query touching a new column would throw.
 `ReplicaDb.onModuleInit` gets a version stamp:
 
 ```ts
-const EXPECTED_SCHEMA_VERSION = 1;  // existing unstamped files read 0 → dropped and rebuilt
+const EXPECTED_SCHEMA_VERSION = 1; // existing unstamped files read 0 → dropped and rebuilt
 const current = this.sqlite.pragma('user_version', { simple: true }) as number;
 if (current !== EXPECTED_SCHEMA_VERSION) {
   this.sqlite.exec(DROP_SCHEMA_SQL);
@@ -149,7 +149,7 @@ this.sqlite.function('regexp', (pattern: string, value: string) =>
 ```
 
 SQLite has no built-in `REGEXP`. The grammar accepts the operator, but `X REGEXP Y` compiles to
-`regexp(Y, X)` and SQLite defines no such function — statement *preparation* fails with
+`regexp(Y, X)` and SQLite defines no such function — statement _preparation_ fails with
 `no such function: REGEXP`. Note the argument order: the operator passes **pattern first**.
 
 ## Runtime behavior
@@ -198,7 +198,7 @@ skips if `payee_id` is now set, or if it is a transfer or reconciliation row. Th
 1. **Exact tier.** Most recent transaction with an identical `description`, `payee_id IS NOT NULL`,
    `id <> self`, ordered `date DESC, id DESC LIMIT 1`. Copy its payee + category.
 2. **Regex tier.** First `enabled` rule by `priority ASC` whose pattern matches this description.
-   Then the most recent mapped transaction matching *that same pattern*, same ordering, excluding
+   Then the most recent mapped transaction matching _that same pattern_, same ordering, excluding
    self. Copy its payee + category.
 3. **Hit** → `UPDATE bank_tx SET payee_id = ?, category_id = ? WHERE id = ?` against Postgres.
 4. **Miss** → log; leave null.

@@ -27,7 +27,8 @@ export async function listAccountsQuery(): Promise<AccountSummary[]> {
       name: bankAccount.name,
       currency: bankAccount.currency,
       // COALESCE so an account with no transactions reports 0 rather than null.
-      balanceCents: sql<number>`coalesce(sum(${bankTx.amountCents}), 0)::bigint`,
+      // A bigint, which the driver hands over as a string.
+      balanceCents: sql<string>`coalesce(sum(${bankTx.amountCents}), 0)::bigint`,
     })
     .from(bankAccount)
     .leftJoin(bankTx, eq(bankTx.bankAccountId, bankAccount.id))

@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Pencil } from 'lucide-react';
-import { Button } from '~/components/ui/button';
-import { Skeleton } from '~/components/ui/skeleton';
+import { useState } from 'react';
 import { Header } from '~/components/layout/header';
 import { Main } from '~/components/layout/main';
+import { RenameAccountDialog } from '~/components/rename-account-dialog';
 import { ThemeSwitch } from '~/components/theme-switch';
 import { Transactions } from '~/components/transactions/transactions';
 import {
   TransactionsToolbar,
   type FilterPatch,
 } from '~/components/transactions/transactions-toolbar';
-import { RenameAccountDialog } from '~/components/rename-account-dialog';
+import { Button } from '~/components/ui/button';
+import { Skeleton } from '~/components/ui/skeleton';
 import { transactionsSearchSchema } from '~/lib/filters';
 import { formatCents } from '~/lib/format';
 import { accountsQueryOptions } from '~/lib/queries';

@@ -20,7 +20,7 @@ There is **no `dev` (watch) script, on purpose**: a reload in the middle of a sc
 a code change, restart the service.
 
 **Why `@swc-node/register`, not Node's native type stripping.** Node can strip types from `.ts`
-directly now, but stripping only *deletes* type syntax — it does **not** emit the
+directly now, but stripping only _deletes_ type syntax — it does **not** emit the
 `emitDecoratorMetadata` that Nest's dependency injection reads to know what to inject into a
 constructor. `@swc-node/register` transpiles with SWC instead, honoring the two decorator flags in
 `tsconfig.json` (`emitDecoratorMetadata` + `experimentalDecorators`), so DI works with no `.swcrc`
@@ -52,7 +52,7 @@ services) — organized into **feature folders**. `src/main.ts` is the bootstrap
 `~/` for anything **cross-tree**; relative `./` only for **siblings**. No `@/`, no `#/`. Imports are
 **extensionless** — never `.ts`/`.js` — which is what `moduleResolution: "bundler"` buys.
 
-**`~/` is app-only.** swc-node resolves `paths` from the *running process's* tsconfig, so a `~/foo`
+**`~/` is app-only.** swc-node resolves `paths` from the _running process's_ tsconfig, so a `~/foo`
 written inside a source-only workspace library would resolve against THIS app's `src`, not the
 library's. Inside a library use relative imports or its own package name.
 
@@ -123,8 +123,12 @@ Widen the autocompleted attribute set by declaration merging, next to whatever o
 
 ```ts
 declare module '@rhyek/nestjs-utils' {
-  interface LogAttributes { orderId?: string }
-  interface RequestContextExtras { clientId?: string }
+  interface LogAttributes {
+    orderId?: string;
+  }
+  interface RequestContextExtras {
+    clientId?: string;
+  }
 }
 ```
 
@@ -161,8 +165,8 @@ across them, so an exception thrown by the library reaches the client as a 500.
 See the `prepare-monorepo` skill for
 how those libraries are shaped, and for the linter hazard that matters most here:
 `consistent-type-imports` rewrites injected constructor types to `import type`, which erases the DI
-metadata and breaks this app at runtime while every check stays green. The repo's `eslint.config.ts`
-turns that rule off for `projects/scrape-txs/**` and `projects/tx-payees/**`. Never write
+metadata and breaks this app at runtime while every check stays green. The repo's `oxlint.config.ts`
+turns that rule on only for `projects/db/**` and `projects/web/**`. Never write
 `import type` for a class a constructor injects.
 
 ## Build / deploy
@@ -211,13 +215,13 @@ code path.
 
 ### Isolation: one bank failing must not affect another
 
-| | Shared between banks? |
-| --- | --- |
-| Chromium process | No. One per run, headless. |
-| Browser context | No. One per attempt (2 attempts, 5 minutes apart: `withRetries` in `scrape/retry.ts`), so a retry inherits no cookies. |
+|                   | Shared between banks?                                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chromium process  | No. One per run, headless.                                                                                                                                                                        |
+| Browser context   | No. One per attempt (2 attempts, 5 minutes apart: `withRetries` in `scrape/retry.ts`), so a retry inherits no cookies.                                                                            |
 | Bitwarden session | Yes, per batch, and only before any browser opens. A broken item fails its own bank only (`scope: 'item'`); a session that cannot open fails the whole batch (`scope: 'session'`) with ONE alert. |
-| Database pool | Yes; each run persists in its own transaction. Nothing ever calls `pool.end()`. |
-| Errors | Caught inside the run. The fork waits with `Promise.allSettled`, and the un-awaited batch promise has a terminal `.catch` — an unhandled rejection would kill the process and every run in it. |
+| Database pool     | Yes; each run persists in its own transaction. Nothing ever calls `pool.end()`.                                                                                                                   |
+| Errors            | Caught inside the run. The fork waits with `Promise.allSettled`, and the un-awaited batch promise has a terminal `.catch` — an unhandled rejection would kill the process and every run in it.    |
 
 `BankCredentialsService` **queues its calls**: `bw` keeps one state directory, and a second session
 locking it while the first still reads breaks the first. A manual run requested during the
@@ -254,7 +258,7 @@ old rule (the current month, plus the previous one through the 10th).
 
 `chromium.launch({ headless: true, channel: 'chromium' })`. `channel: 'chromium'` is Chromium's
 **new headless** mode — the full browser without a window — instead of Playwright's default cut-down
-*headless shell*. Both announce themselves as `HeadlessChrome/<version>` in the user agent, so each
+_headless shell_. Both announce themselves as `HeadlessChrome/<version>` in the user agent, so each
 context overrides it with `chromeUserAgent(browser.version())`: the launched browser's own major,
 never a constant that drifts from the engine. After upgrading `playwright`, install its browser with
 `pnpm -C projects/scrape-txs exec playwright install chromium`.
@@ -265,11 +269,11 @@ No authentication: a local service. Bodies and params are validated by **`nestjs
 `createZodDto`, `ZodValidationPipe` as the global pipe), and what a route returns is checked against
 the DTO it declares with `@ZodSerializerDto` (`ZodSerializerInterceptor`, global).
 
-| Route | |
-| --- | --- |
-| `POST /scrape/:bankKey` | Body, all optional: `months` (`["2026-09"]`), `account`, `dryRun`. `202` with the run. `400` for an unknown bank key, a month that is not `YYYY-MM`, or an unknown field. `409` (with the `runId` in progress) when that bank is already running. |
-| `GET /scrape/runs/:runId` | The run: `status` (`running`/`succeeded`/`failed`), times, `params`, and `result` (`upserted`, `deleted`, `balancesUpdated`, `dryRunPath`) or `error` (`message`, `stage`, `tracePath`). |
-| `GET /scrape/runs` | The 50 most recent runs, newest first. |
+| Route                     |                                                                                                                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /scrape/:bankKey`   | Body, all optional: `months` (`["2026-09"]`), `account`, `dryRun`. `202` with the run. `400` for an unknown bank key, a month that is not `YYYY-MM`, or an unknown field. `409` (with the `runId` in progress) when that bank is already running. |
+| `GET /scrape/runs/:runId` | The run: `status` (`running`/`succeeded`/`failed`), times, `params`, and `result` (`upserted`, `deleted`, `balancesUpdated`, `dryRunPath`) or `error` (`message`, `stage`, `tracePath`).                                                          |
+| `GET /scrape/runs`        | The 50 most recent runs, newest first.                                                                                                                                                                                                            |
 
 - `error.stage` says where a run stopped: `config` (the `config` row, or an `account` that is not
   the bank's), `credentials` (Bitwarden), `scrape` (the bank's site), `persist` (the database).
@@ -280,7 +284,7 @@ the DTO it declares with `@ZodSerializerDto` (`ZodSerializerInterceptor`, global
   `trace-attempt-<n>.zip` next to it. The directory is created only when
   something is written to it.
 
-**A `nestjs-zod` detail that matters.** It validates a parameter only when its *type* is a ZodDto,
+**A `nestjs-zod` detail that matters.** It validates a parameter only when its _type_ is a ZodDto,
 so route params are taken whole — `@Param() { bankKey }: BankKeyParamsDto` — never
 `@Param('bankKey') bankKey: string`, which would let any string through. And the body schema maps
 `undefined` to `{}`, because Express 5 leaves `req.body` undefined for a POST with no body.

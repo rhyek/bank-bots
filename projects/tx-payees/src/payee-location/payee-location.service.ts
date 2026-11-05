@@ -2,8 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { eq, sql } from 'drizzle-orm';
 import { placeField } from '~/owner-location/place-field';
-import { bankTx, payee } from '~/replica-db/replica-schema';
-import { ReplicaDb } from '~/replica-db/replica-db.service';
 import {
   PayeeLocationMatcher,
   checkPayeeLocation,
@@ -11,6 +9,8 @@ import {
   type PayeeLocationInput,
 } from '~/payee-location/payee-location-matcher';
 import { PayeeLocationWriter } from '~/payee-location/payee-location-writer';
+import { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, payee } from '~/replica-db/replica-schema';
 
 const MAX_SAMPLES = 10;
 

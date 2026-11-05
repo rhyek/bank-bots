@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
+import type { BankConfigService } from '~/bank-config/bank-config.service';
 import type { BankKey } from '~/bank-config/bank-keys';
 import type { Config } from '~/bank-config/config-schema';
 import { AccountType } from '~/bank-config/types';
-import type { BankConfigService } from '~/bank-config/bank-config.service';
 import type {
   BankCredentialsService,
   CredentialsResult,

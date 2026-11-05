@@ -3,8 +3,6 @@ import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { daysBetween, windowDates } from '~/location/location-day';
 import { LocationService } from '~/location/location.service';
-import { bankTx, payee } from '~/replica-db/replica-schema';
-import { ReplicaDb } from '~/replica-db/replica-db.service';
 import {
   buildDayEvidence,
   consecutiveRuns,
@@ -28,6 +26,8 @@ import {
   type PayeePlace,
   type TxLocation,
 } from '~/owner-location/tx-location';
+import { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, payee } from '~/replica-db/replica-schema';
 
 /** The most days one resolver call is asked about. */
 const MAX_RUN_DAYS = 14;

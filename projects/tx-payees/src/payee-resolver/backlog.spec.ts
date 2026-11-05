@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
-import type { ReplicaDb } from '~/replica-db/replica-db.service';
 import { hasNoneVerdict, lastLocation, selectBacklog } from '~/payee-resolver/backlog';
+import type { ReplicaDb } from '~/replica-db/replica-db.service';
 import { addPayee, addResult, addTx, makeReplica } from '~/testing/replica';
 
 const FROM = '2026-01-01';

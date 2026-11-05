@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
@@ -10,8 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select';
-import { cn } from '~/lib/utils';
 import { monthEnd, monthStart, WINDOW_LABELS, type TxFilters } from '~/lib/filters';
+import { cn } from '~/lib/utils';
 
 const PRESETS = Object.keys(WINDOW_LABELS) as (keyof typeof WINDOW_LABELS)[];
 

@@ -19,7 +19,7 @@ export const configSchema = z.object({
       bitwardenItemId: z.string(),
       accounts: z.array(
         z.object({
-          type: z.nativeEnum(AccountType),
+          type: z.enum(AccountType),
           number: z.string(),
         }),
       ),

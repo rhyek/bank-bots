@@ -1,6 +1,3 @@
-import { Injectable, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
-import { StructuredLoggerService } from '@rhyek/nestjs-utils';
-import { Client, type Notification } from 'pg';
 import {
   bankTx as pgBankTx,
   category as pgCategory,
@@ -13,7 +10,12 @@ import {
   eq as pgEq,
   gte as pgGte,
 } from '@bank-bots/db';
+import { Injectable, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common';
+import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { eq, getTableColumns, inArray, sql } from 'drizzle-orm';
+import { Client, type Notification } from 'pg';
+import { AppEvents } from '~/events/app-events';
+import { ReplicaDb } from '~/replica-db/replica-db.service';
 import {
   bankTx as liteBankTx,
   category as liteCategory,
@@ -22,8 +24,6 @@ import {
   matchingRule as liteMatchingRule,
   payee as litePayee,
 } from '~/replica-db/replica-schema';
-import { ReplicaDb } from '~/replica-db/replica-db.service';
-import { AppEvents } from '~/events/app-events';
 import { ListenerHeartbeat } from '~/replica-sync/listener-heartbeat';
 
 const CHANNEL = 'replica_events';

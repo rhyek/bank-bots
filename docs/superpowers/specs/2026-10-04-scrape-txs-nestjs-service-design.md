@@ -19,27 +19,27 @@ redesigned. They move, and they log through the service's logger; nothing else a
 
 ## Decisions taken with the owner
 
-| Question | Decision |
-| --- | --- |
-| How many concurrent scrapes per tick? | Three: one per bank key (`bancoIndustrialGt`, `bacGt`, `bacCr`), each its own Bitwarden login. |
-| Browser isolation | One Chromium **per scrape**, and a fresh context per attempt, as today. A crashed browser can only take down its own bank. |
-| Does the endpoint wait for the scrape? | No. `POST` answers 202 with a run id; a `GET` reports the run. |
-| How are credentials fetched? | One service call takes an **array of bank keys** and returns the credentials for all of them. The scrapes are forked from there, each handed its credentials. |
-| Request validation | `nestjs-zod`, not NestJS 12's built-in Zod support. |
-| Headed or headless? | **Headless.** No Chromium window opens. |
-| Playwright version | Upgraded to the latest stable (1.63.0 today, from 1.61.1), with the Chromium it ships. |
-| Where is run history kept? | In a `scrape_run` table (decided during the build; see "Implementation notes"). |
-| How far back does a run with no months reach? | To the bank's last successful scrape, read from `scrape_run` (same). |
+| Question                                      | Decision                                                                                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| How many concurrent scrapes per tick?         | Three: one per bank key (`bancoIndustrialGt`, `bacGt`, `bacCr`), each its own Bitwarden login.                                                                |
+| Browser isolation                             | One Chromium **per scrape**, and a fresh context per attempt, as today. A crashed browser can only take down its own bank.                                    |
+| Does the endpoint wait for the scrape?        | No. `POST` answers 202 with a run id; a `GET` reports the run.                                                                                                |
+| How are credentials fetched?                  | One service call takes an **array of bank keys** and returns the credentials for all of them. The scrapes are forked from there, each handed its credentials. |
+| Request validation                            | `nestjs-zod`, not NestJS 12's built-in Zod support.                                                                                                           |
+| Headed or headless?                           | **Headless.** No Chromium window opens.                                                                                                                       |
+| Playwright version                            | Upgraded to the latest stable (1.63.0 today, from 1.61.1), with the Chromium it ships.                                                                        |
+| Where is run history kept?                    | In a `scrape_run` table (decided during the build; see "Implementation notes").                                                                               |
+| How far back does a run with no months reach? | To the bank's last successful scrape, read from `scrape_run` (same).                                                                                          |
 
 ## What replaces what
 
-| Today | After |
-| --- | --- |
-| `src/console.ts` + `commander` (`--bank-key`, `--month`, `--account`, `--json`, `--trace-dir`) | `POST /scrape/:bankKey` with a JSON body. The CLI is deleted. |
-| `run()` in `src/lib/run.ts` does everything for one bank and ends the DB pool | Split into the credentials service, the batch/registry service and the one-bank job. The pool stays open for the life of the process. |
-| Run on demand through `devtooie cmd scrape-txs -c start -- …` | An always-on devtooie package with a port and a healthcheck. |
-| `console.log` | The structured logger from `@rhyek/nestjs-utils`, as in `tx-payees`. |
-| Traces in `storage/playwright-traces/`, or `--trace-dir` | One directory per run: `storage/runs/<runId>/`. |
+| Today                                                                                          | After                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/console.ts` + `commander` (`--bank-key`, `--month`, `--account`, `--json`, `--trace-dir`) | `POST /scrape/:bankKey` with a JSON body. The CLI is deleted.                                                                         |
+| `run()` in `src/lib/run.ts` does everything for one bank and ends the DB pool                  | Split into the credentials service, the batch/registry service and the one-bank job. The pool stays open for the life of the process. |
+| Run on demand through `devtooie cmd scrape-txs -c start -- …`                                  | An always-on devtooie package with a port and a healthcheck.                                                                          |
+| `console.log`                                                                                  | The structured logger from `@rhyek/nestjs-utils`, as in `tx-payees`.                                                                  |
+| Traces in `storage/playwright-traces/`, or `--trace-dir`                                       | One directory per run: `storage/runs/<runId>/`.                                                                                       |
 
 ## Structure (`projects/scrape-txs/src`)
 
@@ -73,9 +73,7 @@ Each unit has one job:
 ## Credentials
 
 ```ts
-type CredentialsResult =
-  | { ok: true; credentials: BankCredentials }
-  | { ok: false; error: Error };
+type CredentialsResult = { ok: true; credentials: BankCredentials } | { ok: false; error: Error };
 
 class BankCredentialsService {
   fetch(bankKeys: BankKey[], config: Config): Promise<Map<BankKey, CredentialsResult>>;
@@ -160,8 +158,8 @@ installed with `pnpm -C projects/scrape-txs exec playwright install chromium`.
 **Headless** is not new for these banks: the retired Lambda ran them with `headless: true` for two
 years. Only the local path was headed. Two details matter, both measured on the installed build:
 
-- **Which headless.** Playwright has two. Its default is the *headless shell*, a cut-down build
-  (it reports zero browser plugins). `channel: 'chromium'` selects Chromium's *new headless* mode,
+- **Which headless.** Playwright has two. Its default is the _headless shell_, a cut-down build
+  (it reports zero browser plugins). `channel: 'chromium'` selects Chromium's _new headless_ mode,
   which is the full browser without a window (it reports five plugins, the fixed list a normal
   Chrome has; a headed launch was not measured).
   The scrapers are known to work in the full browser, so the service launches
@@ -181,13 +179,13 @@ restructure. If a bank does fail headless, work stops and the owner decides.
 
 What "one failing should not affect another" rests on:
 
-| Shared? | |
-| --- | --- |
-| Chromium process | No. One per run. |
-| Browser context | No. One per attempt. |
-| Bitwarden session | Yes, per batch, and only before any browser opens. An item-level failure still fails one bank only. |
-| Database pool | Yes. Each run writes in its own transaction on its own connection. |
-| Errors | Each run's promise is caught inside the run. Nothing is rethrown to the scheduler or left as an unhandled rejection. The batch waits with `Promise.allSettled`. |
+| Shared?           |                                                                                                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chromium process  | No. One per run.                                                                                                                                                |
+| Browser context   | No. One per attempt.                                                                                                                                            |
+| Bitwarden session | Yes, per batch, and only before any browser opens. An item-level failure still fails one bank only.                                                             |
+| Database pool     | Yes. Each run writes in its own transaction on its own connection.                                                                                              |
+| Errors            | Each run's promise is caught inside the run. Nothing is rethrown to the scheduler or left as an unhandled rejection. The batch waits with `Promise.allSettled`. |
 
 A restart of the service in the middle of a scrape aborts that scrape. Nothing is half-written,
 because a run persists in a single transaction at its end.
@@ -216,9 +214,9 @@ No authentication, same as `tx-payees`: a local service.
 ```jsonc
 // body — every field optional
 {
-  "months": ["2026-09", "2026-10"],   // YYYY-MM; default: current month, plus the previous one if today is the 10th or earlier
-  "account": "904201043",              // scrape only this account of the bank
-  "dryRun": true                       // write scraped.json instead of the database
+  "months": ["2026-09", "2026-10"], // YYYY-MM; default: current month, plus the previous one if today is the 10th or earlier
+  "account": "904201043", // scrape only this account of the bank
+  "dryRun": true, // write scraped.json instead of the database
 }
 ```
 
@@ -237,11 +235,12 @@ request: accounts live in the `config` row, which is read in the background step
   "runId": "bacGt-20261004-070000-012",
   "bankKey": "bacGt",
   "trigger": "schedule",
-  "status": "failed",                  // running | succeeded | failed
-  "startedAt": "…", "finishedAt": "…",
+  "status": "failed", // running | succeeded | failed
+  "startedAt": "…",
+  "finishedAt": "…",
   "params": { "months": ["2026-10"], "dryRun": false },
-  "result": null,                      // { upserted, deleted, balancesUpdated, dryRunPath? } when succeeded
-  "error": { "message": "…", "stage": "scrape", "tracePath": "…/trace.zip" }   // when failed
+  "result": null, // { upserted, deleted, balancesUpdated, dryRunPath? } when succeeded
+  "error": { "message": "…", "stage": "scrape", "tracePath": "…/trace.zip" }, // when failed
 }
 ```
 

@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { cn } from '~/lib/utils';
-import { formatCents } from '~/lib/format';
+import { useState } from 'react';
 import { Skeleton } from '~/components/ui/skeleton';
+import { formatCents } from '~/lib/format';
+import { cn } from '~/lib/utils';
 import type { MonthSummary, SpendingBucket } from '~/server/queries/spending';
 
 type OnDrill = (bucket: SpendingBucket, title: string) => void;

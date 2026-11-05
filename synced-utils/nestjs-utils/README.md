@@ -2,8 +2,8 @@
 
 NestJS utilities, consumed as TypeScript source.
 
-| | |
-|---|---|
+|                                                        |                                                                                                                      |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | [structured-logger](./src/structured-logger/README.md) | Structured JSON logging on pino: per-request context, mixins, an axios-aware error serializer, credential redaction. |
 
 ## Install

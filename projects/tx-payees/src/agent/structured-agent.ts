@@ -1,5 +1,5 @@
-import type { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
+import type { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { z } from 'zod';
 
 export interface StructuredAgentRun<T> {

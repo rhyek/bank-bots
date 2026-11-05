@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useState } from 'react';
 import { Header } from '~/components/layout/header';
 import { Main } from '~/components/layout/main';
-import { ThemeSwitch } from '~/components/theme-switch';
 import { ActivityDialog, type Drilldown } from '~/components/spending/activity-dialog';
 import { CategoryTable } from '~/components/spending/category-table';
 import { MonthNav } from '~/components/spending/month-nav';
 import { SummaryHeader } from '~/components/spending/summary-header';
-import { monthSummaryQueryOptions } from '~/lib/queries';
+import { ThemeSwitch } from '~/components/theme-switch';
 import { spendingSearchSchema } from '~/lib/filters';
+import { monthSummaryQueryOptions } from '~/lib/queries';
 
 export const Route = createFileRoute('/_app/spending')({
   component: Spending,

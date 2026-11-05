@@ -5,15 +5,15 @@ its per-account sum reflects the real balance. Details + how to revert below.
 
 ## Outcome
 
-| Account | rows (was) | Σ bank_tx (was) | real balance | status |
-|---|---|---|---|---|
-| bacGt `904201043` | 2,509 (2,227) | **36,445.72** (25,174.08) | ~36,664.57 (YNAB) | reflects it; see note |
-| bacCr `CR93…` | 105 (93) | **24,769.16** (19,426.30) | 24,769.16 | **exact** |
-| bacGt `CR07…` | 12 (11) | **5,069.76** (5,069.76) | 5,069.76 | **exact** |
-| bancoInd `3250099185` | 4,150 (1,310) | **5,851.57** (−10,587.87) | 5,851.57 | **exact** |
+| Account               | rows (was)    | Σ bank_tx (was)           | real balance      | status                |
+| --------------------- | ------------- | ------------------------- | ----------------- | --------------------- |
+| bacGt `904201043`     | 2,509 (2,227) | **36,445.72** (25,174.08) | ~36,664.57 (YNAB) | reflects it; see note |
+| bacCr `CR93…`         | 105 (93)      | **24,769.16** (19,426.30) | 24,769.16         | **exact**             |
+| bacGt `CR07…`         | 12 (11)       | **5,069.76** (5,069.76)   | 5,069.76          | **exact**             |
+| bancoInd `3250099185` | 4,150 (1,310) | **5,851.57** (−10,587.87) | 5,851.57          | **exact**             |
 
 3 of 4 match the YNAB balance to the cent. `904201043` is $218.85 under YNAB's balance, and that gap
-is **benign and explained** (below) — our figure is actually the *more current* one.
+is **benign and explained** (below) — our figure is actually the _more current_ one.
 
 ## What I did
 
@@ -40,9 +40,9 @@ Also fixed the **YNAB `since_date` bug** in `ynab/client.ts` (both `getTransacti
 I diff'd our scraper's 2024-06+ rows against YNAB's for that account:
 
 - **13 txs our scraper has that YNAB doesn't** (net −585.53) = our **recent July 12–14** transactions.
-  YNAB's data ends 2026-07-11, so *our scraper is more current*. These are legitimately ours.
+  YNAB's data ends 2026-07-11, so _our scraper is more current_. These are legitimately ours.
 - **2 txs YNAB has that we don't** (net −366.68), and both are **YNAB artifacts, not scraper gaps**:
-  - a −$361.45 "Gaby / Educación Ximena" entered in YNAB **twice** (2026-02-26 *and* 02-27, same
+  - a −$361.45 "Gaby / Educación Ximena" entered in YNAB **twice** (2026-02-26 _and_ 02-27, same
     docNo `406838368`) — a duplicate; our scraper correctly has it once.
   - a −$5.23 Uber on a generic reused docNo (`102700000`).
 

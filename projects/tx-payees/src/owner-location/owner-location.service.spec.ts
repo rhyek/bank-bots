@@ -3,8 +3,6 @@ import { afterEach, beforeEach, test } from 'node:test';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import type { LocationDay } from '~/location/location-day';
 import type { LocationService } from '~/location/location.service';
-import type { ReplicaDb } from '~/replica-db/replica-db.service';
-import { addTx as addReplicaTx, makeReplica } from '~/testing/replica';
 import {
   DayLocationResolver,
   type DayAnswer,
@@ -19,6 +17,8 @@ import {
   type PlaceRequest,
 } from '~/owner-location/place-resolver';
 import type { ResolvedDay, ResolvedDayWrite } from '~/owner-location/resolved-day';
+import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import { addTx as addReplicaTx, makeReplica } from '~/testing/replica';
 
 const NOW = '2026-10-04T18:00:00Z';
 

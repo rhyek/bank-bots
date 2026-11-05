@@ -14,7 +14,7 @@ TypeScript **directly**:
 - `pnpm typecheck` → `tsc --noEmit` (types only; it never emits)
 
 **Why `@swc-node/register`, not Node's native type stripping.** Node can strip types from `.ts`
-directly now, but stripping only *deletes* type syntax — it does **not** emit the
+directly now, but stripping only _deletes_ type syntax — it does **not** emit the
 `emitDecoratorMetadata` that Nest's dependency injection reads to know what to inject into a
 constructor. `@swc-node/register` transpiles with SWC instead, honoring the two decorator flags in
 `tsconfig.json` (`emitDecoratorMetadata` + `experimentalDecorators`), so DI works with no `.swcrc`
@@ -125,10 +125,10 @@ src/
 import relationship in either direction** — one emits, the other listens, and either can be changed
 or removed without touching the other. The contract is `AppEventData` in `events/app-events.ts`:
 
-| Event | Payload | Meaning |
-| --- | --- | --- |
-| `replica-sync.startup-sync-finished` | *(none)* | first full delta sync completed; history is safe to read |
-| `replica-sync.row-persisted` | `{ table, op, id }` | a row was applied **to SQLite**; emitted after the write |
+| Event                                | Payload             | Meaning                                                  |
+| ------------------------------------ | ------------------- | -------------------------------------------------------- |
+| `replica-sync.startup-sync-finished` | _(none)_            | first full delta sync completed; history is safe to read |
+| `replica-sync.row-persisted`         | `{ table, op, id }` | a row was applied **to SQLite**; emitted after the write |
 
 `AppEvents` extends **emittery** (`Emittery<AppEventData>`), so `emit` and `on` are both checked
 against that map — an unknown event name, a missing payload, or a wrong payload shape is a compile
@@ -138,7 +138,7 @@ error. Dataless events are emitted as `emit('name')` with no second argument, an
 > **Why emittery and not `@nestjs/event-emitter`.** The Nest-native package peer-depends on
 > `@nestjs/common@^10 || ^11`, and this app pins **v12**. Revisit if it gains v12 support.
 
-**`replica-db` vs `replica-sync`.** `payee-resolver` needs the replica *client* to read from, but has
+**`replica-db` vs `replica-sync`.** `payee-resolver` needs the replica _client_ to read from, but has
 no interest in replication. Keeping the client in its own module lets consumers depend on exactly
 that, and keeps `replica-db` feature-agnostic. (This split originally existed to break a dependency
 cycle; the event bus removed the cycle, but the separation is still the right boundary.)
@@ -172,7 +172,7 @@ Payee matching is **three tiers**:
 3. **ai** — `TxAiMatcher`, only when 1 and 2 both miss
 
 Tiers 1 and 2 copy the payee/category from the most recent already-mapped transaction; a rule only
-decides *where to look* and never carries an answer. Hits are written to **Postgres**, whose trigger
+decides _where to look_ and never carries an answer. Hits are written to **Postgres**, whose trigger
 notifies the replica.
 
 **Why `concurrency: 1` is a feedback loop, not just serialization.** Each resolved transaction
@@ -181,14 +181,14 @@ six occurrences free. That only holds if the write is visible locally before the
 exact-tier `SELECT`, which runs microseconds later. See `ReplicaSettled`.
 
 **Why the insert-only filter lives in the consumer.** `row-persisted` is a bare replication fact, so
-payee-resolver filters for `table === 'bank_tx' && op === 'insert'` itself. That filter is *not* what
+payee-resolver filters for `table === 'bank_tx' && op === 'insert'` itself. That filter is _not_ what
 prevents a feedback loop from our own payee writes — the `payeeId != null` check in `onNewTx` does
 that, and would hold without it. What inserts-only actually prevents is narrower: re-queueing a
 still-unmatched row when an unrelated field changes (a re-scrape touching `amount_cents`). Those wait
 for the next startup sweep.
 
 **`ReplicaSettled` — the write barrier.** `settle.around(table, id, write)` registers a one-off
-`row-persisted` listener, *then* runs the write, then waits for confirmation. Registering after the
+`row-persisted` listener, _then_ runs the write, then waits for confirmation. Registering after the
 write would let a fast notification land in the gap and cost the full timeout every time; taking the
 write as a callback makes that ordering impossible to invert. On timeout it warns and continues —
 Postgres already has the truth, so a lost notification must never fail the work it guards.
@@ -210,17 +210,17 @@ DELETE FROM matcher_result WHERE bank_tx_id = '<uuid>' AND type = 'none';
 `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token` — treat it like a password). It reads the SQLite
 replica through four read tools and mutates Postgres through four write tools:
 
-| Read (SQLite, `readOnlyHint`) | Write (Postgres, barriered) |
-| --- | --- |
-| `find_similar_transactions` | `create_payee` |
-| `search_payees` (with per-payee country breakdown and the payee's own place) | `create_category` |
-| `list_matching_rules` | `create_matching_rule` |
-| `test_regex` | `update_matching_rule` |
+| Read (SQLite, `readOnlyHint`)                                                | Write (Postgres, barriered) |
+| ---------------------------------------------------------------------------- | --------------------------- |
+| `find_similar_transactions`                                                  | `create_payee`              |
+| `search_payees` (with per-payee country breakdown and the payee's own place) | `create_category`           |
+| `list_matching_rules`                                                        | `create_matching_rule`      |
+| `test_regex`                                                                 | `update_matching_rule`      |
 
 Three options are load-bearing and must not be dropped. They are set in `runStructuredAgent`, which
 every agent in this app goes through (`builtinTools` is what it passes as `tools`):
 
-- **`tools: ['WebSearch']`** removes every *other* built-in — `Bash`, `Read`, `Write`, `Edit`,
+- **`tools: ['WebSearch']`** removes every _other_ built-in — `Bash`, `Read`, `Write`, `Edit`,
   `Glob`, `Grep` — from the agent's context. Its whole capability surface is those eight tools plus
   web search.
 - **`settingSources: []`** stops the SDK loading `~/.claude`, project `.claude/`, or this repo's
@@ -364,25 +364,25 @@ options listed above as load-bearing in exactly one place. The day resolver pass
 
 **Rule patterns are gated on liveness, not correctness.** Rules go live enabled with no review. But
 `create_matching_rule` rejects a pattern that doesn't compile, that **nests an unbounded quantifier**
-(`(a+)+`), or that matches >30% of mapped history. The nesting check is *static* and deliberately so:
+(`(a+)+`), or that matches >30% of mapped history. The nesting check is _static_ and deliberately so:
 timing a regex means running it first, and `(a+)+$` against a 34-character description is ~2^34 steps
 — a timing-only guard hangs instead of reporting. The share check is skipped below 50 mapped rows,
 since on a small or freshly-rebuilt replica a good rule can legitimately match most of what's there.
 
-| Env var | Default | Purpose |
-| --- | --- | --- |
-| `TX_AI_ENABLED` | `true` | kill switch; when false the tier throws (does **not** write a terminal `none`) |
-| `TX_AI_MODEL` | *(unset — the latest Sonnet, looked up at boot)* | pins the payee matcher's model; see below |
-| `TX_AI_EFFORT` | `high` | the payee matcher's effort |
-| `TX_AI_MAX_PER_SWEEP` | *(unset — unlimited)* | opt-in throttle for a large backfill; see below |
-| `TX_AI_IDLE_TIMEOUT_MS` | `120000` | **silence**, not duration — rearmed by every message |
-| `TX_AI_SETTLE_TIMEOUT_MS` | `15000` | how long a write waits for `row-persisted` |
-| `DAWARICH_API_KEY` | *(unset — tracker off)* | key for the owner's Dawarich; treat it like a password. Without it days are resolved from card charges alone, and stay provisional |
-| `DAWARICH_URL` | `https://dawarich.homelab.rhyek.com` | Dawarich base URL |
-| `TX_LOCATION_ENABLED` | `true` | `false` disables every location step: days, transaction lookups, payee lookups |
-| `TX_LOCATION_MODEL` | value of `TX_AI_MODEL` | model for the three location agents: the day resolver, the place field resolver and the payee location matcher |
-| `TX_LOCATION_EFFORT` | `medium` | effort for those three agents |
-| `LOCATION_CACHE_DB_PATH` | `storage/location-cache.sqlite` | the tracker's per-day cache |
+| Env var                   | Default                                          | Purpose                                                                                                                            |
+| ------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `TX_AI_ENABLED`           | `true`                                           | kill switch; when false the tier throws (does **not** write a terminal `none`)                                                     |
+| `TX_AI_MODEL`             | _(unset — the latest Sonnet, looked up at boot)_ | pins the payee matcher's model; see below                                                                                          |
+| `TX_AI_EFFORT`            | `high`                                           | the payee matcher's effort                                                                                                         |
+| `TX_AI_MAX_PER_SWEEP`     | _(unset — unlimited)_                            | opt-in throttle for a large backfill; see below                                                                                    |
+| `TX_AI_IDLE_TIMEOUT_MS`   | `120000`                                         | **silence**, not duration — rearmed by every message                                                                               |
+| `TX_AI_SETTLE_TIMEOUT_MS` | `15000`                                          | how long a write waits for `row-persisted`                                                                                         |
+| `DAWARICH_API_KEY`        | _(unset — tracker off)_                          | key for the owner's Dawarich; treat it like a password. Without it days are resolved from card charges alone, and stay provisional |
+| `DAWARICH_URL`            | `https://dawarich.homelab.rhyek.com`             | Dawarich base URL                                                                                                                  |
+| `TX_LOCATION_ENABLED`     | `true`                                           | `false` disables every location step: days, transaction lookups, payee lookups                                                     |
+| `TX_LOCATION_MODEL`       | value of `TX_AI_MODEL`                           | model for the three location agents: the day resolver, the place field resolver and the payee location matcher                     |
+| `TX_LOCATION_EFFORT`      | `medium`                                         | effort for those three agents                                                                                                      |
+| `LOCATION_CACHE_DB_PATH`  | `storage/location-cache.sqlite`                  | the tracker's per-day cache                                                                                                        |
 
 **No Sonnet version is written down in the app (`AgentModels`, `agent/agent-models.service.ts`).**
 In `onModuleInit` it asks the Agent SDK what its `sonnet` alias resolves to (`supportedModels()`, the
@@ -407,7 +407,7 @@ rate limits — which are self-correcting, since a limited call errors, the tran
 and the next sweep retries it. A default cap bought nothing and cost availability: once spent, the
 service kept running while silently skipping every transaction, including newly scraped ones, until
 someone restarted it. The work is bounded anyway (finite backlog, terminal `none` verdicts,
-`maxTurns`). When the budget *is* set, it now resets whenever the queue drains, so it throttles a
+`maxTurns`). When the budget _is_ set, it now resets whenever the queue drains, so it throttles a
 batch rather than the process.
 
 **Why the agent timeout measures silence.** A wall-clock cap kills the wrong runs: an agent working

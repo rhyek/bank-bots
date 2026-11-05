@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
 import {
   payee as pgPayee,
   payeeLocationResult as pgPayeeLocationResult,
   db as pgDb,
   eq as pgEq,
 } from '@bank-bots/db';
+import { Injectable } from '@nestjs/common';
 import { v7 as uuidv7 } from 'uuid';
 import { ReplicaSettled } from '~/events/replica-settled.service';
 import type { PayeeLocationAnswer } from '~/payee-location/payee-location-matcher';

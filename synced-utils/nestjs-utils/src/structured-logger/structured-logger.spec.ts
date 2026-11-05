@@ -1,7 +1,7 @@
-import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { after, before, test } from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { StructuredLoggerService } from './structured-logger.service';

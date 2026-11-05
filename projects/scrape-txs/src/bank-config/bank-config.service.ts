@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import { db } from '@bank-bots/db';
+import { Injectable } from '@nestjs/common';
 import { type Config, configSchema } from './config-schema';
 
 @Injectable()

@@ -1,5 +1,4 @@
 import { tool } from '@anthropic-ai/claude-agent-sdk';
-import { z } from 'zod';
 import {
   category as pgCategory,
   categoryGroup as pgCategoryGroup,
@@ -9,10 +8,11 @@ import {
   eq as pgEq,
 } from '@bank-bots/db';
 import { v7 as uuidv7 } from 'uuid';
-import { matchingRule } from '~/replica-db/replica-schema';
-import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import { z } from 'zod';
 import type { ReplicaSettled } from '~/events/replica-settled.service';
 import { testRegex } from '~/payee-resolver/ai/read-tools';
+import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import { matchingRule } from '~/replica-db/replica-schema';
 
 /**
  * What the agent actually changed during one run.

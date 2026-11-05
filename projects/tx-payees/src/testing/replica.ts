@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from '~/replica-db/replica-schema';
 import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import * as schema from '~/replica-db/replica-schema';
 
 /**
  * An in-memory stand-in for ReplicaDb, set up the way ReplicaDb.onModuleInit does it: create the

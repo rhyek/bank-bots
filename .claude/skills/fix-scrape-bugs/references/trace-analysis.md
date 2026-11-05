@@ -50,6 +50,7 @@ jq -rn '
 ```
 
 Notes:
+
 - `apiName` may render as `null` in some trace versions — the `params.selector` / `params.url`
   column is the reliable identifier of what the step did.
 - Don't depend on extracting a structured error from `after` (`.error.error.message`) — its shape
@@ -59,7 +60,7 @@ Notes:
 ## 2. Page navigations — catch redirects (e.g. the retry/cookie bug)
 
 List every DOM snapshot's `frameUrl` in capture order. Comparing where each attempt's `goto`
-*lands* reveals unexpected redirects (a reused context being sent to a different URL on retry, an
+_lands_ reveals unexpected redirects (a reused context being sent to a different URL on retry, an
 auth redirect, a country/region redirect, etc.).
 
 ```bash
@@ -103,7 +104,7 @@ jq -rc 'select(.type=="console") | "\(.messageType)  \(.text)"' "$work/trace.tra
 
 ## 5. Open the trace in the Playwright UI (optional, for humans)
 
-When you want to *see* it rather than grep it:
+When you want to _see_ it rather than grep it:
 
 ```bash
 pnpm -C projects/scrape-txs exec playwright show-trace "$tf"

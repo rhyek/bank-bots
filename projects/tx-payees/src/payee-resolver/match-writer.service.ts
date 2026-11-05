@@ -1,14 +1,14 @@
-import { Injectable } from '@nestjs/common';
 import {
   bankTx as pgBankTx,
   matcherResult as pgMatcherResult,
   db as pgDb,
   eq as pgEq,
 } from '@bank-bots/db';
+import { Injectable } from '@nestjs/common';
 import { v7 as uuidv7 } from 'uuid';
 import { ReplicaSettled } from '~/events/replica-settled.service';
-import type { MatchOutcome } from '~/payee-resolver/match-outcome';
 import type { TxLocation } from '~/owner-location/tx-location';
+import type { MatchOutcome } from '~/payee-resolver/match-outcome';
 
 /**
  * Every write payee-resolver makes, in one place.

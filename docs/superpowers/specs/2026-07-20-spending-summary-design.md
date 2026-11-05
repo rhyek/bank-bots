@@ -14,11 +14,11 @@ schema, no migration.
 
 Three figures, over every transaction in the month, all accounts:
 
-| | |
-| --- | --- |
-| **Inflow** | sum of positive `amount_cents` |
-| **Outflow** | sum of negative `amount_cents`, shown positive |
-| **Left over** | `inflow − outflow` |
+|               |                                                |
+| ------------- | ---------------------------------------------- |
+| **Inflow**    | sum of positive `amount_cents`                 |
+| **Outflow**   | sum of negative `amount_cents`, shown positive |
+| **Left over** | `inflow − outflow`                             |
 
 Verified against January 2026: `+$11,183.14 / −$6,556.96 / +$4,626.18`.
 
@@ -103,16 +103,16 @@ or a filter changed after arriving — cannot walk the entire table.
 
 **New**
 
-| File | Responsibility |
-| --- | --- |
-| `server/queries/tx-row.ts` | The joined `TxRow` select, joins and row mapping, extracted from `transactions.ts` so both the transactions list and the drill-down produce identical rows |
-| `server/queries/spending.ts` | `monthSummaryQuery`, `listBucketTransactionsQuery` |
-| `server/spending.ts` | The two server fns |
-| `routes/_app/spending.tsx` | Route + page |
-| `components/spending/month-nav.tsx` | `‹ July 2026 ›` + Today |
-| `components/spending/summary-header.tsx` | The three figures |
-| `components/spending/category-table.tsx` | Groups + categories + Uncategorized |
-| `components/spending/activity-dialog.tsx` | The drill-down |
+| File                                      | Responsibility                                                                                                                                             |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/queries/tx-row.ts`                | The joined `TxRow` select, joins and row mapping, extracted from `transactions.ts` so both the transactions list and the drill-down produce identical rows |
+| `server/queries/spending.ts`              | `monthSummaryQuery`, `listBucketTransactionsQuery`                                                                                                         |
+| `server/spending.ts`                      | The two server fns                                                                                                                                         |
+| `routes/_app/spending.tsx`                | Route + page                                                                                                                                               |
+| `components/spending/month-nav.tsx`       | `‹ July 2026 ›` + Today                                                                                                                                    |
+| `components/spending/summary-header.tsx`  | The three figures                                                                                                                                          |
+| `components/spending/category-table.tsx`  | Groups + categories + Uncategorized                                                                                                                        |
+| `components/spending/activity-dialog.tsx` | The drill-down                                                                                                                                             |
 
 **Modified:** `server/queries/transactions.ts` (use the extracted row helpers), `components/transactions/transactions.tsx`
 (seek + scroll), `components/transactions/transaction-row.tsx` (highlight styling), `lib/filters.ts`
@@ -130,7 +130,7 @@ Against the real database, on months whose answers are known:
   carry the expected totals — verified by hand against the raw table.
 - Group totals do **not** sum to outflow, and the tests assert that they don't. January's
   `Quality of Life` nets **+$100.00** from the Vegas 2025 refund: that $100 is in the header's gross
-  inflow *and* nets against its own category, so the two sides differ by exactly the refunds. This
+  inflow _and_ nets against its own category, so the two sides differ by exactly the refunds. This
   is the "net, not gross" rule, and it is asserted rather than worked around.
 - Every group's aggregate total equals the sum of the rows its drill-down returns. The summary and
   the drill-down are separate queries over the same filters; this is the check that they can't drift.

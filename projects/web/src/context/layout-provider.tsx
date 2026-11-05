@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { getCookie, setCookie } from '~/lib/cookies';
 
 export type Collapsible = 'offcanvas' | 'icon' | 'none';
@@ -42,30 +42,34 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     return (saved as Variant) || DEFAULT_VARIANT;
   });
 
-  const setCollapsible = (newCollapsible: Collapsible) => {
+  const setCollapsible = useCallback((newCollapsible: Collapsible) => {
     _setCollapsible(newCollapsible);
     setCookie(LAYOUT_COLLAPSIBLE_COOKIE_NAME, newCollapsible, LAYOUT_COOKIE_MAX_AGE);
-  };
+  }, []);
 
-  const setVariant = (newVariant: Variant) => {
+  const setVariant = useCallback((newVariant: Variant) => {
     _setVariant(newVariant);
     setCookie(LAYOUT_VARIANT_COOKIE_NAME, newVariant, LAYOUT_COOKIE_MAX_AGE);
-  };
+  }, []);
 
-  const resetLayout = () => {
+  const resetLayout = useCallback(() => {
     setCollapsible(DEFAULT_COLLAPSIBLE);
     setVariant(DEFAULT_VARIANT);
-  };
+  }, [setCollapsible, setVariant]);
 
-  const contextValue: LayoutContextType = {
-    resetLayout,
-    defaultCollapsible: DEFAULT_COLLAPSIBLE,
-    collapsible,
-    setCollapsible,
-    defaultVariant: DEFAULT_VARIANT,
-    variant,
-    setVariant,
-  };
+  // Stable while nothing in it changes, so the context's consumers re-render only then.
+  const contextValue = useMemo(
+    (): LayoutContextType => ({
+      resetLayout,
+      defaultCollapsible: DEFAULT_COLLAPSIBLE,
+      collapsible,
+      setCollapsible,
+      defaultVariant: DEFAULT_VARIANT,
+      variant,
+      setVariant,
+    }),
+    [resetLayout, collapsible, setCollapsible, variant, setVariant],
+  );
 
   return <LayoutContext value={contextValue}>{children}</LayoutContext>;
 }

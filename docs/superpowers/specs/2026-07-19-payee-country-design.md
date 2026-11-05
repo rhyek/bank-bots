@@ -26,7 +26,7 @@ UBER *TRIP  CR     n=7    2023-08 .. 2023-12     Uber Costa Rica
 
 The 92 `NL` rides physically happened in Guatemala. Under "where I was" they would all be `GT` and
 the distinction would vanish. Under **"where the entity is"** they are `NL` — Uber B.V. is a Dutch
-company — and the trailing country field becomes *authoritative* rather than misleading.
+company — and the trailing country field becomes _authoritative_ rather than misleading.
 
 This reverses an earlier reading in the tx-ai-matcher spec, which treated the trailing field as a
 "payment rail, not a place" and therefore as noise. It is a payment rail — and the rail **is** the
@@ -42,7 +42,7 @@ entity, which is exactly what this column records.
 country: text(),  // ISO 3166-1 alpha-2, nullable
 ```
 
-Nullable on purpose: `NULL` means *not yet determined*, which is honest and is the input to the
+Nullable on purpose: `NULL` means _not yet determined_, which is honest and is the input to the
 deferred resolution below. It never means "no country".
 
 `payee` is already replicated, so the replica schema and `EXPECTED_SCHEMA_VERSION` bump alongside it.
@@ -51,31 +51,31 @@ deferred resolution below. It never means "no country".
 
 Across 539 payees that have transactions:
 
-| Signal | Payees | Treatment |
-| --- | --- | --- |
-| One consistent country code | 330 | assign directly |
-| Several country codes | 6 | **split into per-country payees** |
-| No signal at all | 195 | research or defer (below) |
+| Signal                      | Payees | Treatment                         |
+| --------------------------- | ------ | --------------------------------- |
+| One consistent country code | 330    | assign directly                   |
+| Several country codes       | 6      | **split into per-country payees** |
+| No signal at all            | 195    | research or defer (below)         |
 
 ### The whitelist is derived, not guessed
 
 A trailing two-letter token is only a country when it is one. Truncated merchant names end in valid
 ISO codes constantly, so ISO membership alone does not filter them — frequency plus inspection does:
 
-| Code | Evidence | Verdict |
-| --- | --- | --- |
-| `GT` | 2139 txs / 224 payees | real |
-| `US` | 539 / 40 | real |
-| `NL` | 129 / 3 — Uber, Uber Eats, Shottr | real |
-| `ES` | 107 / 1 — McDonald's (Spain) | real |
-| `CR` | 49 / 18 | real |
-| `SE` | 34 / 1 — Spotify (Spotify AB) | real |
-| `IE` | 9 / 1 — Oculus (Meta bills from Ireland) | real |
-| `AN` | 12 / 5 — `Café La Escalonia Antigua`, `tienda`, `café condesa` | **word ending** |
-| `BA` | 9 / 1 — `Gaby` | **word ending** |
-| `MO` | 19 / 1 — `ivannia` | **word ending** |
-| `AI` `BI` `VN` `TV` `AL` `SC` `SJ` `GO` `CY` | 1–6 txs each | **word endings** |
-| `UK` | 3 txs | **not ISO** (`GB` is) — word ending |
+| Code                                         | Evidence                                                       | Verdict                             |
+| -------------------------------------------- | -------------------------------------------------------------- | ----------------------------------- |
+| `GT`                                         | 2139 txs / 224 payees                                          | real                                |
+| `US`                                         | 539 / 40                                                       | real                                |
+| `NL`                                         | 129 / 3 — Uber, Uber Eats, Shottr                              | real                                |
+| `ES`                                         | 107 / 1 — McDonald's (Spain)                                   | real                                |
+| `CR`                                         | 49 / 18                                                        | real                                |
+| `SE`                                         | 34 / 1 — Spotify (Spotify AB)                                  | real                                |
+| `IE`                                         | 9 / 1 — Oculus (Meta bills from Ireland)                       | real                                |
+| `AN`                                         | 12 / 5 — `Café La Escalonia Antigua`, `tienda`, `café condesa` | **word ending**                     |
+| `BA`                                         | 9 / 1 — `Gaby`                                                 | **word ending**                     |
+| `MO`                                         | 19 / 1 — `ivannia`                                             | **word ending**                     |
+| `AI` `BI` `VN` `TV` `AL` `SC` `SJ` `GO` `CY` | 1–6 txs each                                                   | **word endings**                    |
+| `UK`                                         | 3 txs                                                          | **not ISO** (`GB` is) — word ending |
 
 Low-volume plausible codes (`GB`, `MX`, `PA`, `CO`, `LU`, `CH`, `SV`, `DE`, `BE`, `CZ`) are checked
 individually rather than accepted or rejected wholesale.
@@ -133,8 +133,8 @@ Country is a property the matcher **determines**, not a new key it matches on:
 
 ### Prompt changes
 
-The §3 "Country codes" section is rewritten. Its current framing — *trailing country is routing noise,
-ignore it* — is now wrong. The replacement:
+The §3 "Country codes" section is rewritten. Its current framing — _trailing country is routing noise,
+ignore it_ — is now wrong. The replacement:
 
 - The trailing field names the **entity** that billed, and that is what `country` records.
 - Uber `NL` is Uber B.V. Amsterdam: a real Dutch entity, so `Uber NL` with country `NL`.

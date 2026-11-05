@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from '~/replica-db/replica-schema';
+import type { ReplicaSettled } from '~/events/replica-settled.service';
 import { buildWriteTools } from '~/payee-resolver/ai/write-tools';
 import type { ReplicaDb } from '~/replica-db/replica-db.service';
-import type { ReplicaSettled } from '~/events/replica-settled.service';
+import * as schema from '~/replica-db/replica-schema';
 
 // These tests cover the validation the write tools do BEFORE they touch Postgres — which is where
 // all the risk lives: a bad regex reaching matching_rule breaks every future match, and a

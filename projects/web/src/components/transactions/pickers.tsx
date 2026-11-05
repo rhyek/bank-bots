@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Button } from '~/components/ui/button';
 import {
   Command,
   CommandEmpty,
@@ -11,9 +12,8 @@ import {
   CommandList,
 } from '~/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
-import { Button } from '~/components/ui/button';
-import { cn } from '~/lib/utils';
 import { categoriesQueryOptions, payeesQueryOptions } from '~/lib/queries';
+import { cn } from '~/lib/utils';
 import { createPayee } from '~/server/lookups';
 import type { PayeeOption } from '~/server/queries/lookups';
 
@@ -40,6 +40,8 @@ function TriggerButton({
       {...props}
       variant="outline"
       size="sm"
+      // The shadcn combobox trigger: `PopoverTrigger` adds `aria-expanded` and `aria-controls`.
+      // oxlint-disable-next-line jsx-a11y/role-has-required-aria-props, jsx-a11y/prefer-tag-over-role
       role="combobox"
       className={cn(
         'h-7 w-full justify-between px-2 font-normal',

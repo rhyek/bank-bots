@@ -1,18 +1,18 @@
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
-import PQueue from 'p-queue';
 import { and, eq, sql } from 'drizzle-orm';
-import { bankTx, category, matchingRule, payee } from '~/replica-db/replica-schema';
-import { ReplicaDb } from '~/replica-db/replica-db.service';
-import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
-import { MatchWriter } from '~/payee-resolver/match-writer.service';
-import { TxAiResolver, isResolved, type MatchOutcome } from '~/payee-resolver/match-outcome';
-import { hasNoneVerdict, lastLocation, selectBacklog } from '~/payee-resolver/backlog';
+import PQueue from 'p-queue';
 import { AppEvents } from '~/events/app-events';
 import { windowDates } from '~/location/location-day';
 import { OwnerLocationService } from '~/owner-location/owner-location.service';
 import { WINDOW_DAYS, sameTxLocation, type TxLocation } from '~/owner-location/tx-location';
 import { PayeeLocationService } from '~/payee-location/payee-location.service';
+import { hasNoneVerdict, lastLocation, selectBacklog } from '~/payee-resolver/backlog';
+import { TxAiResolver, isResolved, type MatchOutcome } from '~/payee-resolver/match-outcome';
+import { MatchWriter } from '~/payee-resolver/match-writer.service';
+import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
+import { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, category, matchingRule, payee } from '~/replica-db/replica-schema';
 
 // Only transactions on or after this date are matched or located. Deliberately the TRANSACTION
 // date, not created_at: 3145 rows share a single created_at from the YNAB history ingest while

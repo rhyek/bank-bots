@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { LinkProps } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
 import { MoreHorizontal } from 'lucide-react';
-import { useLayout } from '~/context/layout-provider';
-import { accountsQueryOptions, unmatchedCountQueryOptions } from '~/lib/queries';
-import { formatCents } from '~/lib/format';
-import type { AccountSummary } from '~/server/queries/accounts';
+import { useState } from 'react';
+import { NavGroup } from '~/components/layout/nav-group';
+import type { NavGroup as NavGroupData } from '~/components/layout/types';
+import { RenameAccountDialog } from '~/components/rename-account-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu';
 import {
   Sidebar,
   SidebarContent,
@@ -20,15 +25,10 @@ import {
   SidebarRail,
 } from '~/components/ui/sidebar';
 import { Skeleton } from '~/components/ui/skeleton';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu';
-import { NavGroup } from '~/components/layout/nav-group';
-import type { NavGroup as NavGroupData } from '~/components/layout/types';
-import { RenameAccountDialog } from '~/components/rename-account-dialog';
+import { useLayout } from '~/context/layout-provider';
+import { formatCents } from '~/lib/format';
+import { accountsQueryOptions, unmatchedCountQueryOptions } from '~/lib/queries';
+import type { AccountSummary } from '~/server/queries/accounts';
 
 // `/accounts/$accountId` is a dynamic route, so its href is built from a template string rather
 // than typed params. Same escape hatch as NavLink/NavCollapsible in ~/components/layout/types.

@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, Lock, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '~/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip';
-import { cn } from '~/lib/utils';
 import { formatCents, formatDate } from '~/lib/format';
-import { updateTransaction } from '~/server/transactions';
+import { cn } from '~/lib/utils';
 import type { TxPage, TxRow } from '~/server/queries/transactions';
+import { updateTransaction } from '~/server/transactions';
 import { TRANSACTIONS_GRID } from './columns';
 import { CategoryCombobox, PayeeCombobox } from './pickers';
 

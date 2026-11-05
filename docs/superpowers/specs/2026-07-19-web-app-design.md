@@ -18,7 +18,7 @@ payee/category data that `tx-payees` produces, and the first UI in this repo.
 
 These are deliberately excluded. Each is a coherent follow-up, not an oversight.
 
-- **Setting transfers.** An existing `transfer_bank_account_id` is *displayed* ("Transfer: BAC GT"),
+- **Setting transfers.** An existing `transfer_bank_account_id` is _displayed_ ("Transfer: BAC GT"),
   but nothing in the UI writes it. YNAB puts "To/From ⟨account⟩" entries in the payee dropdown; that
   is a v1.1 feature.
 - **Manage Payees.** Renaming/merging across the 685 payees is its own screen.
@@ -37,7 +37,7 @@ scraped month by comparing that same five-column natural key in JS and deleting 
 longer sees on the bank site.
 
 So editing any of those five columns from the UI would, on the next scrape of that month, re-insert
-the original row as a duplicate *and* delete the edited one. The single existing escape hatch is
+the original row as a duplicate _and_ delete the edited one. The single existing escape hatch is
 `if (currentTx.reconcile) return false`.
 
 **Therefore v1 writes only columns outside that key:** `payee_id`, `category_id`, and the new
@@ -52,11 +52,11 @@ scraper's delete pass and upsert both honor. Both are viable; neither is worth i
 
 All additive; one migration in `@bank-bots/db`.
 
-| Change | Rationale |
-| --- | --- |
-| `bank_account.name text` (nullable) | The rename target. UI falls back to `bank_key` + `account_number` when null. |
+| Change                                            | Rationale                                                                                                                                                                                                                                          |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bank_account.name text` (nullable)               | The rename target. UI falls back to `bank_key` + `account_number` when null.                                                                                                                                                                       |
 | `index bank_tx_date_id_idx on bank_tx (date, id)` | **Required.** `bank_tx` has only `bank_tx_pkey` and `bank_tx_unique_cols` today; the latter leads with `bank_account_id` and cannot serve `ORDER BY date DESC, id DESC`. Plain ASC suffices — Postgres reads it backward and keeps the index seek. |
-| `bank_tx.memo text` (nullable) | Lets the owner annotate a transaction without touching `description`, which is part of the natural key. |
+| `bank_tx.memo text` (nullable)                    | Lets the owner annotate a transaction without touching `description`, which is part of the natural key.                                                                                                                                            |
 
 ## Architecture
 
@@ -88,7 +88,7 @@ SSR renders **layout and skeletons only**. No route loader fetches transaction d
 client-side through TanStack Query, so the first paint is the sidebar plus a skeleton table and the
 data streams in after hydration.
 
-The one thing that *is* read on the server is the cookie-backed chrome state (theme, sidebar
+The one thing that _is_ read on the server is the cookie-backed chrome state (theme, sidebar
 collapsed, layout variant), passed down from the root route as props — see "Template port" for why.
 
 ### Data access
@@ -146,7 +146,7 @@ There is no upstream TanStack Start version, so this is a subset vendor, not a f
 
 **Not taken, though initially planned:** `components/data-table/*` and `hooks/use-table-url-state.ts`.
 Both exist to map TanStack Table's client-side pagination/filter state to URL params. This list
-paginates and filters *server-side* and renders through a virtualizer, so a `<tr>`-based table row
+paginates and filters _server-side_ and renders through a virtualizer, so a `<tr>`-based table row
 model buys nothing — the list is built directly on shadcn `Table` primitives with a CSS-grid row
 layout (virtualized rows can't participate in native table layout). Filter state is held in
 TanStack Router `validateSearch` schemas read via `useSearch`/`useNavigate`. `@tanstack/react-table`
@@ -184,13 +184,13 @@ cookies, all guarded with `typeof document === 'undefined'` — and `use-mobile.
 
 Routes under a single layout route that renders the sidebar.
 
-| Route | Content |
-| --- | --- |
-| `/` | Overview: balance cards per account, total, unmatched count. The smallest screen; trimmable. |
-| `/accounts` | All Accounts transactions list. |
-| `/accounts/$accountId` | One account's transactions, plus rename. |
-| `/unmatched` | Same list, `payee_id is null` (696 rows today). |
-| `/payees` | 685 payees with transaction counts; click through to that payee's transactions. |
+| Route                  | Content                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------- |
+| `/`                    | Overview: balance cards per account, total, unmatched count. The smallest screen; trimmable. |
+| `/accounts`            | All Accounts transactions list.                                                              |
+| `/accounts/$accountId` | One account's transactions, plus rename.                                                     |
+| `/unmatched`           | Same list, `payee_id is null` (696 rows today).                                              |
+| `/payees`              | 685 payees with transaction counts; click through to that payee's transactions.              |
 
 ### Sidebar
 

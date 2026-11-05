@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from '~/replica-db/replica-schema';
 import { testRegex } from '~/payee-resolver/ai/read-tools';
 import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import * as schema from '~/replica-db/replica-schema';
 
 function makeReplica() {
   const sqlite = new Database(':memory:');

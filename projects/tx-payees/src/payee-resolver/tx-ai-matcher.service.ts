@@ -1,19 +1,19 @@
+import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
-import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { eq } from 'drizzle-orm';
 import { idleTimeoutMs } from '~/agent/agent-config';
 import { AgentModels } from '~/agent/agent-models.service';
 import { runStructuredAgent } from '~/agent/structured-agent';
-import { bankTx, category, payee } from '~/replica-db/replica-schema';
-import { ReplicaDb } from '~/replica-db/replica-db.service';
 import { ReplicaSettled } from '~/events/replica-settled.service';
 import { OwnerLocationService } from '~/owner-location/owner-location.service';
-import { TxAiResolver, type MatchOutcome, type MatchableTx } from '~/payee-resolver/match-outcome';
+import { Answer } from '~/payee-resolver/ai/output-schema';
+import { SYSTEM_PROMPT, buildCategoryList, buildUserPrompt } from '~/payee-resolver/ai/prompt';
 import { buildReadTools } from '~/payee-resolver/ai/read-tools';
 import { buildWriteTools } from '~/payee-resolver/ai/write-tools';
-import { SYSTEM_PROMPT, buildCategoryList, buildUserPrompt } from '~/payee-resolver/ai/prompt';
-import { Answer } from '~/payee-resolver/ai/output-schema';
+import { TxAiResolver, type MatchOutcome, type MatchableTx } from '~/payee-resolver/match-outcome';
+import { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, category, payee } from '~/replica-db/replica-schema';
 
 const MAX_TURNS = 25;
 

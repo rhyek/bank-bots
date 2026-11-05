@@ -13,5 +13,3 @@ declare module '@rhyek/nestjs-utils' {
     description?: string;
   }
 }
-
-export {};

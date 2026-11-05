@@ -27,11 +27,13 @@
 ### Task 1: Replace `new-tx` with `row-persisted`
 
 **Files:**
+
 - Modify: `projects/tx-payees/src/events/app-events.ts`
 - Modify: `projects/tx-payees/src/replica-sync/replica-sync.service.ts`
 - Modify: `projects/tx-payees/src/payee-resolver/payee-resolver.service.ts`
 
 **Interfaces:**
+
 - Produces: `AppEventData['replica-sync.row-persisted'] = { table: string; op: 'insert' | 'update' | 'delete'; id: string }`
 
 - [ ] **Step 1: Change the event map**
@@ -58,8 +60,11 @@ if (evt.op === 'delete') {
 } else {
   const [row] = await pgDb.select().from(t.pg).where(pgEq(t.pg.id, id));
   if (!row) return;
-  this.replica.db.insert(t.lite).values(row)
-    .onConflictDoUpdate({ target: t.lite.id, set: this.excludedSet(t.lite) }).run();
+  this.replica.db
+    .insert(t.lite)
+    .values(row)
+    .onConflictDoUpdate({ target: t.lite.id, set: this.excludedSet(t.lite) })
+    .run();
   void this.events.emit('replica-sync.row-persisted', {
     table: evt.table,
     op: evt.op === 'insert' ? 'insert' : 'update',
@@ -93,28 +98,40 @@ grep -rn "new-tx" projects/tx-payees/src   # expect no matches
 ### Task 2: `matcher_result` table, migration, replication
 
 **Files:**
+
 - Modify: `projects/db/src/schema.ts`, `projects/db/src/index.ts`
 - Create: `projects/db/drizzle/0010_matcher_result.sql`
 - Modify: `projects/tx-payees/src/replica-db/replica-schema.ts`, `replica-db.service.ts`, `replica-sync.service.ts`
 
 **Interfaces:**
+
 - Produces: `matcherResult` Drizzle table exported from `@bank-bots/db` and from the replica schema.
 
 - [ ] **Step 1: Add the Postgres table**
 
 ```ts
-export const matcherResult = pgTable('matcher_result', {
-  id: uuid().primaryKey().$defaultFn(uuidv7),
-  bankTxId: uuid('bank_tx_id').notNull().references(() => bankTx.id, { onDelete: 'cascade' }),
-  type: text().notNull(),
-  payeeId: text('payee_id').references(() => payee.id),
-  categoryId: text('category_id').references(() => category.id),
-  sourceTxId: uuid('source_tx_id').references(() => bankTx.id),
-  matchingRuleId: uuid('matching_rule_id').references(() => matchingRule.id),
-  data: jsonb(),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [index('matcher_result_bank_tx_id_idx').on(table.bankTxId)]);
+export const matcherResult = pgTable(
+  'matcher_result',
+  {
+    id: uuid().primaryKey().$defaultFn(uuidv7),
+    bankTxId: uuid('bank_tx_id')
+      .notNull()
+      .references(() => bankTx.id, { onDelete: 'cascade' }),
+    type: text().notNull(),
+    payeeId: text('payee_id').references(() => payee.id),
+    categoryId: text('category_id').references(() => category.id),
+    sourceTxId: uuid('source_tx_id').references(() => bankTx.id),
+    matchingRuleId: uuid('matching_rule_id').references(() => matchingRule.id),
+    data: jsonb(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index('matcher_result_bank_tx_id_idx').on(table.bankTxId)],
+);
 ```
 
 Export it from `projects/db/src/index.ts`.
@@ -145,11 +162,13 @@ set -a; . ./.env.local; set +a; psql "$DATABASE_URL" -c '\d matcher_result'
 ### Task 3: `ReplicaSettled`
 
 **Files:**
+
 - Create: `projects/tx-payees/src/events/replica-settled.service.ts`
 - Create: `projects/tx-payees/src/events/replica-settled.service.test.ts`
 - Modify: `projects/tx-payees/src/events/events.module.ts`
 
 **Interfaces:**
+
 - Produces: `ReplicaSettled.around<T>(table: string, id: string, write: () => Promise<T>): Promise<T>`
 
 - [ ] **Step 1: Write the failing tests**
@@ -159,15 +178,22 @@ test('resolves when the matching row-persisted event fires', async () => {
   const events = new AppEvents();
   const settled = new ReplicaSettled(events);
   const out = await settled.around('payee', 'p1', async () => {
-    setTimeout(() => void events.emit('replica-sync.row-persisted',
-      { table: 'payee', op: 'insert', id: 'p1' }), 5);
+    setTimeout(
+      () =>
+        void events.emit('replica-sync.row-persisted', { table: 'payee', op: 'insert', id: 'p1' }),
+      5,
+    );
     return 'ok';
   });
   assert.equal(out, 'ok');
 });
 
-test('ignores events for a different table or id', async () => { /* emit payee/p2 then payee/p1 */ });
-test('resolves on timeout instead of throwing', async () => { /* never emit; assert it returns */ });
+test('ignores events for a different table or id', async () => {
+  /* emit payee/p2 then payee/p1 */
+});
+test('resolves on timeout instead of throwing', async () => {
+  /* never emit; assert it returns */
+});
 test('listens before the write runs', async () => {
   // emit synchronously from inside the write callback; it must still be observed
 });
@@ -192,7 +218,9 @@ export class ReplicaSettled {
    */
   async around<T>(table: string, id: string, write: () => Promise<T>): Promise<T> {
     let settle!: () => void;
-    const landed = new Promise<void>((resolve) => { settle = resolve; });
+    const landed = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
     const off = this.events.on('replica-sync.row-persisted', ({ data }) => {
       if (data.table === table && data.id === id) settle();
     });
@@ -208,7 +236,9 @@ export class ReplicaSettled {
   private timeout(table: string, id: string): Promise<void> {
     return new Promise((resolve) =>
       setTimeout(() => {
-        this.logger.warn(`replica did not confirm ${table}#${id} in ${this.timeoutMs}ms; continuing`);
+        this.logger.warn(
+          `replica did not confirm ${table}#${id} in ${this.timeoutMs}ms; continuing`,
+        );
         resolve();
       }, this.timeoutMs).unref(),
     );
@@ -225,16 +255,25 @@ Provide and export it from `EventsModule` (already `@Global`).
 ### Task 4: `matcher_result` persistence + `none` skip
 
 **Files:**
+
 - Create: `projects/tx-payees/src/payee-resolver/matcher-result.service.ts`
 - Modify: `projects/tx-payees/src/payee-resolver/tx-matcher.service.ts`
 - Modify: `projects/tx-payees/src/payee-resolver/payee-resolver.service.ts`
 - Modify: `projects/tx-payees/src/payee-resolver/tx-matcher.service.test.ts`
 
 **Interfaces:**
+
 - Produces:
+
   ```ts
   type MatchOutcome =
-    | { type: 'exact' | 'rule'; payeeId: string; categoryId: string; sourceTxId: string; ruleId?: string }
+    | {
+        type: 'exact' | 'rule';
+        payeeId: string;
+        categoryId: string;
+        sourceTxId: string;
+        ruleId?: string;
+      }
     | { type: 'ai'; payeeId: string; categoryId: string; data: MatcherData }
     | { type: 'none'; data?: MatcherData };
   ```
@@ -273,10 +312,12 @@ Feedback-loop test: queue two transactions with identical descriptions; the stub
 ### Task 5: Read tools
 
 **Files:**
+
 - Create: `projects/tx-payees/src/payee-resolver/ai/read-tools.ts`
 - Create: `projects/tx-payees/src/payee-resolver/ai/read-tools.test.ts`
 
 **Interfaces:**
+
 - Produces: `buildReadTools(replica: ReplicaDb): SdkMcpToolDefinition[]` and `testRegex(replica, pattern): RegexReport`
 
 - [ ] **Step 1: Write failing tests for `testRegex`** — agreement counts, unmapped counts, overlap with existing rules, invalid pattern rejected, catastrophic backtracking rejected (budget exceeded), over-broad rejected (>30% of mapped descriptions).
@@ -294,10 +335,12 @@ Feedback-loop test: queue two transactions with identical descriptions; the stub
 ### Task 6: Write tools
 
 **Files:**
+
 - Create: `projects/tx-payees/src/payee-resolver/ai/write-tools.ts`
 - Create: `projects/tx-payees/src/payee-resolver/ai/write-tools.test.ts`
 
 **Interfaces:**
+
 - Produces: `buildWriteTools(deps): { tools: SdkMcpToolDefinition[]; sideEffects: SideEffects }`
 
 - [ ] **Step 1: Write failing tests** — uuidv7 minted for new rows; `create_category` rejects an unknown `groupId`; `create_matching_rule` rejects an uncompilable pattern, a catastrophically slow one, and an over-broad one; side effects are recorded.
@@ -315,12 +358,14 @@ Four tools, each `await settle.around(table, id, () => pgDb…)`. Rule-writing t
 ### Task 7: `TxAiMatcher` + prompt + third tier
 
 **Files:**
+
 - Create: `projects/tx-payees/src/payee-resolver/ai/prompt.ts`
 - Create: `projects/tx-payees/src/payee-resolver/ai/output-schema.ts`
 - Create: `projects/tx-payees/src/payee-resolver/tx-ai-matcher.service.ts`
 - Modify: `projects/tx-payees/src/payee-resolver/tx-matcher.service.ts`, `payee-resolver.module.ts`, `package.json`
 
 **Interfaces:**
+
 - Consumes: `buildReadTools`, `buildWriteTools`, `ReplicaSettled`
 - Produces: `TxAiMatcher.resolve(tx: MatchableTx): Promise<MatchOutcome>`
 
@@ -360,6 +405,7 @@ Build the in-process MCP server from the read + write tools, run `query()` with 
 ### Task 8: Docs and live verification
 
 **Files:**
+
 - Modify: `projects/tx-payees/CLAUDE.md`, `CLAUDE.md`
 
 - [ ] **Step 1: Update `projects/tx-payees/CLAUDE.md`** — third tier, tool surface, read/write split, `matcher_result`, manual-retry SQL, new env vars, `row-persisted` replacing `new-tx` in the event table, and correct the "inserts-only" rationale (the `payeeId` check prevents the loop, not the emitter's filter).

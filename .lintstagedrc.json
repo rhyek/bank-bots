@@ -1,6 +1,4 @@
 {
-  "*.{ts,tsx}": [
-    "prettier --write",
-    "eslint --concurrency=auto --fix --max-warnings=0 --no-warn-ignored"
-  ]
+  "*": ["oxfmt --no-error-on-unmatched-pattern"],
+  "*.{ts,tsx}": ["oxlint --fix --deny-warnings --no-error-on-unmatched-pattern"]
 }

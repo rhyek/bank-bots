@@ -1,5 +1,11 @@
 export type TimeWindow =
-  'this-month' | 'last-month' | 'last-3-months' | 'this-year' | 'last-year' | 'all' | 'custom';
+  | 'this-month'
+  | 'last-month'
+  | 'last-3-months'
+  | 'this-year'
+  | 'last-year'
+  | 'all'
+  | 'custom';
 
 export type TxFilters = {
   accountId?: string;

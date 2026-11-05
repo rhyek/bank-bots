@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { cn } from '~/lib/utils';
 import { Separator } from '~/components/ui/separator';
 import { SidebarTrigger } from '~/components/ui/sidebar';
+import { cn } from '~/lib/utils';
 
 type HeaderProps = React.HTMLAttributes<HTMLElement> & {
   fixed?: boolean;

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { StructuredLoggerService } from '@rhyek/nestjs-utils';
 import { and, eq, isNotNull, ne, sql, type SQL } from 'drizzle-orm';
-import { bankTx, matchingRule } from '~/replica-db/replica-schema';
-import { ReplicaDb } from '~/replica-db/replica-db.service';
 import { TxAiResolver, type MatchOutcome, type MatchableTx } from '~/payee-resolver/match-outcome';
+import { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, matchingRule } from '~/replica-db/replica-schema';
 
 export type { MatchableTx, MatchOutcome } from '~/payee-resolver/match-outcome';
 

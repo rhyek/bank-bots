@@ -1,6 +1,6 @@
-import { cn } from '~/lib/utils';
-import { formatCents } from '~/lib/format';
 import { Skeleton } from '~/components/ui/skeleton';
+import { formatCents } from '~/lib/format';
+import { cn } from '~/lib/utils';
 import type { MonthSummary, SpendingBucket } from '~/server/queries/spending';
 
 /**

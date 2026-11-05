@@ -8,10 +8,10 @@ import {
   type PayeeLocationAnswer,
   type PayeeLocationInput,
 } from '~/payee-location/payee-location-matcher';
-import { PayeeLocationService } from '~/payee-location/payee-location.service';
 import type { PayeeLocationWriter } from '~/payee-location/payee-location-writer';
-import { payee } from '~/replica-db/replica-schema';
+import { PayeeLocationService } from '~/payee-location/payee-location.service';
 import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import { payee } from '~/replica-db/replica-schema';
 import { addPayee, addTx, makeReplica } from '~/testing/replica';
 
 const answer = (over: Partial<PayeeLocationAnswer>): PayeeLocationAnswer => ({

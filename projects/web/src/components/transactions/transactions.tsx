@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { cn } from '~/lib/utils';
-import type { TxFilters } from '~/lib/filters';
-import { listTransactions } from '~/server/transactions';
+import { useEffect, useRef, useState } from 'react';
 import { Skeleton } from '~/components/ui/skeleton';
-import { TransactionRow } from './transaction-row';
-import { RowEditor } from './row-editor';
+import type { TxFilters } from '~/lib/filters';
+import { cn } from '~/lib/utils';
+import { listTransactions } from '~/server/transactions';
 import { HEADER_HEIGHT, TRANSACTIONS_GRID, TRANSACTIONS_MIN_WIDTH, ROW_HEIGHT } from './columns';
+import { RowEditor } from './row-editor';
+import { TransactionRow } from './transaction-row';
 
 type TransactionsProps = {
   filters: TxFilters;

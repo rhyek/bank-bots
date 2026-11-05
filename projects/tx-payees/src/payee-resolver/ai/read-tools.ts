@@ -1,8 +1,11 @@
+// The SDK takes a handler that returns a promise: an `async` one, even with nothing to await, turns
+// a throw into the rejection the SDK reports to the agent.
+/* oxlint-disable typescript/require-await */
 import { tool } from '@anthropic-ai/claude-agent-sdk';
-import { z } from 'zod';
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
-import { bankTx, category, matchingRule, payee } from '~/replica-db/replica-schema';
+import { z } from 'zod';
 import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, category, matchingRule, payee } from '~/replica-db/replica-schema';
 
 /** How many descriptions a candidate pattern is timed against, and the budget it must fit in. */
 const REDOS_SAMPLE = 200;

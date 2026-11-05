@@ -2,8 +2,8 @@ import { queryOptions } from '@tanstack/react-query';
 import { listAccounts } from '~/server/accounts';
 import { listCategories, listPayees } from '~/server/lookups';
 import { listPayeeSummaries, unmatchedCount } from '~/server/payees';
-import { listBucketTransactions, monthSummary } from '~/server/spending';
 import type { SpendingBucket } from '~/server/queries/spending';
+import { listBucketTransactions, monthSummary } from '~/server/spending';
 
 export function accountsQueryOptions() {
   return queryOptions({

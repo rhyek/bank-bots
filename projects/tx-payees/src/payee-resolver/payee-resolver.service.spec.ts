@@ -15,8 +15,8 @@ import { TxAiResolver, type MatchOutcome, type MatchableTx } from '~/payee-resol
 import type { MatchWriter } from '~/payee-resolver/match-writer.service';
 import { PayeeResolver } from '~/payee-resolver/payee-resolver.service';
 import { TxMatcher } from '~/payee-resolver/tx-matcher.service';
-import { bankTx, matcherResult, payee } from '~/replica-db/replica-schema';
 import type { ReplicaDb } from '~/replica-db/replica-db.service';
+import { bankTx, matcherResult, payee } from '~/replica-db/replica-schema';
 import { addPayee, addResult, addTx, makeReplica, nextId } from '~/testing/replica';
 
 const LA_TORRE = 'LA TORRE ZONA 14         GUATE';
