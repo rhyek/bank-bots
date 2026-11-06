@@ -24,6 +24,10 @@ export default defineConfig({
     rootDomain: ({ envs }) => envs.ROOT_DOMAIN,
     port: ({ envs }) => Number(envs.DEV_REVERSE_PROXY_PORT),
   },
+  // Caddy serves the root on 443, so that is where a routed service is reached; devtooie can't
+  // see it on its own.
+  publicOrigin: ({ service }) =>
+    service.proxy ? `https://${service.proxy.host}` : `http://localhost:${service.port}`,
   serviceRootDir: 'projects',
   services: {
     web: {
